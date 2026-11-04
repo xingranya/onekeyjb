@@ -3,7 +3,7 @@
 OnePlus 16（PYB110 / 6.18.21）与 OnePlus Ace 7 Pro（PMS110 / 6.12.69）的一键越狱 App。
 稳定链 CVE-2026-64560，实验链 CVE-2026-98260；内置 KernelSU 系管理器适配、云端模块与在线更新。
 
-- 当前版本：**2.17.17（versionCode 165）**
+- 当前版本：**2.18.0（versionCode 167）**
 - 产物：`artifacts/OneKeyJB-v2.17.16.apk`
 - 发布源：`https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/`
 
@@ -43,6 +43,7 @@ OnePlus 16（PYB110 / 6.18.21）与 OnePlus Ace 7 Pro（PMS110 / 6.12.69）的�
 | `07-故障排查.md` | 报错对照表、日志标记、诊断命令 |
 | `08-UI与交互规范.md` | 页面结构、组件规格、文案基调 |
 | `09-新系统17.0.1.201适配.md` | 新 OTA 的内核变化、符号表重导、哪些必须真机 |
+| `10-98260执行引擎.md` | 引擎调用协议、五个拓展开关、日志落盘、排障 |
 
 AI 导入用：`knowledge/ai-kb/onekey-kb.json`（段落式，44 段）、`knowledge/ai-kb/onekey-kb.docs.json`（整篇式，8 篇）。
 改完 Markdown 跑 `python3 knowledge/ai-kb/build_kb.py` 同步。
