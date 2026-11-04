@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "generated_at": "2026-11-04",
+  "modules": [
+    {
+      "manager": "official",
+      "version": 32680,
+      "name": "official-32680-c39431f6998806b8.ko",
+      "size": 385501,
+      "sha256": "b9bb10bb682dd19a9077ceea6ffbdeee7c3c2582ff2460eb7e3e356cef1cf9db",
+      "vermagic": "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
+      "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/official-32680-c39431f6998806b8.ko"
+    },
+    {
+      "manager": "next",
+      "version": 33355,
+      "name": "next-33355-c39431f6998806b8.ko",
+      "size": 492550,
+      "sha256": "8314de9a306ccc9810d93d3d120c6c51bf714008151c53e3e98c44e8d08dbff9",
+      "vermagic": "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
+      "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/next-33355-c39431f6998806b8.ko"
+    },
+    {
+      "manager": "bakasu",
+      "version": 35171,
+      "name": "bakasu-35171-c39431f6998806b8.ko",
+      "size": 439018,
+      "sha256": "d0a483ffa13cee835ebad1c0b7dc76f82934604515a836732c18cbccd37291d0",
+      "vermagic": "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
+      "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/bakasu-35171-c39431f6998806b8.ko"
+    },
+    {
+      "manager": "sukisu",
+      "version": 41140,
+      "name": "sukisu-41140-c39431f6998806b8.ko",
+      "size": 615254,
+      "sha256": "f6433df85e525f2ed1ee258fb18d48aa7210f3a690974e9365ddfd814244f335",
+      "vermagic": "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
+      "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/sukisu-41140-c39431f6998806b8.ko"
+    },
+    {
+      "manager": "finasu",
+      "version": 33167,
+      "name": "finasu-33167-c39431f6998806b8.ko",
+      "size": 549260,
+      "sha256": "6b7a9da8663410d144de793d374c8ae4110234766eab1d383512630face5a1c7",
+      "vermagic": "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
+      "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/finasu-33167-c39431f6998806b8.ko"
+    }
+  ]
+}

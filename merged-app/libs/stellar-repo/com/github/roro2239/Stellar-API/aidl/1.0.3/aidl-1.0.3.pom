@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <!-- do_not_remove: published-with-gradle-metadata -->
+<modelVersion>4.0.0</modelVersion>
+  <groupId>com.github.roro2239.Stellar-API</groupId>
+  <artifactId>aidl</artifactId>
+  <version>1.0.3</version>
+  <packaging>aar</packaging>
+  <name>Stellar API</name>
+  <description>Stellar privileged API framework based on Shizuku</description>
+  <url>https://github.com/roro2239/Stellar-API</url>
+  <inceptionYear>2026</inceptionYear>
+  <licenses>
+    <license>
+      <name>GNU General Public License v3.0</name>
+      <url>https://www.gnu.org/licenses/gpl-3.0.html</url>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <id>rorostudio</id>
+      <name>RoRo Studio</name>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:git://github.com/roro2239/Stellar-API.git</connection>
+    <developerConnection>scm:git:ssh://github.com/roro2239/Stellar-API.git</developerConnection>
+    <url>https://github.com/roro2239/Stellar-API</url>
+  </scm>
+</project>

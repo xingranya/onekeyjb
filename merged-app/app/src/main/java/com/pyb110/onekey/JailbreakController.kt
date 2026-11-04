@@ -1,0 +1,879 @@
+package com.pyb110.onekey
+
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.setValue
+import dev.onekey.jb.ShizukuShell
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import roro.stellar.Stellar
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+data class ManagerOption(
+    val kind: String,
+    val label: String,
+    val pkg: String,
+    val installedVersion: String?,
+    val expectedVersionCode: Int,
+    val installedVersionCode: Int?,
+    val statusText: String,
+    val supported: Boolean,
+    val certOk: Boolean
+)
+
+object RunState {
+    @Volatile var active: Boolean = false
+}
+
+class JailbreakController private constructor(private val context: Context) {
+    companion object {
+        @Volatile private var shared: JailbreakController? = null
+        fun get(context: Context): JailbreakController =
+            shared ?: synchronized(this) {
+                shared ?: JailbreakController(context.applicationContext).also { shared = it }
+            }
+    }
+
+    private val prefs = context.getSharedPreferences("merged", Context.MODE_PRIVATE)
+    private val legacyPrefs = context.getSharedPreferences("onekey", Context.MODE_PRIVATE)
+    private val scope = CoroutineScope(Dispatchers.IO)
+    private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.US)
+    private val expectedCert = mapOf(
+        "next" to "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
+        "kernelsu" to "c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6",
+        "sukisu" to "947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef",
+        "bakasu" to "d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64",
+        "finasu" to "2d89b50aaf1db013c2b6738f973f48b62ea21a3a8d7216bfec3521065d448458",
+    )
+
+
+    val profile: DeviceProfile? = DeviceProfiles.current()
+    var platformReason: String? by mutableStateOf(null); private set
+    var managers: List<ManagerOption> by mutableStateOf(emptyList()); private set
+    var selectedManager: String by mutableStateOf(loadSelectedManager()); private set
+    var adaptiveManagerEnabled: Boolean by mutableStateOf(prefs.getBoolean("adaptive_manager", true)); private set
+    var exploitKind: String by mutableStateOf(loadExploitKind()); private set
+    var runtimeAdapter: RuntimeExtractor.Adapter? by mutableStateOf(null); private set
+    var preparing: Boolean by mutableStateOf(false); private set
+    var antiRootGuard: Boolean by mutableStateOf(prefs.getBoolean("antiroot", true)); private set
+    var cloudAuto: Boolean by mutableStateOf(prefs.getBoolean("cloud_auto", true)); private set
+    var updateStatus: String by mutableStateOf("尚未检查更新"); private set
+    var checkingUpdate: Boolean by mutableStateOf(false); private set
+    var defaultSuCompat: Boolean by mutableStateOf(false); private set
+    /** ColorOS 17 安全机制会拦截原生内核调用；越狱后软重启用户态可恢复 su（内核 LKM 保持加载）。 */
+    var softRebootFix: Boolean by mutableStateOf(prefs.getBoolean("soft_reboot_fix", true)); private set
+    var running: Boolean by mutableStateOf(false); private set
+    var elapsedSeconds: Long by mutableStateOf(0L); private set
+    var progress: Float by mutableStateOf(0f); private set
+    var stage: String by mutableStateOf("就绪"); private set
+    var logs: List<String> by mutableStateOf(emptyList()); private set
+    var deviceInfo: String by mutableStateOf(""); private set
+    var serviceReady: Boolean by mutableStateOf(false); private set
+    var serviceGranted: Boolean by mutableStateOf(false); private set
+    var lastResultOk: Boolean? by mutableStateOf(null); private set
+    var lastResultExploitKind: String? by mutableStateOf(null); private set
+    var suCompatReady: Boolean by mutableStateOf(false); private set
+
+    private var autoRepairTried = false
+
+    private val binderListener = Stellar.OnBinderReceivedListener {
+        serviceReady = StellarShell.available()
+        serviceGranted = StellarShell.hasPermission()
+        if (serviceReady) {
+            addLog("Stellar 服务已连接")
+            scope.launch { cleanupStaleExecutor() }
+        }
+    }
+    private val deadListener = Stellar.OnBinderDeadListener {
+        serviceReady = false; serviceGranted = false; addLog("Stellar 服务已断开")
+    }
+    private val permissionListener = Stellar.OnRequestPermissionResultListener { code, granted, _ ->
+        serviceGranted = granted
+        addLog(if (granted) "Stellar 权限已授予" else "Stellar 权限被拒绝")
+    }
+
+    init {
+        HistoryStore.attach(context)
+        runCatching {
+            Stellar.addBinderReceivedListenerSticky(binderListener, null)
+            Stellar.addBinderDeadListener(deadListener, null)
+            Stellar.addRequestPermissionResultListener(permissionListener, null)
+        }
+        serviceReady = StellarShell.available()
+        serviceGranted = StellarShell.hasPermission()
+        refreshState()
+        scope.launch {
+            snapshotFlow { stage to progress }.collect { (s, p) ->
+                if (running) runCatching { JailbreakRunService.update(context, s, p) }
+            }
+        }
+    }
+
+    private fun loadExploitKind(): String {
+        if (profile != null && !profile.supportsStable) return "cve98260"
+        val saved = prefs.getString("exploit_kind", "cve64560")
+        return if (saved == "cve98260") "cve98260" else "cve64560"
+    }
+
+    fun updateExploitKind(kind: String) {
+        if (running) return
+        if (profile != null && !profile.supportsStable && kind != "cve98260") {
+            addLog(profile.displayName + " 仅支持 98260 新链")
+            return
+        }
+        exploitKind = if (kind == "cve98260") "cve98260" else "cve64560"
+        prefs.edit().putString("exploit_kind", exploitKind).apply()
+        addLog(if (exploitKind == "cve98260") "已切到 98260 实验链：仅临时 root，不加载管理器" else "已切回 64560 稳定越狱链")
+    }
+
+    init {
+        platformReason = SecurityCheck.reason(context)
+    }
+
+    private fun loadSelectedManager(): String {
+        val saved = prefs.getString("manager", null)
+        if (saved != null) return saved
+        val legacy = legacyPrefs.getString("manager", null)
+        return when (legacy) {
+            "ksu" -> "next"
+            "sukisu" -> "sukisu"
+            else -> "next"
+        }
+    }
+
+    fun refreshState() {
+        serviceReady = StellarShell.available()
+        serviceGranted = StellarShell.hasPermission()
+        if (!RunState.active && lockFile().isFile()) {
+            lockFile().delete()
+            addLog("已清理上次中断留下的运行锁，可直接重试")
+        }
+        managers = buildManagers()
+        platformReason = SecurityCheck.reason(context)
+        if (adaptiveManagerEnabled) {
+            val valid = managers.filter { it.supported && it.installedVersionCode != null && it.certOk }
+            if (valid.none { it.kind == selectedManager }) {
+                valid.firstOrNull()?.let { selectedManager = it.kind }
+            }
+        }
+        scope.launch {
+            runCatching {
+                // Never re-enable security components from status refresh; only Safer restores
+                // exactly what the current session disabled.
+                if (serviceReady) StellarShell.run("echo SECURITY_CHECKED", 10)
+            }
+            val kernel = System.getProperty("os.version") ?: "未知"
+            val selinux = if (serviceReady) StellarShell.run("getenforce", 10).output else "未知"
+            val mod = if (serviceReady) StellarShell.run("grep -i kernelsu /proc/modules | tr '\n' ' '", 10).output else ""
+            val overlay = if (serviceReady) StellarShell.run("grep -i onekey /proc/mounts 2>/dev/null | wc -l", 10).output else "0"
+            val nativeSu = if (serviceReady) StellarShell.run("timeout 6 su -c 'id -u' 2>/dev/null; true", 15).output.trim() else ""
+            val overlaySu = if (serviceReady) StellarShell.run("[ -x /system_ext/bin/su ] && grep -q su_compat /proc/mounts && echo READY || echo MISSING", 15).output else "MISSING"
+            suCompatReady = nativeSu == "0" || overlaySu.contains("READY")
+            deviceInfo = buildString {
+                append((profile?.model ?: "UNKNOWN") + " · Android ").append(Build.VERSION.RELEASE)
+                append(" · SELinux ").append(selinux)
+                append(" · 内核 ").append(kernel)
+                if (mod.isNotBlank()) append(" · 模块 ").append(mod.take(40))
+                append(" · 可见挂载 ").append(overlay.trim().ifBlank { "0" })
+            }
+        }
+    }
+
+
+    private data class PkgEntry(val pkg: String, val code: Int, val version: String?, val cert: String)
+
+    private fun signerCert(pi: android.content.pm.PackageInfo): String? = try {
+        val der = pi.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray() ?: return null
+        java.security.MessageDigest.getInstance("SHA-256").digest(der).joinToString("") { String.format("%02x", it) }
+    } catch (e: Throwable) { null }
+
+    private fun installedEntries(): List<PkgEntry> {
+        return try {
+            context.packageManager.getInstalledPackages(PackageManager.GET_SIGNING_CERTIFICATES).mapNotNull { pi ->
+                val cert = signerCert(pi) ?: return@mapNotNull null
+                val code = if (android.os.Build.VERSION.SDK_INT >= 28) pi.longVersionCode.toInt() else @Suppress("DEPRECATION") pi.versionCode
+                PkgEntry(pi.packageName, code, pi.versionName, cert)
+            }
+        } catch (e: Throwable) { emptyList() }
+    }
+
+    private fun buildManagers(): List<ManagerOption> {
+        val entries = installedEntries()
+        val byCert = entries.groupBy { it.cert }
+        val defs = listOf(
+            Triple("next", "KernelSU-Next", "com.rifsxd.ksunext") to 33355,
+            Triple("kernelsu", "KernelSU 官方", "me.weishu.kernelsu") to 32680,
+            Triple("sukisu", "SukiSU Ultra", "com.sukisu.ultra") to 41140,
+            Triple("bakasu", "BakaSU", "com.resukisu.resukisu") to 35171,
+            Triple("finasu", "FinaSU", "me.yuki.fina") to 33167,
+        )
+        return defs.map { (triple, expected) ->
+            val (kind, label, staticPkg) = triple
+            val cert = expectedCert[kind]
+            val candidates = if (cert == null) emptyList() else byCert[cert].orEmpty()
+            val chosen = when {
+                adaptiveManagerEnabled -> candidates.maxByOrNull { it.code }
+                else -> candidates.firstOrNull { it.code == expected } ?: candidates.maxByOrNull { it.code }
+            }
+            val pkg = chosen?.pkg ?: staticPkg
+            val installedCode = chosen?.code
+            val supported = true
+            val certOk = chosen != null && certSha256(pkg) == expectedCert[kind]
+            val status = when {
+                !supported -> "适配验证中，暂不可用"
+                kind == "finasu" && !adaptiveManagerEnabled -> "FinaSU 请开启自适应适配"
+                installedCode == null -> "未安装 · 请安装后再选择"
+                adaptiveManagerEnabled && !certOk -> "签名不匹配，已拒绝"
+                adaptiveManagerEnabled -> "已安装 " + (chosen?.version ?: "") + " · 可运行时适配"
+                installedCode != expected -> "版本不匹配：需要 " + expected + "，当前 " + installedCode
+                !certOk -> "签名不匹配，已拒绝"
+                else -> "已安装 · 版本与签名匹配"
+            }
+            ManagerOption(kind, label, pkg, chosen?.version, expected, installedCode, status, supported, certOk)
+        }
+    }
+
+    val visibleManagers: List<ManagerOption>
+        get() = if (adaptiveManagerEnabled) managers.filter { it.installedVersionCode != null } else managers
+
+    val canRunSelected: Boolean
+        get() = managers.firstOrNull { it.kind == selectedManager }?.let {
+            it.supported && it.installedVersionCode != null && it.certOk && (if (adaptiveManagerEnabled) true else it.installedVersionCode == it.expectedVersionCode)
+        } == true
+
+    val canRunExploit: Boolean
+        get() = !running && canRunSelected && platformReason == null
+
+    private fun installedVersionCode(pkg: String): Int? = try {
+        val info = context.packageManager.getPackageInfo(pkg, 0)
+        if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else @Suppress("DEPRECATION") info.versionCode
+    } catch (e: PackageManager.NameNotFoundException) { null }
+
+    private fun certSha256(pkg: String): String? = try {
+        val info = context.packageManager.getPackageInfo(pkg, PackageManager.GET_SIGNING_CERTIFICATES)
+        val signers = info.signingInfo?.apkContentsSigners ?: return null
+        val der = signers.firstOrNull()?.toByteArray() ?: return null
+        java.security.MessageDigest.getInstance("SHA-256").digest(der).joinToString("") { String.format("%02x", it) }
+    } catch (e: Exception) { null }
+
+    fun prepareRuntimeAdapter() {
+        if (preparing || running) return
+        val m = managers.firstOrNull { it.kind == selectedManager && it.installedVersionCode != null && it.certOk }
+            ?: managers.firstOrNull { it.installedVersionCode != null && it.certOk }
+            ?: run {
+                addLog("没有可准备的管理器"); return
+            }
+        if (m.installedVersionCode == null) { addLog("管理器未安装"); return }
+        preparing = true
+        addLog("开始读取 " + m.label + " 的实际 APK 并提取 6.18 模块…")
+        scope.launch {
+            try {
+                val cert = expectedCert[m.kind] ?: throw IllegalStateException("缺少管理器信任证书")
+                val a = if (m.kind == "finasu") RuntimeExtractor.prepareFina(context, m.pkg, cert) { addLog(it) } else RuntimeExtractor.prepare(context, m.pkg, m.kind, cert) { addLog(it) }
+                runtimeAdapter = a
+                addLog("准备完成：模块 " + a.moduleSize + " B，vermagic=" + a.vermagic)
+            } catch (e: Throwable) {
+                addLog("准备失败：" + e.message)
+            } finally {
+                preparing = false
+            }
+        }
+    }
+
+    fun updateAdaptiveManager(enabled: Boolean) {
+        if (running) { addLog("运行中不能切换自适应模式"); return }
+        adaptiveManagerEnabled = enabled
+        runtimeAdapter = null
+        managers = buildManagers()
+        prefs.edit().putBoolean("adaptive_manager", enabled).apply()
+        addLog(if (enabled) "已开启自适应管理器：只列出已安装的固定版本" else "已关闭自适应管理器：显示全部固定版本")
+    }
+
+    private fun installedVersion(pkg: String): String? = try {
+        context.packageManager.getPackageInfo(pkg, 0).versionName ?: "已安装"
+    } catch (e: PackageManager.NameNotFoundException) { null }
+
+    fun selectManager(kind: String) {
+        if (running) { addLog("运行中不能切换管理器"); return }
+        selectedManager = kind
+        prefs.edit().putString("manager", kind).apply()
+        addLog("已选择管理器: " + kind)
+    }
+
+    fun updateAntiRootGuard(enabled: Boolean) {
+        antiRootGuard = enabled
+        prefs.edit().putBoolean("antiroot", enabled).apply()
+        addLog(if (enabled) "已开启：越狱后临时禁用 ColorOS 安全弹窗" else "已关闭安全弹窗处理")
+    }
+
+    fun updateCloudAuto(enabled: Boolean) {
+        cloudAuto = enabled
+        prefs.edit().putBoolean("cloud_auto", enabled).apply()
+        addLog(if (enabled) "已开启自动匹配云端组件" else "已关闭自动匹配云端组件")
+    }
+
+    fun checkUpdates() {
+        if (checkingUpdate || running) return
+        checkingUpdate = true
+        updateStatus = "正在检查…"
+        scope.launch {
+            val app = runCatching { UpdateChecker.check(BuildConfig.VERSION_CODE) }.getOrNull()
+            val m = managers.firstOrNull { it.kind == selectedManager }
+            val installed = m?.installedVersionCode
+            val cloud = if (cloudAuto && installed != null) {
+                CloudComponents.inspect(selectedManager, installed, com.pyb110.onekey.ghost.device.KernelProbe.read().trim())
+            } else CloudComponents.Status("自动匹配已关闭或管理器未安装")
+            val text = (if (app != null) "App 有更新 " + app.versionName else "App 已是最新") + " · " + cloud.text
+            withContext(Dispatchers.Main) {
+                updateStatus = text
+                checkingUpdate = false
+                addLog("检查更新: " + text)
+            }
+        }
+    }
+
+    fun updateSoftRebootFix(enabled: Boolean) {
+        softRebootFix = enabled
+        prefs.edit().putBoolean("soft_reboot_fix", enabled).apply()
+        addLog(if (enabled) "已开启「越狱后软重启修复」：ColorOS 安全机制拦截时自动软重启恢复 su" else "已关闭「越狱后软重启修复」")
+    }
+
+    fun updateDefaultSuCompat(enabled: Boolean) {
+        defaultSuCompat = enabled
+        addLog(
+            if (enabled) "已开启「默认 SU 兼容」：下次越狱/修复会额外部署 /system_ext/bin/su（会多一个 su_compat 挂载，可被检测）"
+            else "已关闭「默认 SU 兼容」：完全使用内核原生 su，不创建任何挂载（推荐）"
+        )
+        if (!enabled) addLog("提示：如果之前开过兼容层，点一次「修复」即可清除现有挂载。")
+    }
+
+    private fun cleanupStaleExecutor() {
+        if (running) return
+        val r = ShizukuShell.run(
+            """su -c 'pkill -9 -f "onuce --plant" 2>/dev/null; true' 2>&1""", 20
+        )
+        if (r.output.isNotBlank()) addLog("已清理残留执行器")
+    }
+
+    fun requestUserSpaceReboot() {
+        if (running) { addLog("当前任务运行中，暂不执行用户态重启"); return }
+        addLog("用户手动请求用户态重启（内核模块保持加载）")
+        scope.launch {
+            val ok = RestartManager.request(context) { addLog(it) }
+            addLog(if (ok) "用户态重启请求已发送" else "用户态重启请求未发送或失败")
+        }
+    }
+
+    fun repairScreenshot() {
+        if (running) { addLog("当前任务运行中，暂不修复截屏"); return }
+        scope.launch {
+            val r = ScreenshotRepair.repair(::addLog)
+            stage = if (r.enabled) "截屏修复完成" else "截屏修复未完成"
+        }
+    }
+
+    fun restoreSecurityComponents() {
+        if (running) {
+            addLog("运行中不能恢复安全组件")
+            return
+        }
+        scope.launch {
+            if (!ensurePermission()) return@launch
+            addLog("开始恢复安全组件…")
+            val ok = Safer.restoreLast(::addLog)
+            addLog(if (ok) "安全组件恢复完成" else "没有可恢复的记录，或恢复未执行")
+        }
+    }
+
+    private val logLock = Any()
+
+    fun addLog(line: String) {
+        val stamped = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date()) + "  " + line
+        synchronized(logLock) {
+            val next = logs + stamped
+            logs = if (next.size > 3000) next.takeLast(3000) else next
+            runCatching { File(context.filesDir, "onekey-live.log").appendText(stamped + "\n") }
+            HistoryStore.append(stamped)
+        }
+    }
+
+    fun clearLogs() = synchronized(logLock) { logs = emptyList() }
+
+    private fun ensurePermission(): Boolean {
+        if (!StellarShell.available()) { addLog("Stellar 未运行：请先打开 Stellar 并通过无线调试启动服务"); return false }
+        if (StellarShell.hasPermission()) return true
+        addLog("请求 Stellar 权限…（弹窗请点允许）")
+        android.os.Handler(android.os.Looper.getMainLooper()).post { StellarShell.requestPermission(1001) }
+        for (i in 0 until 40) {
+            if (StellarShell.hasPermission()) { serviceGranted = true; addLog("Stellar 权限已授予"); return true }
+            try { Thread.sleep(500) } catch (_: InterruptedException) { return false }
+        }
+        addLog("等待 Stellar 权限超时，请手动授予后重试")
+        return false
+    }
+
+    private fun lockFile() = java.io.File(context.filesDir, "run.lock")
+
+    private fun acquireRunLock(): Boolean {
+        if (RunState.active) {
+            addLog("上一次运行尚未结束，请等待完成")
+            return false
+        }
+        val f = lockFile()
+        // 进程重启/设备重启后，本进程没有活动运行，旧锁一律视为陈旧并清理。
+        if (f.isFile()) f.delete()
+        return try {
+            f.writeText(System.currentTimeMillis().toString())
+            RunState.active = true
+            true
+        } catch (e: Exception) { false }
+    }
+
+    private fun releaseRunLock() {
+        RunState.active = false
+        runCatching { lockFile().delete() }
+    }
+
+    fun runJailbreak() {
+        if (running) return
+        platformReason = SecurityCheck.reason(context)
+        if (platformReason != null) {
+            addLog("设备、内核或签名校验失败：" + platformReason)
+            return
+        }
+        if (!canRunSelected) {
+            addLog("当前选择的管理器未安装或版本不匹配，已拒绝开始；请安装固定版本后重试")
+            return
+        }
+        if (profile != null && !profile.supportsStable) {
+            exploitKind = "cve98260"
+        }
+        if (exploitKind == "cve98260") {
+            runInfinity98260()
+            return
+        }
+        if (!acquireRunLock()) return
+        running = true
+        lastResultExploitKind = exploitKind
+        val runAdaptive = adaptiveManagerEnabled
+        val runKind = selectedManager
+        runCatching { JailbreakRunService.start(context) }
+        progress = 0.01f
+        stage = "检查 Stellar 服务"
+        elapsedSeconds = 0L
+        lastResultOk = null
+        logs = emptyList()
+        HistoryStore.start(context, exploitKind, runKind, runAdaptive, BuildConfig.VERSION_NAME)
+        addLog("========== OneKey · " + (profile?.displayName ?: "OnePlus") + " · v" + BuildConfig.VERSION_NAME + " ==========")
+        val t0 = System.currentTimeMillis()
+        scope.launch { while (running) { elapsedSeconds = (System.currentTimeMillis() - t0) / 1000L; delay(1000L) } }
+        scope.launch {
+            var ok = false
+            try {
+                if (!ensurePermission()) { stage = "未获得权限"; return@launch }
+                progress = 0.02f
+                var adapter = if (runAdaptive) runtimeAdapter else null
+                val chosen = managers.firstOrNull { it.kind == runKind } ?: run {
+                    addLog("选择的管理器已不在列表中，已停止")
+                    return@launch
+                }
+                if (runAdaptive && (adapter == null || adapter.pkg != chosen.pkg || adapter.versionCode != chosen.installedVersionCode)) {
+                    preparing = true
+                    stage = "读取管理器 APK 并提取模块"
+                    addLog("开始运行时适配：" + selectedManager)
+                    adapter = try {
+                        if (runKind == "finasu") {
+                            RuntimeExtractor.prepareFina(context, chosen.pkg, expectedCert[runKind] ?: throw IllegalStateException("缺少管理器信任证书")) { addLog(it) }
+                                .also { runtimeAdapter = it }
+                        } else {
+                            RuntimeExtractor.prepare(context, chosen.pkg, runKind, expectedCert[runKind] ?: throw IllegalStateException("缺少管理器信任证书")) { addLog(it) }
+                                .also { runtimeAdapter = it }
+                        }
+                    } catch (e: Throwable) {
+                        if (runKind == "finasu") {
+                            addLog("FinaSU 提取失败，改用内置兼容组件：" + e.message)
+                            runtimeAdapter = null
+                            null
+                        } else {
+                            addLog("适配失败，已停止：" + e.message)
+                            preparing = false
+                            stage = "适配失败"
+                            return@launch
+                        }
+                    } finally { preparing = false }
+                }
+                val engine = StableEngine(
+                    context,
+                    logSink = { line -> addLog(line) },
+                    stageSink = { title -> stage = title; HistoryStore.updateStage(title) },
+                    progressSink = { pct -> if (pct >= 100) progress = 1f else progress = pct / 100f }
+                )
+                ok = engine.run(runKind, antiRootGuard, defaultSuCompat, softRebootFix, adapter, chosen.pkg)
+            } catch (e: Throwable) {
+                addLog("异常: " + e)
+                ok = false
+            } finally {
+                running = false
+                runCatching {
+                    JailbreakRunService.update(context, if (ok) "完成" else "未完成", if (ok) 1f else progress)
+                }
+                if (ok) {
+                    scope.launch { kotlinx.coroutines.delay(3000); runCatching { JailbreakRunService.stop(context) } }
+                } else {
+                    runCatching { JailbreakRunService.stop(context) }
+                }
+                releaseRunLock()
+                lastResultOk = ok
+                lastResultExploitKind = exploitKind
+                if (ok) hardenAfterSuccess()
+                stage = if (ok) "越狱完成" else "未完成，请查看日志"
+                if (ok) progress = 1f
+                if (ok && softRebootFix) {
+                    addLog("ColorOS 17 安全机制修复：约 10 秒后软重启 Android 用户态（LKM 保持加载）。")
+                    addLog("软重启完成后重新打开本应用即可，不需要重新越狱。")
+                }
+                persistLogs()
+                if (serviceReady) {
+                    val nativeSu = StellarShell.run("timeout 6 su -c 'id -u' 2>/dev/null; true", 15).output.trim()
+                    val overlaySu = StellarShell.run("[ -x /system_ext/bin/su ] && grep -q su_compat /proc/mounts && echo READY || echo MISSING", 15)
+                    suCompatReady = nativeSu == "0" || overlaySu.output.contains("READY")
+                    if (!suCompatReady) addLog("提示：su 通道未就绪，请点「修复」重试")
+                }
+                runCatching {
+                    if (serviceReady) {
+                        StellarShell.run(
+                            "rm -rf /data/local/tmp/onekey /data/local/tmp/onekey-[0-9]* /data/local/tmp/onekey-su " +
+                                "/data/local/tmp/ksu_grant /data/local/tmp/root_stage.sh /data/local/tmp/onekey_dir " +
+                                "/data/local/tmp/ksu-op3.ko /data/local/tmp/ksud342 " +
+                                "/data/local/tmp/root_run /data/local/tmp/root_backend " +
+                                "/data/local/tmp/root_manager_pkg /data/local/tmp/root_manager_apk /data/local/tmp/root_expected_uapi " +
+                                "/data/local/tmp/root_expected_version /data/local/tmp/root_strict /data/local/tmp/root_antiroot 2>/dev/null; " +
+                                "echo TEMP_CLEANED",
+                            60
+                        )
+                    }
+                }
+                HistoryStore.finish(ok, stage, elapsedSeconds)
+                refreshState()
+            }
+        }
+    }
+
+    private fun runInfinity98260() {
+        platformReason = SecurityCheck.reason(context)
+        if (platformReason != null) {
+            addLog("设备、内核或签名校验失败：" + platformReason)
+            return
+        }
+        if (!acquireRunLock()) return
+        running = true
+        val runAdaptive = adaptiveManagerEnabled
+        val runKind = selectedManager
+        runCatching { JailbreakRunService.start(context) }
+        progress = 0.01f
+        stage = "检查 Stellar 服务"
+        elapsedSeconds = 0L
+        lastResultOk = null
+        logs = emptyList()
+        runCatching { File(context.filesDir, "onekey-live.log").delete() }
+        HistoryStore.start(context, "cve98260", runKind, runAdaptive, BuildConfig.VERSION_NAME)
+        addLog("========== OneKey · " + (profile?.displayName ?: "OnePlus") + " · 98260 ==========")
+        val t0 = System.currentTimeMillis()
+        scope.launch { while (running) { elapsedSeconds = (System.currentTimeMillis() - t0) / 1000L; delay(1000L) } }
+        scope.launch {
+            var ok = false
+            try {
+                if (!ensurePermission()) { stage = "未获得权限"; return@launch }
+                val chosen = managers.firstOrNull { it.kind == runKind } ?: run {
+                    addLog("选择的管理器已不在列表中，已停止")
+                    return@launch
+                }
+                var adapter: RuntimeExtractor.Adapter? = if (runAdaptive) runtimeAdapter else null
+                if (runAdaptive && runKind == "finasu") {
+                    if (adapter == null || adapter.pkg != chosen.pkg || adapter.versionCode != chosen.installedVersionCode) {
+                        preparing = true
+                        stage = "读取 FinaSU APK 并匹配 libksud"
+                        adapter = try {
+                            RuntimeExtractor.prepareFina(context, chosen.pkg, expectedCert[runKind] ?: throw IllegalStateException("缺少管理器信任证书")) { addLog(it) }
+                                .also { runtimeAdapter = it }
+                        } catch (e: Throwable) {
+                            addLog("FinaSU 自适应失败，改用内置兼容组件：" + e.message)
+                            adapter = null
+                            runtimeAdapter = null
+                            null
+                        } finally {
+                            preparing = false
+                        }
+                    }
+                } else if (runAdaptive && (adapter == null || adapter.pkg != chosen.pkg || adapter.versionCode != chosen.installedVersionCode)) {
+                    preparing = true
+                    stage = "读取管理器 APK 并提取模块"
+                    addLog("开始运行时适配：" + selectedManager)
+                    adapter = try {
+                        RuntimeExtractor.prepare(context, chosen.pkg, runKind, expectedCert[runKind] ?: throw IllegalStateException("缺少管理器信任证书")) { addLog(it) }
+                            .also { runtimeAdapter = it }
+                    } catch (e: Throwable) {
+                        addLog("自适应提取失败，改用内置组件：" + e.message)
+                        runtimeAdapter = null
+                        null
+                    } finally {
+                        preparing = false
+                    }
+                }
+                stage = "运行 98260 实验链"
+                progress = 0.05f
+                ok = Cve98260Engine.run(
+                    context,
+                    chosen.pkg,
+                    runKind,
+                    adapter,
+                    antiRootGuard,
+                    defaultSuCompat,
+                    softRebootFix,
+                    logSink = { addLog(it) },
+                    stageSink = { stage = it; HistoryStore.updateStage(it) },
+                    progressSink = { progress = it / 100f }
+                )
+            } catch (e: Throwable) {
+                addLog("98260 异常: " + e)
+                ok = false
+            } finally {
+                running = false
+                runCatching {
+                    JailbreakRunService.update(context, if (ok) "完成" else "未完成", if (ok) 1f else progress)
+                }
+                if (ok) {
+                    scope.launch { kotlinx.coroutines.delay(3000); runCatching { JailbreakRunService.stop(context) } }
+                } else {
+                    runCatching { JailbreakRunService.stop(context) }
+                }
+                releaseRunLock()
+                lastResultOk = ok
+                lastResultExploitKind = "cve98260"
+                if (ok) hardenAfterSuccess()
+                stage = if (ok) "98260 全链完成" else "98260 未完成（需硬重启后再试）"
+                if (ok) progress = 1f
+                addLog(if (ok) "98260 全链完成；重启后需要重新越狱。" else "98260 未完成；内核可能处于脏状态，切回 64560 或重试前必须先硬重启设备。")
+                persistLogs()
+                if (serviceReady) {
+                    val nativeSu = StellarShell.run("timeout 6 su -c 'id -u' 2>/dev/null; true", 15).output.trim()
+                    val overlaySu = StellarShell.run("[ -x /system_ext/bin/su ] && grep -q su_compat /proc/mounts && echo READY || echo MISSING", 15)
+                    suCompatReady = nativeSu == "0" || overlaySu.output.contains("READY")
+                }
+                HistoryStore.finish(ok, stage, elapsedSeconds)
+                refreshState()
+            }
+        }
+    }
+
+    /** 权限修复：不跑漏洞链，只修 su_compat / 授权刷新 / 管理器登记。 */
+    fun repairPermissions() {
+        platformReason = SecurityCheck.reason(context)
+        if (platformReason != null) { addLog("校验失败，已拒绝：" + platformReason); return }
+        if (running) {
+            addLog("正在运行，请稍候")
+            return
+        }
+        running = true
+        logs = emptyList()
+        stage = "权限修复"
+        progress = 0.1f
+        lastResultOk = null
+        addLog("========== 权限修复 ==========")
+        scope.launch {
+            var ok = false
+            try {
+                if (!ensurePermission()) { stage = "未获得权限"; return@launch }
+                val probe = StellarShell.run("su -c id", 15)
+                if (probe.code != 0 || !probe.output.contains("uid=0")) {
+                    addLog("当前没有 root：请先点「一键越狱」，成功后再执行权限修复。")
+                    if (probe.output.isNotBlank()) addLog(probe.output.trim())
+                    stage = "无 root，请先越狱"
+                    return@launch
+                }
+                progress = 0.5f
+                addLog("root 已就绪，开始刷新 su_compat / 授权 / 管理器登记…")
+                val script = "su -c '/data/adb/ksud feature set su_compat 1' 2>&1; " +
+                    "su -c '/data/adb/ksud debug mark refresh' 2>&1; " +
+                    "su -c '/data/adb/ksud manager set-enabled true' 2>&1; " +
+                    "su -c '/data/adb/ksud manager list' 2>&1; " +
+                    "su -c 'id' 2>&1"
+                val r = StellarShell.run(script, 60)
+                r.output.lines().forEach { if (it.isNotBlank()) addLog(it) }
+                ok = r.code == 0
+                addLog("权限修复结束 (exit=" + r.code + ")")
+                addLog("已授权应用请彻底关闭后重新打开，即可通过默认 su 获取 root。")
+                stage = if (ok) "权限修复完成" else "权限修复未完成"
+                progress = 1f
+            } catch (e: Throwable) {
+                addLog("异常: " + e)
+                stage = "权限修复失败"
+            } finally {
+                running = false
+                lastResultOk = ok
+                persistLogs()
+                refreshState()
+            }
+        }
+    }
+
+    fun repair() {
+        if (running) {
+            addLog("正在运行，请稍候")
+            return
+        }
+        addLog("修复模式：内核已加载时只修复用户态/SU/管理器；未加载时执行完整越狱。")
+        runJailbreak()
+    }
+
+    private fun persistLogs() {
+        val text = logs.joinToString("\n")
+        runCatching { File(context.filesDir, "onekey-last.log").writeText(text) }
+        runCatching {
+            if (ShizukuShell.available() && ShizukuShell.hasPermission()) {
+                ShizukuShell.stageBytes(text.toByteArray(Charsets.UTF_8), "/data/local/tmp/onekey-last.log", 644)
+            }
+        }
+    }
+
+    fun selfCheck() {
+        if (running) { addLog("正在运行，请稍候"); return }
+        scope.launch {
+            if (!ensurePermission()) return@launch
+            stage = "自检中"
+            val script = "id; getenforce; uname -r; grep -i kernelsu /proc/modules; " +
+                "su -c id; su -M -c id; /system/bin/su -c id; " +
+                "[ -x /data/adb/ksud ] && { su -c '/data/adb/ksud debug info' 2>/dev/null; su -c '/data/adb/ksud feature list' 2>/dev/null; } || echo KSUD_MISSING; " +
+                "ls -l /system_ext/bin/su 2>&1; grep -i onekey /proc/mounts 2>&1; " +
+                "ls -ld /data/local/tmp/onekey* 2>&1; pm list packages -d | grep exsystemservice"
+            val r = StellarShell.run(script, 60)
+            r.output.lines().forEach { if (it.isNotBlank()) addLog(it) }
+            addLog("自检结束 (exit=" + r.code + ")")
+            refreshState()
+            stage = "就绪"
+        }
+    }
+
+    /** 采集设备诊断（供远程定位）：内核模块、管理器、su 通道、ksud 状态。 */
+    fun collectDiagnostics() {
+        scope.launch {
+            stage = "采集诊断"
+            addLog("===== 设备诊断 =====")
+            val script = """
+                echo "[uname]"; uname -r
+                echo "[selinux]"; getenforce
+                echo "[modules]"; grep -i kernelsu /proc/modules
+                echo "[system/bin/su]"; ls -l /system/bin/su 2>&1
+                echo "[ksud]"; ls -l /data/adb/ksud 2>&1
+                echo "[ksu bin]"; ls -l /data/adb/ksu/bin 2>&1
+                echo "[mounts]"; grep -iE 'onekey|ksu' /proc/mounts 2>&1 | head -10
+                echo "[current app uid su]"; /system/bin/su -c 'id -u' 2>&1
+                echo "[ksud]"; [ -x /data/adb/ksud ] && { su -c '/data/adb/ksud debug info' 2>&1 | head -20; su -c '/data/adb/ksud feature list' 2>&1 | head -20; su -c '/data/adb/ksud manager list' 2>&1 | head -10; } || echo KSUD_MISSING
+                echo "[dmesg kernelsu]"; su -c 'dmesg | grep -i kernelsu | tail -40' 2>&1
+                echo "[console tail]"; tail -80 /data/local/tmp/onekey-console.log 2>&1
+                echo "[post marker]"; cat /data/local/tmp/onekey-*/post_stage.ok 2>&1 | tail -3
+                echo "[oplus modules]"; grep -iE 'oplus_secure|oplus_security' /proc/modules 2>&1
+                echo "[ksud soft-reboot]"; /data/adb/ksud debug version 2>&1 | head -2
+            """.trimIndent()
+            val r = StellarShell.run(script, 90)
+            r.output.lines().forEach { line -> if (line.isNotBlank()) addLog(line) }
+            addLog("===== 诊断结束 =====")
+            stage = "诊断完成，请导出 TXT"
+        }
+    }
+
+    /** 直接从本应用 UID 执行 su，验证管理器授权是否真正生效。 */
+    fun diagnoseRoot() {
+        scope.launch {
+            stage = "root 诊断"
+            addLog("== root 诊断（本应用 UID=" + android.os.Process.myUid() + "） ==")
+            addLog("请先在管理器里给「OneKey」授权 root，再点一次诊断。")
+            val probe = dev.onekey.jb.RootDiagnostics.PROBE
+            val commands = listOf(
+                "应用进程：绝对路径 su" to arrayOf("/system/bin/su", "-c", probe),
+                "应用进程：PATH 查找 su（libsu 常用）" to arrayOf("su", "-c", probe),
+                "应用进程 sh + 绝对路径 su" to arrayOf("/system/bin/sh", "-c", "/system/bin/su -c " + probe),
+                "应用进程 sh + PATH su" to arrayOf("/system/bin/sh", "-c", "su -c " + probe),
+                "兼容入口 /system_ext/bin/su" to arrayOf("/system_ext/bin/su", "-c", probe)
+            )
+            var appDirectOk = false
+            var appPathOk = false
+            var shellAbsoluteOk = false
+            for ((index, entry) in commands.withIndex()) {
+                val (label, cmd) = entry
+                val result = dev.onekey.jb.RootDiagnostics.run(cmd, "", 20)
+                addLog(label + "：退出码=" + result.code)
+                for (line in result.output.split("\n")) if (line.trim().isNotEmpty()) addLog("  " + line.trim())
+                val ok = dev.onekey.jb.RootDiagnostics.suPassed(result.code, result.output) ||
+                    (result.code == 0 && result.output.contains("uid=0(root)"))
+                if (index == 0) appDirectOk = ok
+                if (index == 1) appPathOk = ok
+                if (index == 2) shellAbsoluteOk = ok
+            }
+            val appRootOk = appDirectOk || appPathOk || shellAbsoluteOk
+            addLog("应用进程 root：" + if (appRootOk) "已生效 ✓" else "未生效 ✗")
+            if (!appPathOk) {
+                addLog("提示：PATH 查找 su 未通过，说明该 shell 入口被系统策略拦截；使用 libsu/绝对路径的应用不受影响。")
+            }
+            if (!appRootOk) {
+                addLog("若管理器里已授权仍失败：在管理器中先撤销再重新授权，然后彻底关闭本应用再打开。")
+            }
+            stage = if (appRootOk) "root 已生效" else "root 未生效"
+        }
+    }
+
+    fun moduleConflictCheck() {
+        scope.launch {
+            if (!ensurePermission()) return@launch
+            addLog("== 模块冲突自检 ==")
+            val mods = StellarShell.run("ls /data/adb/modules 2>/dev/null; echo ---; su -c 'ls /data/adb/modules' 2>/dev/null", 30)
+            mods.output.lines().forEach { if (it.isNotBlank() && it.trim() != "---") addLog("  模块: " + it.trim()) }
+            val conflicts = listOf("zygisksu", "zygisk_next", "lsposed", "mountify", "fix_soft_reboot", "scene_systemless")
+            val installed = conflicts.filter { mods.output.contains(it) }
+            if (installed.isEmpty()) {
+                addLog("未发现已知冲突模块；可以正常越狱。")
+            } else {
+                addLog("发现已知冲突模块: " + installed.joinToString(", "))
+                addLog("建议在管理器中先禁用以上模块并重启，再执行一键越狱。")
+            }
+        }
+    }
+
+    fun cleanupOldCompatMounts() {
+        scope.launch {
+            val script = "for m in \$(awk '\$1==\"onekey-su\"{print \$2}' /proc/mounts 2>/dev/null); do umount \"\$m\" 2>/dev/null; done; " +
+                "rm -rf /data/adb/onekey-su-compat /data/local/tmp/onekey /data/local/tmp/ksu-op3.ko; " +
+                "echo CLEAN_DONE; grep -i onekey /proc/mounts 2>/dev/null || true"
+            val r = StellarShell.execSu(script, 30)
+            r.output.lines().forEach { if (it.isNotBlank()) addLog(it) }
+            addLog("旧兼容挂载清理结束 (exit=" + r.code + ")")
+            refreshState()
+        }
+    }
+
+    fun openStellar() {
+        try {
+            val intent = context.packageManager.getLaunchIntentForPackage("roro.stellar.manager")
+            if (intent != null) { intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); context.startActivity(intent) }
+            else addLog("未安装 Stellar 管理器")
+        } catch (e: Exception) { addLog("打开 Stellar 失败: " + e) }
+    }
+
+    /** 与 Onuce 的 harden_after 对齐：仅会话成功后停用安全守护/安全中心，不动截屏组件。 */
+    private fun hardenAfterSuccess() {
+        if (!antiRootGuard) return
+        addLog("会话完成：按设置停用安全守护/安全中心（未停用截屏组件）")
+        Safer.disable(::addLog)
+    }
+}

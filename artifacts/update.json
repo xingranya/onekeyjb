@@ -1,0 +1,134 @@
+{
+  "versionCode": 164,
+  "versionName": "2.17.16",
+  "publishedAt": "2026-11-04T08:35:00+08:00",
+  "size": 42839435,
+  "sha256": "3f087b7d103c569558be0a190f78c889c648ffcaded7dee7b5c77dafc6c58cf1",
+  "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
+  "changelog": "v2.17.16\n\n- 五个管理器全部对齐当前最新版：KernelSU 官方 v3.3.1/32680、KernelSU-Next v3.4.2/33355、SukiSU Ultra v4.3.0-r1/41140、BakaSU v4.2.0-rc3/35171、FinaSU v1.4.4/33167\n- 内置 6.18 模块全部换成与最新管理器同版本的内核镜像，模块自述版本与管理器 versionCode 一致\n- FinaSU 升级到 1.4.4：6.18 与 6.12 双内核模块、libksud 全部更新到 33167\n- 云端模块重发五个条目，覆盖最新 versionCode，并按内核 release 精确匹配\n- 管理器说明文案修正，之前仍显示 v1.0.5 / v0.9.5 / v2.0.0-alpha 等旧版本号\n- 保留 FinaSU 1.4.4 自适应、更新弹窗的更新时间/包大小/分版本日志/下载速度",
+  "versions": [
+    {
+      "versionName": "2.17.16",
+      "versionCode": 164,
+      "publishedAt": "2026-11-04T08:35:00+08:00",
+      "size": 42839435,
+      "notes": [
+        "五个管理器全部对齐当前最新版：KernelSU 官方 v3.3.1/32680、KernelSU-Next v3.4.2/33355、SukiSU Ultra v4.3.0-r1/41140、BakaSU v4.2.0-rc3/35171、FinaSU v1.4.4/33167",
+        "内置 6.18 模块全部换成与最新管理器同版本的内核镜像，模块自述版本与管理器 versionCode 一致",
+        "FinaSU 升级到 1.4.4：6.18 与 6.12 双内核模块、libksud 全部更新到 33167",
+        "云端模块重发五个条目，覆盖最新 versionCode，并按内核 release 精确匹配",
+        "管理器说明文案修正，之前仍显示 v1.0.5 / v0.9.5 / v2.0.0-alpha 等旧版本号",
+        "保留 FinaSU 1.4.4 自适应、更新弹窗的更新时间/包大小/分版本日志/下载速度"
+      ]
+    },
+    {
+      "versionName": "2.17.15",
+      "versionCode": 163,
+      "publishedAt": "2026-11-02T02:52:00+08:00",
+      "size": 42798967,
+      "notes": [
+        "适配 FinaSU 1.4.3（versionCode 33156）：本地自适应改用 1.4.3 官方 6.18 LKM 与本版本 libksud",
+        "新增 1.4.3 的 6.12 内核模块，FinaSU 在 Ace 7 Pro 上按内核系列自动选对模块",
+        "FinaSU 恢复云端模块：新增 finasu-33156 云端 .ko，catalog 支持按内核 release 精确匹配",
+        "更新弹窗显示发布时间与安装包大小（两位小数）",
+        "更新弹窗可按版本展开查看每个小版本的具体更新日志",
+        "下载进度新增实时速度与剩余体积，并保留 SHA-256 校验"
+      ]
+    },
+    {
+      "versionName": "2.17.14",
+      "versionCode": 162,
+      "publishedAt": "2026-11-01T22:10:38+08:00",
+      "size": 42617131,
+      "notes": [
+        "所有页面左上角固定显示 OneKey 版本名和 versionCode",
+        "保留 FinaSU 1.4.2 自适应与官方 LKM 修复",
+        "保留状态栏、底栏、弹窗与历史日志修复"
+      ]
+    },
+    {
+      "versionName": "2.17.13",
+      "versionCode": 161,
+      "publishedAt": "2026-11-01T22:03:35+08:00",
+      "size": 42617135,
+      "notes": [
+        "修复 FinaSU 自适应失败：回退到未预修补的官方 1.4.2 LKM，由 RuntimeExtractor 动态 patch vermagic",
+        "内置 FinaSU ksud 更新为 1.4.2/33155",
+        "修复 finasu.ko ELF 结构无效导致的旧模块回退",
+        "保留 Suki、云端 NUL 校验和 UI 修复"
+      ]
+    },
+    {
+      "versionName": "2.17.12",
+      "versionCode": 160,
+      "publishedAt": "2026-11-01T20:53:46+08:00",
+      "size": 42943571,
+      "notes": [
+        "使用 FinaSU 1.4.2 官方 kernel bundle 的 6.18 LKM（v1.4.1-96104eac）并 patch 到 6.18.21",
+        "FinaSU 管理器基线 33155 / v1.4.2 自适应",
+        "移除错误的 Fina 云端 33090 模块，Fina 走 APK libksud + 本地适配 LKM",
+        "保留 Suki、6.18 云端模块和其他 UI/稳定性修复"
+      ]
+    },
+    {
+      "versionName": "2.17.11",
+      "versionCode": 159,
+      "publishedAt": "2026-11-01T20:40:07+08:00",
+      "size": 42943559,
+      "notes": [
+        "替换 FinaSU 内核模块为真实 1.4.0 LKM（v1.4.0-36673c93）并适配 6.18.21 vermagic",
+        "管理器和内核模块版本不再停留在 v1.3.2/33090",
+        "Fina 使用管理器 APK 的 libksud + 本地适配 LKM，不使用错误云端模块",
+        "保留 Suki 6.18.21、云端 NUL 校验和状态栏/弹窗修复"
+      ]
+    },
+    {
+      "versionName": "2.17.10",
+      "versionCode": 158,
+      "publishedAt": "2026-11-01T17:52:12+08:00",
+      "size": 42926827,
+      "notes": [
+        "适配 FinaSU 1.4.0 / versionCode 33153 自适应",
+        "云端 catalog 增加 FinaSU 33153 模块",
+        "Fina 自适应使用管理器 APK 的 libksud + 适配 LKM",
+        "保留 6.18 云端模块、Suki 修复和稳定链 trace 修复"
+      ]
+    },
+    {
+      "versionName": "2.17.9",
+      "versionCode": 157,
+      "publishedAt": "2026-11-01T15:57:28+08:00",
+      "size": 42926835,
+      "notes": [
+        "修复 6.18 OnePlus16 的 Onuce 配置模式：设备适配模块改用 onuce-runtime-v2",
+        "云端模块 NUL modinfo 解析修复保留",
+        "云端 41120 模块可正常校验",
+        "保留状态栏、底栏、弹窗与历史修复"
+      ]
+    },
+    {
+      "versionName": "2.17.8",
+      "versionCode": 156,
+      "publishedAt": "2026-11-01T15:39:21+08:00",
+      "size": 42926835,
+      "notes": [
+        "修复云端模块校验：.ko 的 modinfo 是 NUL 分隔，先归一化再解析",
+        "云端模块 41120 可通过 SHA/证书/vermagic/UAPI 校验",
+        "保留状态栏 scrim、底栏、弹窗圆角与历史复制/导出",
+        "保留 Suki 6.18.21 模块与稳定链 trace 修复"
+      ]
+    },
+    {
+      "versionName": "2.17.7",
+      "versionCode": 155,
+      "publishedAt": "2026-11-01T14:20:54+08:00",
+      "size": 42926835,
+      "notes": [
+        "增加状态栏不透明 scrim，修复 edge-to-edge 内容穿透状态栏",
+        "弹窗按钮统一 14dp 圆角、46dp 高度、左右 8dp 内边距",
+        "历史详情恢复复制/导出",
+        "保留底部导航、Suki 6.18.21 模块和稳定链 trace 修复"
+      ]
+    }
+  ]
+}

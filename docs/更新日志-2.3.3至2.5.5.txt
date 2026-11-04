@@ -1,0 +1,338 @@
+一加16提权越狱 更新日志（v2.3.3 → v2.5.5）
+
+【v2.3.3】默认 su 修复、动态颜色与 TXT 日志分享
+- 修复默认 su 入口；已授权应用可用，未授权应用仍被拒绝。
+- 修复时自动匹配当前内核，兼容从 1.8 延续的 KernelSU-Next 环境。
+- Material 3 支持系统动态颜色与深浅色。
+- 日志页新增「分享 TXT」，支持中文 UTF-8 文件与系统分享面板。
+
+【v2.4.0】全新 COUI 界面 + 4 管理器 + 默认 SU 自动化
+🎨 全新 COUI 界面
+- 颜值重做：星苒粉 #FFC0CB 主题 + 动态取色一键切换（关于页）
+- 磨砂玻璃顶栏 / 悬浮圆角底栏，动效 + 振动反馈，浅色模式专项优化
+⚡ 一台手机，四种内核
+- 支持 KernelSU 官方 / KernelSU-Next / SukiSU Ultra / BakaSU
+- 修复 4 管理器识别问题，任意管理器越狱后都能正常收尾
+🛡️ 默认 SU 全自动
+- 越狱结束自动部署默认 SU，软重启不丢，不用再手点「修复」
+- 新增「权限修复」与「Root 诊断」，一键验证管理器授权是否真正生效
+🚀 越狱链路更稳
+- 关键步骤失败自动重试，日志可定位到具体环节，临时文件自动清理
+- 安装包 38MB → 13.6MB，启动图标比例修复
+
+【v2.4.1】默认 SU 改为开关（隐藏环境优先）
+🛡️ 默认 SU 改为开关，默认关闭（隐藏环境优先）
+- 不再每次越狱/修复后自动部署默认 SU
+- 默认不创建任何 su 兼容层，环境隐藏不受影响
+- 需要 MT 终端等按 PATH 调 su 的应用时，在「选项」里手动开启「默认 SU 兼容」，再点一次「修复」生效
+- 开启后会多一个 su_compat 挂载，可能被部分检测识别；关闭后点一次「修复」即可清除
+⚡ 4 管理器识别修复
+- 修复 BakaSU / KernelSU 官方 / KernelSU-Next 修复时提示「无法确认当前 root 的配套版本」的问题
+- 支持按 full_version / version 数字 / 已安装管理器三级识别，识别不出可回退界面选择
+🎨 其他
+- 启动图标比例修复（不再被桌面遮罩裁切）
+- 安装包 38MB → 13.6MB
+- 主题色、悬浮底栏、赞赏弹窗、Root 诊断自动跳日志等保持
+
+【v2.4.2】内核换上游 6.18.21 自编 LKM，默认 SU 免挂载
+🧬 内核整体换血（关键修复）
+- 4 个管理器全部改用上游按本机 6.18.21 内核源码自编的 LKM + 配套 ksud
+- 官方 KernelSU 349,224B · BakaSU 385,440B · Next 350,000B · SukiSU 376,136B
+- 修掉 v2.3.3 的 6.18.32 模板 LKM 在本机（6.18.21）上 sucompat 不完整的问题
+- 之前表现为：应用进程能 root，但 shell/PATH 调 su 被拒，只能靠 overlay 兼容层 → 会暴露环境
+🥷 默认 SU 不再需要挂载，环境零痕迹
+- 管理器授权后，应用 / MT 终端按 PATH 调用 su 直接拿到 root，由内核原生放行
+- 不再创建 /system_ext/bin/su、不再有任何 su_compat 挂载
+- 删掉自动默认-su 修复逻辑；只保留「默认 SU 兼容（会暴露环境）」手动开关作兜底
+🔧 其他
+- Root 诊断恢复 4 项检查（内核原生 su 应 4/4）
+- 4 管理器识别修复保留（BakaSU / 官方 / Next 不再报“无法确认配套版本”）
+- 安装包 23.8MB（4 套内核 + 配套 ksud 全内置，保证版本严格配对）
+
+【v2.4.3】修复投放 Permission denied（刷不了）
+🐞 修复「投放失败：Permission denied，刷不了」
+- 现象：修复/越狱时报 sh: can't create /data/local/tmp/onekey/ksu_grant.tmp: Permission denied
+- 原因：上一次运行后 /data/local/tmp/onekey 残留成 root 属主/不可写，下一次 shell 投放时没有写权限；有人手机没有历史残留所以能正常刷
+- 修复：
+- 每次运行改用全新唯一工作目录 /data/local/tmp/onekey-<时间戳>，彻底避免历史目录污染
+- ksu_grant、root_stage.sh、onekey_dir 改放到 /data/local/tmp 固定可写位置
+- root 收尾脚本以 root 自动清理旧的 /data/local/tmp/onekey 遗留给后续 shell 使用
+- 失败也不会影响下一次运行
+⚠️ 使用提醒
+- 选哪个管理器，手机就必须装对应版本的管理器：
+- KernelSU 官方 v3.3.1
+- BakaSU v4.2.0-rc3 (35235)
+- SukiSU Ultra v4.2.1
+- KernelSU-Next（上游未实测）
+- 没装对应管理器会提示「请先安装官方 XXX 管理器」
+其他
+- 4 管理器全部使用上游 6.18.21 自编 LKM + 配套 ksud；默认 SU 走内核原生，不产生任何挂载
+- 只保留「默认 SU 兼容（会暴露环境）」手动开关做兜底
+
+【v2.4.4】修复授权 root / su 用不了（su_compat + 管理器连接校验）
+🐞 修复「刷完无法给软件授权 root / su 用不了」
+- 原因：换用上游 6.18.21 自编 LKM 后，收尾脚本缺少两个关键步骤：
+1) 没有显式开启内核 su 兼容（su_compat），部分 LKM 默认不开 → 应用调 su 直接被拒
+2) 管理器加冕后没有验证它是否真正连上内核 → 管理器写不进授权，应用永远拿不到 root
+- 修复：
+- 收尾阶段显式执行 ksud feature set su_compat 1，并输出 feature list 确认 ENABLED
+- 加冕 → 重启管理器 → 检查管理器是否取得内核连接（/proc/pid/fd 的 ksu 句柄）
+- 未连接则自动 ksud manager add + set-enabled 再重启一次（双保险）
+- 输出 manager list，可直接看到登记状态
+- 新增「未授权 su 自检」：setpriv 降到 uid 2000 执行 su，日志里看 unpriv_su=0 即内核放行
+- 越狱结束再补一条「原生 su 已放行 / 未放行」日志，出问题一眼定位
+其他
+- 继承 v2.4.3 的唯一工作目录修复（不再 Permission denied）
+- 4 管理器统一上游 6.18.21 LKM + 配套 ksud；默认 SU 免挂载；只保留「默认 SU 兼容（暴露环境）」开关兜底
+
+【v2.4.5】修复刷完无 root/无 su（ksud 引导路径错配）
+🎯 为什么刷了还是没 root / 没 su —— 已定位并修复
+v2.4.2 换上游 LKM 时，我把「引导 ksud 的固定路径」改错了：
+- 漏洞加载器：它硬编码读取的路径
+- perf_cred（Next / 官方 / BakaSU 用）：`/data/local/tmp/ksud342`
+- perf_cred_sukisu（SukiSU 用）：`/data/local/tmp/onekey/ksud_sukisu`
+v2.4.2~v2.4.4 却把 ksud 投到了 /data/local/tmp/ksud_next、/data/local/tmp/ksud_official 等新路径，
+导致 cred 阶段复制 ksud 到 /data/adb 布局时找不到文件 → LAYOUT_DONE 不出现 → 内核模块根本不会加载
+→ 后续管理器加冕、su_compat 全部无从谈起（表现就是“刷完了但没 root、没 su”）。
+v2.4.5 修复
+- 恢复两个硬编码路径：/data/local/tmp/ksud342 和 /data/local/tmp/onekey/ksud_sukisu
+- 每次越狱前保证固定目录可写（旧版残留的 root 属主目录会被改名后重建）
+- 保留 v2.4.4 的 su_compat 显式开启、管理器连接校验、未授权 su 自检
+- 保留 v2.4.3 的唯一工作目录与自动清理
+验证方式（刷完后看日志）
+- LAYOUT_DONE → MODULE_LOADED → MANAGER_CONNECTED → unpriv_su=0
+- 管理器授权后，Root 诊断应 4/4
+
+【v2.4.6】修复投放失败 + 模块加载失败（vermagic）
+🐞 修复「投放失败 … su_forward.tmp: No such file or directory」（所有用户卡住的问题）
+- 原因：v2.4.3 改成唯一工作目录后，投放组件前没有先创建该目录；旧投放函数只会 mkdir 固定的 /data/local/tmp/onekey
+- 修复：投放前先建本次目录；投放函数改为按目标父目录自动创建
+🐞 修复模块加载失败（这才是「刷了没 root / 没 su」的根因）
+- 反汇编确认加载器 finit_module 的 flags=0，不忽略 vermagic
+- 上游 3 个 LKM（Next/BakaSU/SukiSU）的 .modinfo vermagic 是短串 6.18.21-4k，设备要求完整串
+6.18.21-android17-5-gf957accaf563-ab15926176-4k SMP preempt mod_unload modversions aarch64
+→ 内核直接返回 EINVAL，模块根本没加载
+- 已按官方 LKM 相同方式处理：把 .modinfo 搬到文件末尾并写入完整本机 vermagic，4 个 LKM 现在全部匹配
+- 官方 LKM 原本就是这种「末尾追加 .modinfo」的补丁形态，现在四个一致
+🔧 与上游对齐的两处
+- SukiSU 改用 perf_cred 加载器（参数 allow_shell=1 bundled=1，引导 ksud 放 /data/local/tmp/ksud342）；上游能用时 debug info 正是 bundled:true
+- 收尾执行顺序：su -c 优先，ksu_grant 兜底（上游同款）
+保留
+- 唯一工作目录 / 旧 root 属主目录改名重建 / 自动清理
+- su_compat 显式开启、管理器连接校验、未授权 su 自检
+- 默认 SU 兼容开关（会暴露环境，默认关闭）
+刷完看日志顺序
+LAYOUT_DONE → FINIT=0 MODULE_LOADED → MANAGER_CONNECTED → unpriv_su=0 → Root 诊断 4/4
+
+【v2.4.7】修复 bl 抓包全空（grab.sh 写死旧目录）
+🐞 修复「bl_*.bin 全空 / 反推 KASLR 失败 / 按多少次都一样」
+- 现象：grab 阶段打印了文件大小、GRAB_DONE，但引擎判定 bl_0~7.bin 全部“为空/不存在”，提示没有可用 raw 抓包
+- 原因：grab.sh 里写死了 D=/data/local/tmp/onekey，v2.4.3 改成唯一工作目录 /data/local/tmp/onekey-<时间戳> 后，
+抓包文件全被写到旧目录，引擎在本次目录找不到 → 每次都在这一步失败
+- 修复：
+- grab.sh 改为通过 /data/local/tmp/onekey_dir 读取本次工作目录（perfetto 配置路径同步）
+- 引擎检查 bl 文件大小时改用 shell 的 wc -c（不再依赖应用进程 File API，避免 SELinux/权限误判）
+传承 v2.4.6 的修复
+- 投放前先创建唯一工作目录（修 su_forward.tmp: No such file or directory）
+- 4 个 LKM 全部补全本机 vermagic（修 finit_module EINVAL / 模块根本没加载）
+- SukiSU 改用 perf_cred（allow_shell=1 bundled=1）
+- 收尾 su -c 优先、ksu_grant 兜底
+刷完日志应依次出现
+GRAB_DONE → slide=0x... → LANDED → LAYOUT_DONE → FINIT=0 MODULE_LOADED → MANAGER_CONNECTED → unpriv_su=0
+
+【v2.4.8】修复 LKM 版本不匹配/内嵌提示（去掉 bundled 参数）+ 设备诊断
+🐞 修复「LKM 版本不匹配 / 内嵌 LKM 有可用更新 / 应用还是没有 root」
+- 根因：v2.4.6~v2.4.7 给 SukiSU 用了 PC 版加载器，finit_module 参数是 allow_shell=1 bundled=1
+- 内核把模块当成 内嵌（bundled）LKM，于是：
+- 管理器显示「内嵌 LKM 有可用更新 / 版本不匹配」
+- bundled 模式下的 su 兼容/授权链路和自定义 LKM 不同 → 管理器授权了应用也拿不到 root
+- 上游能用时的加载参数只有 allow_shell=1，管理器显示 [自定义]，没有这个提示
+- v2.4.8：4 个管理器统一改用 perf_cred_sukisu 加载（只传 allow_shell=1，不再传 bundled=1），与上游 loader2 完全一致
+🩺 新增「导出设备诊断」
+- 关于页新增按钮，一键采集：
+uname / SELinux / kernelsu 模块 / /system/bin/su / /data/adb/ksud / 挂载痕迹 /
+应用 UID 的 su 结果 / ksud debug info / feature list / manager list / dmesg 里 kernelsu 相关日志
+- 越狱失败、死机重启后直接把导出的 TXT 发我，能精确定位
+⚠️ 关于「刷入过程中死机重启」
+- 这类崩溃发生在漏洞写入阶段（v36 / cred 竞态），不是安装包问题；不同批次机器概率不同
+- v2.4.8 去掉了 bundled 参数，能减少一种内核异常路径
+- 若频繁发生：刷前先在管理器中备份/关闭模块，插电、屏幕常亮、后台清空再试；崩溃后重启再试，不要连续重试
+刷完正确状态
+- 管理器：[LKM] [自定义] [越狱模式]，无「内嵌 LKM 更新」提示
+- 日志：LAYOUT_DONE → MODULE_LOADED → MANAGER_CONNECTED → unpriv_su=0（shell 域可能仍拒，属正常）
+- 在管理器里给应用授权后重新打开应用即可用 root
+
+【v2.4.9】ColorOS17 安全机制修复（内置 soft_reboot_core 等价逻辑）
+🛡️ 集成 soft_reboot_core 等价修复（ColorOS 17 安全机制）
+- 现象：越狱成功后管理器显示「工作中」，但应用授权后仍拿不到 root；终端 su 报 Permission denied (126)
+- 原因：ColorOS 17 的安全机制（oplus_secure_guard 等内核模块 + 安全服务）会拦截/杀掉原生内核调用（KernelSU 的 su 通道）
+- 你用的 soft_reboot_core 本质是 fix_soft_reboot 模块的原生辅助程序，行为包括：
+- 结束相关进程 / 重启 zygote 或执行 ksud soft-reboot
+- 重装管理器 APK（pm install -r Ksu.apk），让管理器与内核重新建连
+- 处理 SELinux 状态与模块配置
+- v2.4.9 已把这套逻辑内置（无需再装模块）：
+1. 卸载 oplus_secure_guard 等 ColorOS 安全内核模块（软重启后不会自动加载）
+2. 重装当前管理器 APK
+3. 软重启 Android 用户态：优先 ksud soft-reboot，失败回退 setprop ctl.restart zygote
+- 内核 LKM 保持加载，不需要重新越狱
+⚙️ 新增开关
+- 「越狱后软重启修复（ColorOS 17 安全机制）」默认开启
+- 越狱/修复完成后约 10 秒自动软重启（黑屏转圈属正常，约 20~60 秒）
+- 软重启后重新打开本应用即可；如果之后 su 又被安全机制拦截，再点一次「修复」即可
+继承
+- v2.4.8：去掉 bundled=1，管理器显示 [自定义]，不再提示「内嵌 LKM 更新 / 版本不匹配」
+- v2.4.7：grab 动态目录、v2.4.6：投放目录 + vermagic、v2.4.5+：管理器连接校验等
+刷完状态
+- 管理器：[LKM] [自定义] [越狱模式]
+- 授权应用后彻底关闭再打开应用 → Root 诊断 4/4
+- 终端 shell 域 su 仍可能被拒（正常），应用域 root 可用
+
+【v2.5.0】四管理器全兼容（版本/签名不再拦截）
+✅ 四个管理器全部按「配对版本」放行，不再因版本/签名不一致卡住
+- 管理器版本与签名检查改为「只提示、不拦截」：
+- 以前 SukiSU 要求必须 v4.2.1、Next 要求签名匹配官方证书，版本/签名不同就直接停止
+- 现在只要装了对应管理器就继续越狱，LKM + ksud 已内置严格配对，管理器版本不同也能工作
+- 四个管理器的推荐配对（仅提示）：
+- 管理器：推荐版本：对应内置内核/ksud
+- KernelSU 官方：v3.3.1：ksu-base.ko + ksud 3.3.1
+- KernelSU-Next：v3.4.2：ksu-base-next.ko + ksud 3.4.2
+- SukiSU Ultra：v4.2.1：ksu-base-sukisu.ko（自定义 LKM，模块版 41027-5）
+- BakaSU（原 ReSukiSU）：v4.2.0-rc3 (35235)：ksu-base-bakasu.ko + ksud 4.2.0-rc3
+- 越狱日志新增「版本配对」一行：管理器版本 / 内核模块版本，一眼确认是否配对
+- SukiSU 管理器显示 [自定义] 属正常（不是版本错误），不会再弹「内嵌 LKM 有可用更新」
+🔄 继承 v2.4.9 的 ColorOS 17 安全机制修复
+- 越狱后自动：卸载 oplus 安全内核模块 → 重装管理器 → 软重启用户态（ksud soft-reboot，失败回退 setprop ctl.restart zygote）
+- 内核 LKM 保持加载，软重启后重新打开应用即可，不需要重新越狱
+- 开关「越狱后软重启修复（ColorOS 17 安全机制）」默认开启
+🛠️ 越狱链路（4 个管理器统一）
+- 唯一工作目录 + 投放前建目录（无 Permission denied）
+- grab.sh 动态目录（bl 抓包不再全空）
+- 4 个 LKM 均补全本机完整 vermagic（finit_module 不再 EINVAL）
+- 统一 perf_cred_sukisu 加载：只传 allow_shell=1（不传 bundled=1，避免内嵌 LKM 提示与授权异常）
+- su -c 优先收尾、ksu_grant 兜底；su_compat 显式开启；管理器连接校验
+
+【v2.5.1】漏洞链切换为上游 run.sh 链路（修授权异常）
+🔁 漏洞链换成上游验证过的那套（和"能用的那个人"完全一致）
+之前一直沿用的是 v2.3.3 的链路（t64560_v36 + perf_cred + t64560_v42）。
+它在我们的机器上能加载模块、管理器也显示"工作中"，但授权始终异常——问题就出在这条链留下的内核状态上。
+v2.5.1 起直接改用上游 run.sh 全链路：
+- take_slide.sh 抓 slide
+- prep_solve 解 slide
+- prep_patch 按本机 uname 打符号 + vermagic 补丁
+- t64560_v36 → SELinux Permissive
+- t64560_loader2 → cred 泄漏
+- t64560_w2 → cred 写入 + finit_module 加载 LKM（allow_shell=1）
+- 收尾：ksud install → crown → 管理器重启
+4 个管理器只需切换 PYB110_MANAGER（kernelsu / next / bakasu / sukisu），
+LKM 与 ksud 仍是内置严格配对的那四套（官方 3.3.1 / Next 3.4.2 / BakaSU 4.2.0-rc3 / SukiSU 4.2.1）。
+其他保留
+- 管理器版本/签名只提示不拦截（不因版本不一致停止）
+- 唯一工作目录、投放前建目录（不再 Permission denied）
+- ColorOS 17 安全机制修复：越狱后卸载 oplus 安全内核模块 + 软重启用户态（LKM 保持加载）
+- 改为独立脚本执行，不再重装管理器，避免把授权状态重置
+- 关于页「导出设备诊断」保留
+包体
+- 移除旧链路（v36/v42/perf_cred/旧 syms 等）约 9MB，加入上游链路约 16MB，APK 27.4MB
+刷完状态
+- 日志应依次出现：SLIDE → PATCH → SELINUX_OK → CRED → MODULE_LOADED → DONE
+- 管理器 [LKM] [自定义] [越狱模式]，授权应用后重开应用即可
+
+【v2.5.2】su 通道修复（重建 /system/bin/su，不开默认 SU）
+先理清「应用调 su」到底靠什么
+Runtime.exec("su") / 终端 su 正常路径：
+1. 应用调用 PATH 里的 /system/bin/su
+2. KernelSU 内核模块（LKM）的 sucompat 内核钩子接管这次 exec
+3. 按该应用 UID 查管理器的授权名单
+4. 已授权 → 给 root 凭证，执行 ksud 提供的 su wrapper
+所以三个条件缺一不可：LKM 已加载 + su wrapper 有效 + 管理器授权名单可写。
+ColorOS 17 的安全机制（oplus_secure_guard 等）会把这个"原生内核调用"拦截/干掉，
+表现就是终端 su: can't execute: Permission denied (126)、管理器授权了应用也用不了。
+v2.5.2「su 通道修复」（等价 soft_reboot_core，但不需要装模块）
+越狱收尾时以 root 执行完整修复链：
+1. 卸载 oplus_secure_guard / oplus_security_guard 等 ColorOS 安全内核模块
+2. 重装管理器 APK（刷新内核侧管理器绑定，授权名单写入依赖它）
+3. 关键：ksud soft-reboot 重跑 late-load stage 脚本，重建 /system/bin/su 的 kernel file wrapper
+- 不是只 setprop ctl.restart zygote（只重启 zygote 不会重建 su wrapper）
+- 失败才回退 restart zygote
+4. 该修复集成在 run.sh 收尾里，以 root 执行；如果 shell 拿不到 root，会自动改用 KSU fd 方式重试
+仍然不开默认 SU
+- 「默认 SU 兼容」保持关闭，不创建任何 su_compat / system_ext 挂载，环境不暴露
+- 修的是内核原生的 /system/bin/su 通道，不是 overlay
+继承
+- 漏洞链：上游 run.sh 全链路（take_slide → prep_solve → prep_patch → v36 → loader2 → w2）
+- 4 管理器同名切换，LKM/ksud 内置严格配对，管理版本/签名只提示不拦截
+- 唯一工作目录、投放前建目录、关于页「导出设备诊断」
+刷完怎么看是否成功
+- 日志出现：MODULE_LOADED → MGR_REINSTALL_OK → SOFT_REBOOT_OK → SU_REPAIR_DONE
+- 软重启后重开应用 → 管理器授权应用 → 应用调用 su（PATH 或 /system/bin/su）应正常
+
+【v2.5.3】修复顺序（后台排队等就绪）+ 越狱链路复查
+✅ 你说的顺序是对的：安全组件修复不能在越狱后立刻做
+v2.5.2 的修复是越狱收尾里"立刻执行"，此时：
+- 管理器刚被重启，还没连上内核（ksu fd 未建立）
+- ksud 刚安装，late-load 状态还没稳定
+- shell 的 su 通道可能还没就绪
+→ 于是 su -c 修复脚本 直接失败，自动修复形同失效
+v2.5.3 改成严格先后顺序 + 后台排队
+1. 越狱链路跑完（run.sh 的 install / crown / 管理器重启）
+2. 排队：不阻塞越狱，后台启动 su_repair_launch.sh
+3. 等 shell su 就绪（每 2 秒探测，最多 60 秒）
+4. 修复脚本再等管理器连上内核 + ksud 就绪（最多 120 秒），再等 5 秒让管理器完成初始化
+5. 然后才：卸载 oplus_secure_guard 等安全内核模块 → 重装管理器 → ksud soft-reboot 重建 /system/bin/su
+6. 修复完成自动软重启（LKM 保持加载，不用重新越狱）
+这样越狱主体不被修复拖死，日志也能先保存；修复失败也不会影响已加载的模块。
+🔍 越狱链路复查发现并修掉的问题
+1. 残留进程：上次运行留下的 trace_pipe_raw / t64560_w2 / loader2 / prep_* 会干扰 slide 抓取 → 越狱前统一清理
+2. run.sh 收尾立刻修：见上，改为后台排队
+3. 修复失败无兜底：run.sh 里排队失败时，应用会用 KSU fd 方式按同样顺序再试一次
+4. 诊断补强：导出诊断新增 /data/local/tmp/su_repair.log、su_repair_launch.log、oplus 模块列表、ksud 版本
+继承
+- 漏洞链：上游 run.sh 全链路（take_slide → prep_solve → prep_patch → v36 → loader2 → w2）
+- 4 管理器内置严格配对，版本/签名只提示不拦截
+- 不开默认 SU、不创建任何挂载
+刷完怎么看
+- 日志：SU_REPAIR_SCHEDULED → SHELL_SU_READY → MGR_REINSTALL_OK → SOFT_REBOOT_OK → SU_REPAIR_DONE
+- 软重启后重开应用 → 管理器授权应用 → 应用调 su 应正常
+
+【v2.5.4】P0 降检测（清残留 + SELinux 恢复 + 隐藏特性）
+P0：App 内可做的降检测（不改变 root 授权链路）
+1. 清理旧挂载
+- 卸掉所有历史 su_compat / onekey-su overlay 挂载（v2.4.x 默认 SU 时代残留，升级不重启会一直挂着 → 检测里的「挂载异常(1)」）
+- 删除 /data/adb/onekey-su* 旧兼容层目录
+2. 清理 /data/local/tmp 残留
+- 越狱前 + 修复脚本内双重清理：onekey*、ksu-op3.ko、ksud342、ksu_grant、root_stage.sh、onekey_dir、onekey_mgr_apk/pkg、su_repair*.log 等
+- 修复目录 /data/local/tmp/onekey_repair 在修复成功后自删；失败才保留供诊断
+3. 恢复 SELinux Enforcing
+- 修复脚本收尾执行 setenforce 1 并记录 getenforce（漏洞链先切 Permissive 的痕迹不再留着）
+4. 开启内核隐藏特性
+- ksud feature set selinux_hide 1
+- ksud feature set kernel_umount 1
+（两个特性当前 4 个 LKM 都支持；能降低 SELinux Policy 与部分挂载类检测）
+顺带修复
+- su 修复脚本改放独立目录 /data/local/tmp/onekey_repair，不再受越狱工作目录清理影响（v2.5.3 的修复排队可能因目录被清而失效）
+仍然无法在 App 内解决的（保持原状）
+- 「设备取得 ROOT 权限/异常模块」「Found ksu」：LKM 无 susfs，/proc/modules 里就是 kernelsu + /data/adb/ksu 痕迹 → 需要带 SUSFS 的 LKM（P2）
+- Magic Mount / Mount loophole / 隐藏应用列表：来自已安装模块（P1，需要用户逐个停用排查）
+
+【v2.5.5】紧急修复 v2.5.4 自删工作目录问题
+🐞 现象
+v2.5.4 所有人越狱都报：
+
+== 执行漏洞链（上游 run.sh） ==
+sh: cd: /data/local/tmp/onekey-<时间戳>: No such file or directory
+run.sh 退出码=2
+内核模块未加载
+
+🎯 原因（我自己写的 P0 清理误伤）
+v2.5.4 新加的「清理旧残留」用了：
+rm -rf /data/local/tmp/onekey-[0-9]*
+但这段清理是在已经创建本次工作目录之后才执行的——本次目录名字正好是 onekey-<时间戳>，于是把自己的工作目录删掉了，run.sh 自然 cd 失败，模块根本没加载。
+✅ v2.5.5 修复
+1. 清理步骤移到「创建本次工作目录之前」执行 → 只清历史残留，不会误伤当前目录
+2. 补回 ksu_grant 的投放（KSU fd 兜底修复需要它）
+3. su_repair.sh 自删加保护：只有目录名是 /data/local/tmp/onekey_repair 才删除，避免极端情况下误删 /data/local/tmp
+保留的 P0 内容（v2.5.4 原有，仍然有效）
+- 清旧 su_compat / onekey-su 挂载与 /data/adb/onekey-su*
+- 清 /data/local/tmp 临时残留
+- 恢复 SELinux Enforcing
+- 开启 selinux_hide / kernel_umount 特性

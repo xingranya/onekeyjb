@@ -1,0 +1,10 @@
+一加16提权越狱 · 第三方组件说明
+
+本应用内置的部分引导组件来自公开开源项目，遵循其各自的开源许可证：
+- take_slide / loader / writer / forker 等引导组件：公开仓库，Apache-2.0
+- KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU 内核与用户态组件：各自项目许可证
+- COUI 组件库：https://github.com/suqi8/coui
+- Stellar：https://github.com/roro2239/Stellar
+
+以上组件仅用于本应用自身的越狱流程，不对外提供、不单独分发。
+应用本体免费，禁止倒卖。作者：星苒鸭 · github.com/xingranya · xran.uk
