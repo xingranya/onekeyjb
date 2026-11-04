@@ -1,12 +1,27 @@
 {
-  "versionCode": 165,
-  "versionName": "2.17.17",
-  "publishedAt": "2026-11-04T20:20:00+08:00",
-  "size": 44178916,
-  "sha256": "5a25b16af2b3d0ff554662682f58ec782cad6d4e0b8a5aab30e8e4baf965e56b",
+  "versionCode": 167,
+  "versionName": "2.18.0",
+  "publishedAt": "2026-11-05T00:48:00+08:00",
+  "size": 14560299,
+  "sha256": "cb764403ea9528ef73945892ee37a4f766a46222e21d723e006f5b91cb099747",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.17.17\n\n- 适配 ColorOS 17.0.1.201 新内核：6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k\n- 从新 boot.img 重新导出 143,616 条 kallsyms，生成 core/symbols-1701201.txt，64560 稳定链按新符号表解析地址\n- 内核模块不再绑定旧内核串：内置模块按设备 uname -r 现场对齐 vermagic，同版本换 OTA 不用重发模块\n- 新增机型档案 PYB110_201（17.0.1.201），App 会自动选符号表；旧 17.0.0.x 档案保留\n- 98260 链标为「未验证构建」：执行器按旧内核标定，运行前会明确提示，失败不算适配回归\n- 修复自适应管理器：管理器 APK 已不再内嵌 LKM，现在会快速判定并回落云端/内置，不再白等 60 秒甚至直接中断\n- FinaSU 升级到 1.4.5（versionCode 33168）：6.18/6.12 模块与 libksud 全部更新，云端模块同步",
+  "changelog": "v2.18.0\n\n- 98260 链路真机跑通：su -c id 返回 uid=0、context=u:r:ksu:s0，kernelsu 模块 Live\n- 新增 98260 执行引擎通道，与自研执行器并存，按内核档案自动选择\n- 首页高级设置默认展开，拓展功能移到运行卡片上方；删除服务状态卡（保留「服务在线」标签）\n- 五个拓展开关全部接入：安全弹窗、软重启、卸载内核安全防护、SUSFS、VFS\n- 日志改为逐行 fsync 落盘，软重启/进程中断后仍可回看上次运行\n- 本 App 不再主动软重启，只记录 boot_id 变化做归因\n- 删除修复 SU / SU 兼容 / 恢复系统组件等冗余入口与死代码",
   "versions": [
+    {
+      "versionName": "2.18.0",
+      "versionCode": 167,
+      "publishedAt": "2026-11-05T00:48:00+08:00",
+      "size": 14560299,
+      "notes": [
+        "98260 链路真机跑通：su -c id 返回 uid=0、context=u:r:ksu:s0，kernelsu 模块 Live",
+        "新增 98260 执行引擎通道，与自研执行器并存，按内核档案自动选择",
+        "首页高级设置默认展开，拓展功能移到运行卡片上方；删除服务状态卡（保留「服务在线」标签）",
+        "五个拓展开关全部接入：安全弹窗、软重启、卸载内核安全防护、SUSFS、VFS",
+        "日志改为逐行 fsync 落盘，软重启/进程中断后仍可回看上次运行",
+        "本 App 不再主动软重启，只记录 boot_id 变化做归因",
+        "删除修复 SU / SU 兼容 / 恢复系统组件等冗余入口与死代码"
+      ]
+    },
     {
       "versionName": "2.17.17",
       "versionCode": 165,

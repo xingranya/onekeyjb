@@ -148,6 +148,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
     var showFolkPrompt by remember { mutableStateOf(false) }
     var showDiagnostics by remember { mutableStateOf(false) }
     var showClearHistoryConfirm by remember { mutableStateOf(false) }
+    var showManual by remember { mutableStateOf(false) }
     var reloadHistoryTick by remember { mutableIntStateOf(0) }
 
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -214,12 +215,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             onDiagnostics = { showDiagnostics = true },
                             onOpenLog = { tab = 1 },
                             onRunJailbreak = {
-                                if (controller.exploitKind == "cve98260") {
-                                    show98260Warning = true
-                                } else {
-                                    controller.runJailbreak()
-                                    tab = 1
-                                }
+                                show98260Warning = true
                             },
                             contentPadding = screenContentPadding
                         )
@@ -249,6 +245,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             haptic = haptic,
                             onOpenLog = { tab = 1 },
                             onNotice = { showNotice = true },
+                            onManual = { showManual = true },
                             contentPadding = screenContentPadding
                         )
                     }
@@ -291,6 +288,42 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                 )
             }
 
+            if (showManual) {
+                WindowDialog(title = "使用手册", show = true, onDismissRequest = { showManual = false }) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 460.dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        ManualSection("一、准备", listOf(
+                            "安装要用的管理器（KernelSU / KernelSU-Next / SukiSU / BakaSU / FinaSU 之一），App 不再内置管理器和模块。",
+                            "启动 Stellar（推荐）或 Shizuku 服务，回到 App 授予权限；首页显示「服务已连接并授权」才能继续。"
+                        ))
+                        ManualSection("二、一键越狱", listOf(
+                            "点「运行 98260 越狱链」，确认后等待日志出现「越狱完成」。",
+                            "失败时日志会写明停在哪一步；只有在真的写入内核后才会提示重启，未写入可直接再试。"
+                        ))
+                        ManualSection("三、拓展功能（5 项）", listOf(
+                            "越狱后禁用安全弹窗：停用安全守护/安全中心，不影响截屏。",
+                            "越狱后软重启：系统拦截原生调用时，软重启用户态恢复 root。",
+                            "越狱后卸载内核安全防护：卸载 oplus_secure_guard 一类内核防护模块。",
+                            "SUSFS 支持：越狱后加载隐藏模块（需要执行器侧配合）。",
+                            "VFS 支持：加载 hybridmount 做路径重定向，仅 6.18 内核生效。"
+                        ))
+                        ManualSection("四、异常处理", listOf(
+                            "提示「未写内核，可直接重试」：直接再点一次即可。",
+                            "提示「已写内核但未拿到 root」：重启手机后再试，并导出日志。",
+                            "管理器未授权：先在管理器里给 OneKey 授权 root，再回到 App 运行。"
+                        ))
+                        DialogActions(
+                            DialogAction("知道了", COUIIcons.Ok, primary = true) { showManual = false }
+                        )
+                    }
+                }
+            }
+
             if (showNotice) {
                 AppreciationDialog(
                     onMessage = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
@@ -310,7 +343,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
             if (show98260Warning) {
                 WindowDialog(title = "98260 运行前确认", show = true, onDismissRequest = { show98260Warning = false }) {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
-                        Text("实验链一次开机仅能执行一次；若执行失败需硬重启手机。", style = COUITheme.textStyles.body2)
+                        Text("失败后可直接再点一次；只有内核状态异常时才需要硬重启。", style = COUITheme.textStyles.body2)
                         Text(
                             "执行过程中将短暂提权并向内核装载特权模块。",
                             style = COUITheme.textStyles.body2,
@@ -538,6 +571,19 @@ private fun VersionNoteRow(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ManualSection(title: String, lines: List<String>) {
+    Column(Modifier.padding(bottom = 12.dp)) {
+        Text(title, style = COUITheme.textStyles.headline2, color = COUITheme.colorScheme.primary)
+        lines.forEach { line ->
+            Row(Modifier.padding(top = 4.dp)) {
+                Text("· ", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
+                Text(line, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant)
             }
         }
     }
@@ -940,7 +986,7 @@ private fun ResultBanner(
                         text = if (isOk) {
                             "内核提权与模块加载完成 · Root 服务已就绪"
                         } else if (is98260) {
-                            "98260 执行未完成；内核状态可能已改变，切回 64560 或重试前必须先硬重启设备。"
+                            "98260 执行未完成；内核状态可能已改变，重试前必须先硬重启设备。"
                         } else {
                             "在「${controller.stage}」阶段遇到错误，请查看日志排查问题。"
                         },
@@ -983,7 +1029,7 @@ private fun HomeScreen(
     contentPadding: PaddingValues,
 ) {
     val context = LocalContext.current
-    var showAdvanced by remember { mutableStateOf(false) }
+    var showAdvanced by remember { mutableStateOf(true) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = contentPadding,
@@ -1008,26 +1054,23 @@ private fun HomeScreen(
                 )
             }
         }
-        item { StatusCard(controller) }
+        // 高级设置（含拓展功能）放在运行卡片上方
+        item {
+            Card {
+                BasicComponent(
+                    title = if (showAdvanced) "收起高级设置" else "高级设置",
+                    summary = if (showAdvanced) "已展开：安全组件、软重启与拓展功能" else "安全组件、软重启与拓展功能",
+                    startAction = { Icon(COUIIcons.Settings, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
+                    onClick = { haptic(CouiHapticEffect.Switch); showAdvanced = !showAdvanced }
+                )
+            }
+        }
+        if (showAdvanced) {
+            item { OptionsCard(controller, haptic, onOpenLog) }
+            item { ManagerCard(controller, haptic) }
+        }
         item { ActionCard(controller, haptic, onDiagnostics, onRunJailbreak) }
         item { ExploitCard(controller, haptic) }
-        if (controller.exploitKind == "cve98260") {
-            item { FinaOnlyCard() }
-        } else {
-            item { ManagerCard(controller, haptic) }
-            item { AdaptiveManagerCard(controller, haptic) }
-            item {
-                Card {
-                    BasicComponent(
-                        title = if (showAdvanced) "收起高级设置" else "高级设置",
-                        summary = if (showAdvanced) "已展开" else "安全组件、SU 兼容、软重启",
-                        startAction = { Icon(COUIIcons.Settings, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                        onClick = { haptic(CouiHapticEffect.Switch); showAdvanced = !showAdvanced }
-                    )
-                }
-            }
-            if (showAdvanced) item { OptionsCard(controller, haptic, onOpenLog) }
-        }
     }
 }
 
@@ -1041,13 +1084,7 @@ private fun HiddenEnvCard(
         Column(Modifier.padding(4.dp)) {
             BasicComponent(
                 title = "环境隐藏",
-                summary = "默认原生 SU 方式不触碰任何系统挂载，环境隐藏最彻底。"
-            )
-            BasicComponent(
-                title = "清理旧兼容挂载",
-                summary = "若之前开启过兼容层，可点击恢复为纯净原生状态",
-                startAction = { Icon(COUIIcons.Clear, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                onClick = { haptic(CouiHapticEffect.Switch); controller.repairPermissions(); onOpenLog() }
+                summary = "原生方式不触碰任何系统挂载，环境隐藏最彻底。"
             )
         }
     }
@@ -1067,7 +1104,7 @@ private fun HeroCard(controller: JailbreakController) {
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    (if (controller.exploitKind == "cve98260") "98260 实验链" else "64560 稳定越狱链") +
+                    "98260 越狱链" +
                             " · " + (if (controller.suCompatReady) "SU 就绪" else "未提权"),
                     style = COUITheme.textStyles.body2,
                     color = COUITheme.colorScheme.onSurfaceContainerVariant
@@ -1112,9 +1149,8 @@ private fun StatusCard(controller: JailbreakController) {
             }
             Text(
                 when {
-                    controller.suCompatReady && !controller.defaultSuCompat -> "默认 SU：内核原生可用（无任何挂载，环境隐藏）"
-                    controller.suCompatReady -> "默认 SU：已就绪（兼容层已开启）"
-                    else -> "默认 SU：未就绪 → 点「修复」；仍不行再开启「终端 su 兼容」"
+                    controller.suCompatReady -> "默认 SU：已就绪"
+                    else -> "默认 SU：未就绪（重新运行一次越狱即可）"
                 },
                 style = COUITheme.textStyles.body2,
                 color = if (controller.suCompatReady) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurfaceContainerVariant,
@@ -1139,84 +1175,25 @@ private fun ExploitCard(controller: JailbreakController, haptic: (CouiHapticEffe
         Column(Modifier.padding(4.dp)) {
             BasicComponent(
                 title = "越狱方式",
-                summary = if (controller.exploitKind == "cve98260") "CVE-2026-98260 · 实验链" else "CVE-2026-64560 · 稳定链"
+                summary = "CVE-2026-98260 · 唯一链路"
             )
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val stable = controller.exploitKind == "cve64560"
                 Button(
-                    onClick = { haptic(CouiHapticEffect.Switch); controller.updateExploitKind("cve64560") },
+                    onClick = { haptic(CouiHapticEffect.Switch) },
                     modifier = Modifier.weight(1f),
-                    enabled = !controller.running && (controller.profile?.supportsStable != false),
+                    enabled = false,
                     colors = ButtonDefaults.buttonColors(
-                        color = if (stable) COUITheme.colorScheme.primary else COUITheme.colorScheme.surfaceContainer,
-                        contentColor = if (stable) COUITheme.colorScheme.onPrimary else COUITheme.colorScheme.onSurface
+                        color = COUITheme.colorScheme.primary,
+                        contentColor = COUITheme.colorScheme.onPrimary
                     )
-                ) { ButtonIconText(COUIIcons.Lock, if (controller.profile?.supportsStable == false) "仅实验链" else "64560 稳定链") }
-                Button(
-                    onClick = { haptic(CouiHapticEffect.Switch); controller.updateExploitKind("cve98260") },
-                    modifier = Modifier.weight(1f),
-                    enabled = !controller.running,
-                    colors = ButtonDefaults.buttonColors(
-                        color = if (!stable) COUITheme.colorScheme.primary else COUITheme.colorScheme.surfaceContainer,
-                        contentColor = if (!stable) COUITheme.colorScheme.onPrimary else COUITheme.colorScheme.onSurface
-                    )
-                ) { ButtonIconText(COUIIcons.Unlock, "98260 实验链") }
+                ) { ButtonIconText(COUIIcons.Unlock, "98260 越狱链") }
             }
             Text(
-                if (controller.exploitKind == "cve98260")
-                    "98260 实验链仅支持 OnePlus 16 与 Ace 7 Pro。每次开机仅能执行一次，失败必须硬重启。"
-                else
-                    "64560 稳定链成熟稳定，支持完整防检测与自适应模块提取。",
+                "64560 已被官方修复（157 → 201 反汇编确认），App 只保留 98260。失败可直接重试，只有内核异常才需要硬重启。",
                 style = COUITheme.textStyles.body2,
                 color = COUITheme.colorScheme.onSurfaceContainerVariant,
                 modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp, top = 4.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun AdaptiveManagerCard(controller: JailbreakController, haptic: (CouiHapticEffect) -> Unit) {
-    Card {
-        Column(Modifier.padding(4.dp)) {
-            BasicComponent(
-                title = "运行时自适应管理器",
-                summary = "按已装管理器取 ksud 与内核模块；管理器 APK 不再内嵌模块时自动改用云端/内置组件",
-                startAction = { Icon(COUIIcons.Update, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                endActions = {
-                    Switch(
-                        checked = controller.adaptiveManagerEnabled,
-                        onCheckedChange = {
-                            haptic(CouiHapticEffect.Switch)
-                            controller.updateAdaptiveManager(it)
-                        },
-                        enabled = !controller.running
-                    )
-                }
-            )
-            if (controller.adaptiveManagerEnabled) {
-                val a = controller.runtimeAdapter
-                Text(
-                    if (a != null) "已提取 " + a.kind + " 模块 " + (a.moduleSize / 1024) + " KB (v" + a.versionCode + ")"
-                    else "未准备适配材料。点击下方按钮提取当前安装管理器的组件",
-                    style = COUITheme.textStyles.body2,
-                    color = if (a != null) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurfaceContainerVariant,
-                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 4.dp)
-                )
-                Button(
-                    onClick = { haptic(CouiHapticEffect.Switch); controller.prepareRuntimeAdapter() },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                    enabled = !controller.running && !controller.preparing
-                ) {
-                    if (controller.preparing) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("正在提取模块…")
-                    } else {
-                        ButtonIconText(COUIIcons.Refresh, "读取已安装管理器并准备适配")
-                    }
-                }
-            }
         }
     }
 }
@@ -1277,8 +1254,13 @@ private fun OptionsCard(
     Card {
         Column(Modifier.padding(4.dp)) {
             BasicComponent(
-                title = "停用安全组件",
-                summary = "仅安全守护/安全中心，不影响截屏。",
+                title = "拓展功能",
+                summary = "越狱成功后自动生效，可随时关掉",
+                startAction = { Icon(COUIIcons.Settings, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }
+            )
+            BasicComponent(
+                title = "越狱后禁用安全弹窗",
+                summary = "停用安全守护与安全中心，不影响截屏",
                 startAction = { Icon(COUIIcons.Lock, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
                 endActions = {
                     Switch(
@@ -1289,14 +1271,8 @@ private fun OptionsCard(
                 }
             )
             BasicComponent(
-                title = "恢复系统组件",
-                summary = "重新启用安全守护和安全中心",
-                startAction = { Icon(COUIIcons.Unlock, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                onClick = { haptic(CouiHapticEffect.Switch); controller.restoreSecurityComponents(); onOpenLog() }
-            )
-            BasicComponent(
-                title = "越狱后软重启修复",
-                summary = "ColorOS 安全机制拦截原生调用时软重启恢复",
+                title = "越狱后软重启",
+                summary = "ColorOS 拦截原生调用时，软重启用户态恢复 root",
                 startAction = { Icon(COUIIcons.Refresh, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
                 endActions = {
                     Switch(
@@ -1307,19 +1283,37 @@ private fun OptionsCard(
                 }
             )
             BasicComponent(
-                title = "立即软重启 Android",
-                summary = "调用 ksud soft-reboot",
-                startAction = { Icon(COUIIcons.Play, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                onClick = { haptic(CouiHapticEffect.Switch); controller.requestUserSpaceReboot(); onOpenLog() }
-            )
-            BasicComponent(
-                title = "终端 su 兼容层",
-                summary = "为 MT 管理器、Termux 等提供标准 /system_ext/bin/su",
-                startAction = { Icon(COUIIcons.Settings, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
+                title = "越狱后卸载内核安全防护",
+                summary = "卸载 oplus_secure_guard 等内核防护模块",
+                startAction = { Icon(COUIIcons.Unlock, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
                 endActions = {
                     Switch(
-                        checked = controller.defaultSuCompat,
-                        onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateDefaultSuCompat(it) },
+                        checked = controller.unloadKernelGuard,
+                        onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateUnloadKernelGuard(it) },
+                        enabled = !controller.running
+                    )
+                }
+            )
+            BasicComponent(
+                title = "SUSFS 支持",
+                summary = "加载 SUSFS 隐藏模块（需要执行器侧配合）",
+                startAction = { Icon(COUIIcons.Lock, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
+                endActions = {
+                    Switch(
+                        checked = controller.susfsEnabled,
+                        onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateSusfs(it) },
+                        enabled = !controller.running
+                    )
+                }
+            )
+            BasicComponent(
+                title = "VFS 支持",
+                summary = "加载 hybridmount VFS 重定向（仅 6.18 内核）",
+                startAction = { Icon(COUIIcons.Tasks, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
+                endActions = {
+                    Switch(
+                        checked = controller.vfsEnabled,
+                        onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateVfs(it) },
                         enabled = !controller.running
                     )
                 }
@@ -1353,7 +1347,7 @@ private fun ActionCard(
                     Spacer(Modifier.width(8.dp))
                     Text("越狱中 (${controller.elapsedSeconds}s)")
                 } else {
-                    ButtonIconText(COUIIcons.Play, if (controller.exploitKind == "cve98260") "运行 98260 实验链" else "开始 64560 越狱")
+                    ButtonIconText(COUIIcons.Play, "运行 98260 越狱链")
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1369,7 +1363,7 @@ private fun ActionCard(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(text = "环境诊断与修复", onClick = onDiagnostics)
+                TextButton(text = "环境诊断", onClick = onDiagnostics)
             }
         }
     }
@@ -1382,19 +1376,13 @@ private fun DiagnosticsDialog(
     onOpenLog: () -> Unit,
     onMessage: (String) -> Unit,
 ) {
-    WindowDialog(title = "环境诊断与组件修复", show = true, onDismissRequest = onDismiss) {
+    WindowDialog(title = "环境诊断", show = true, onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth()) {
             BasicComponent(
                 title = "环境检查",
                 summary = "服务通道、已装管理器与 SU 挂载",
                 startAction = { Icon(COUIIcons.Search, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
                 onClick = { controller.selfCheck(); onMessage("正在检查环境"); onDismiss(); onOpenLog() }
-            )
-            BasicComponent(
-                title = "修复 SU 通道",
-                summary = "重建 su 链接并刷新授权",
-                startAction = { Icon(COUIIcons.Refresh, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                onClick = { controller.repair(); onMessage("正在修复 SU"); onDismiss(); onOpenLog() }
             )
             BasicComponent(
                 title = "修复截屏扩展",
@@ -1605,6 +1593,7 @@ private fun AboutScreen(
     haptic: (CouiHapticEffect) -> Unit,
     onOpenLog: () -> Unit,
     onNotice: () -> Unit,
+    onManual: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     val context = LocalContext.current
@@ -1665,6 +1654,7 @@ private fun AboutScreen(
         item {
             Card {
                 Column {
+                    BasicComponent(title = "使用手册", summary = "首次使用、拓展功能说明与异常处理", startAction = { Icon(COUIIcons.Notes, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = onManual)
                     BasicComponent(title = "免费声明与赞赏码", summary = "群内免费 · 禁止倒卖", startAction = { Icon(COUIIcons.Help, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = onNotice)
                     BasicComponent(title = "COUI 组件库（开源）", summary = "github.com/suqi8/coui", startAction = { Icon(COUIIcons.Link, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = { openUrl(context, "https://github.com/suqi8/coui") })
                     BasicComponent(title = "Stellar（开源）", summary = "github.com/roro2239/Stellar", startAction = { Icon(COUIIcons.Link, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = { openUrl(context, "https://github.com/roro2239/Stellar") })

@@ -8,8 +8,6 @@ data class DeviceProfile(
     val model: String,
     val device: String?,
     val kernelRelease: String,
-    val supportsStable: Boolean,
-    val supportsNew: Boolean,
     val symbolsAsset: String,
     val onuceSymbolsAsset: String,
     val onuceAsset: String,
@@ -25,26 +23,22 @@ object DeviceProfiles {
         model = "PYB110",
         device = "OP64E1L1",
         kernelRelease = "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
-        supportsStable = true,
-        supportsNew = true,
         symbolsAsset = "core/symbols.txt",
         onuceSymbolsAsset = "core/symbols.txt",
         onuceAsset = "core/onuce/onuce_111_98260",
     )
 
-    /** 一加 16 · ColorOS 17.0.1.201（内核 commit 7fcbffcad3e1，符号表按本 boot.img 重导）。 */
+    /** 一加 16 · ColorOS 17.0.1.201（内核 commit 7fcbffcad3e1，执行器已按新构建放行）。 */
     val PYB110_201 = DeviceProfile(
         id = "pyb110",
         displayName = "OnePlus 16",
         model = "PYB110",
         device = "OP64E1L1",
         kernelRelease = "6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k",
-        supportsStable = true,
-        supportsNew = true,
         symbolsAsset = "core/symbols-1701201.txt",
         onuceSymbolsAsset = "core/symbols-1701201.txt",
-        onuceAsset = "core/onuce/onuce_111_98260",
-        // 98260 原生执行器只在 f957acc 构建上验证过；新构建未验证，失败不代表适配错误。
+        onuceAsset = "core/onuce/onuce_111_98260_201",
+        // 偏移仍由 symbols 文件提供；新构建尚未在真机跑通整链，失败请导出日志。
         onuceVerified = false,
     )
 
@@ -54,8 +48,6 @@ object DeviceProfiles {
         model = "PMS110",
         device = null,
         kernelRelease = "6.12.69-android16-6-g242e1a07f878-ab15865446-4k",
-        supportsStable = false,
-        supportsNew = true,
         symbolsAsset = "core/onuce/device-symbols-612.txt",
         onuceSymbolsAsset = "core/onuce/device-symbols-612.txt",
         onuceAsset = "core/onuce/onuce_111_64560",
@@ -83,7 +75,7 @@ object DeviceProfiles {
         }
     }
 
-    /** 机型命中但内核串不认识时，返回它支持的内核列表用于提示。 */
+    /** 机型命中但内核串不认识时，用它提示支持哪些 release。 */
     fun knownReleasesFor(profile: DeviceProfile?): List<String> =
         profile?.let { p -> all.filter { it.id == p.id }.map { it.kernelRelease } } ?: emptyList()
 }

@@ -13,13 +13,6 @@ import dev.onekey.jb.ShizukuShell
  *   - never soft-reboots; requires hard reboot on failure
  */
 object Cve98260Engine {
-    private const val PREF_BOOT = "p98260_attempt_boot_id"
-    private const val PREF_AT = "p98260_attempt_at"
-
-    fun markBootAttempt(context: Context, bootId: String) {
-        val prefs = context.getSharedPreferences("merged", Context.MODE_PRIVATE)
-        prefs.edit().putString(PREF_BOOT, bootId).putLong(PREF_AT, System.currentTimeMillis()).apply()
-    }
 
     fun run(
         context: Context,
@@ -34,7 +27,7 @@ object Cve98260Engine {
         progressSink: (Int) -> Unit,
     ): Boolean {
         val profile = DeviceProfiles.current()
-        if (profile == null || !profile.supportsNew) {
+        if (profile == null) {
             logSink("98260 当前设备不在支持范围：" + android.os.Build.MODEL + " / " + (System.getProperty("os.version") ?: ""))
             return false
         }
@@ -50,11 +43,7 @@ object Cve98260Engine {
             logSink("98260 读取 boot_id 失败，拒绝运行")
             return false
         }
-        val prefs = context.getSharedPreferences("merged", Context.MODE_PRIVATE)
-        if (prefs.getString(PREF_BOOT, null) == bootId) {
-            logSink("98260 本次开机已经尝试过（boot_id=" + bootId.take(8) + "），请硬重启后再试")
-            return false
-        }
+        logSink("98260 boot=" + bootId.take(8) + "，本次开机可重复尝试；仅在内核状态异常时才需要硬重启")
 
         stageSink("98260 检查已有 root")
         progressSink(2)
@@ -90,7 +79,7 @@ object Cve98260Engine {
             logSink("98260 使用 GhostKey 原生后端")
             val ghost = GhostKeyEngine.run(
                 context, targetPkg, targetKind, logSink, stageSink, progressSink,
-                beforeNative = { markBootAttempt(context, bootId) }
+                beforeNative = { }
             )
             if (ghost != null) {
                 return ghost
@@ -102,9 +91,19 @@ object Cve98260Engine {
         // is not device-verified and a wrong slide/task offset can panic the kernel.
         logSink("98260 使用新越狱执行器（" + targetKind + "）")
         // 标记本次开机已尝试原生提权，防止失败后重试导致硬重启死循环
-        markBootAttempt(context, bootId)
-        logSink("98260 本次开机一次性许可已锁定（boot_id=" + bootId.take(8) + "）")
-        return OnuceEngine.run(context, targetPkg, targetKind, runAdapter, logSink, stageSink, progressSink)
+        logSink("98260 开始执行（boot=" + bootId.take(8) + "），失败可直接重试")
+        val ok = OnuceEngine.run(context, targetPkg, targetKind, runAdapter, logSink, stageSink, progressSink)
+        if (!ok) {
+            if (OnuceEngine.lastAbortStage == "slide") {
+                RunReport.stop("校准内核地址", "滑动量校验未通过")
+            } else {
+                RunReport.stop("提权", "执行器未拿到 root")
+            }
+        }
+        if (!ok && OnuceEngine.lastAbortStage == "slide") {
+            logSink("本次只在校准阶段停止，未写入内核；可以直接再点一次")
+        }
+        return ok
     }
 
     private fun managerCert(context: Context, pkg: String): String? = runCatching {

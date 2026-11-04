@@ -144,19 +144,24 @@ object RuntimeExtractor {
             }
             if (ksud.isEmpty()) throw IllegalStateException("FinaSU libksud 为空")
             val rel = com.pyb110.onekey.ghost.device.KernelProbe.read().trim()
-            // 6.12 与 6.18 的 LKM 不能混用：按设备内核系列选择对应 KMI 的内置模块。
+            val dir = File(ctx.filesDir, "adapters/fina-" + versionCode + "-" + sha256(apkBytes).take(12))
+            dir.mkdirs()
+            val ksudOut = File(dir, "ksud").apply { writeBytes(ksud) }
+            // 不再内置 LKM：模块交给云端，未命中时由执行器用管理器 ksud 自带的 late-load 数据。
             val moduleAsset = if (rel.startsWith("6.12")) "core/finasu-6.12.ko" else "core/finasu.ko"
-            val rawModule = ctx.assets.open(moduleAsset).use { it.readBytes() }
+            val rawModule = runCatching { ctx.assets.open(moduleAsset).use { it.readBytes() } }.getOrNull()
+            if (rawModule == null) {
+                log("FinaSU 自适应：仅取管理器 libksud（" + ksud.size + " B），内核模块改用云端或 ksud 内置")
+                return Adapter(pkg, "finasu", versionCode, versionName, sha256(apkBytes), "", ksudOut.absolutePath, "", 0, "", certSha)
+            }
             val info = inspect(rawModule) ?: throw IllegalStateException("finasu.ko ELF 结构无效")
             val rawMod = Module(rawModule, sha256(rawModule), info.first, info.second)
             val patched = if (rel.isNotEmpty() && !info.first.startsWith(rel)) {
                 log("FinaSU 自适应：内核 release ($rel) 与 finasu.ko (${info.first}) 不一致，执行 vermagic 动态对齐")
                 patchVermagic(rawMod, rel)
             } else rawMod
-            val dir = File(ctx.filesDir, "adapters/fina-" + versionCode + "-" + sha256(apkBytes).take(12))
-            dir.mkdirs()
             val mf = File(dir, "module.ko").apply { writeBytes(patched.bytes) }
-            val kf = File(dir, "ksud").apply { writeBytes(ksud) }
+            val kf = ksudOut
             log("FinaSU 自适应：libksud.so " + ksud.size + " B，LKM " + moduleAsset + " " + patched.bytes.size + " B (vermagic=" + patched.vermagic + ")")
             return Adapter(pkg, "finasu", versionCode, versionName, sha256(apkBytes), mf.absolutePath, kf.absolutePath, patched.sha256, patched.bytes.size, patched.vermagic, certSha)
         } finally {

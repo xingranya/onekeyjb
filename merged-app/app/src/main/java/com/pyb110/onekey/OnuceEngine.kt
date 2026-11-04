@@ -11,6 +11,9 @@ import java.security.MessageDigest
 object OnuceEngine {
     private const val ROOT = "/data/local/tmp/onuce"
 
+    /** 最近一次运行停在哪：slide=仅校准失败（内核未被写入），其它为空。 */
+    @Volatile var lastAbortStage: String? = null
+
     private fun sha256(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes)
             .joinToString("") { String.format("%02x", it) }
@@ -27,10 +30,12 @@ object OnuceEngine {
     private fun koAsset(b: String) = "core/" + if (b == "official") "official.ko" else b + ".ko"
     private fun ksudAsset(b: String) = "core/ksud_" + b
 
-    /** Onuce 1.11：64560 变体带 6.12，98260 变体用于 6.18。 */
-    private fun runtimeAsset(): String =
-        if (KernelProbe.read().trim().startsWith("6.12.")) "core/onuce/onuce_111_64560"
+    /** 执行器按机型档案选：不同内核构建用各自放行过的二进制。 */
+    private fun runtimeAsset(): String {
+        DeviceProfiles.current()?.let { return it.onuceAsset }
+        return if (KernelProbe.read().trim().startsWith("6.12.")) "core/onuce/onuce_111_64560"
         else "core/onuce/onuce_111_98260"
+    }
 
     fun run(
         context: Context,
@@ -41,6 +46,7 @@ object OnuceEngine {
         stage: (String) -> Unit,
         progress: (Int) -> Unit,
     ): Boolean {
+        lastAbortStage = null
         val profile = DeviceProfiles.current()
         if (profile != null && !profile.onuceVerified) {
             log("提示：98260 执行器按旧内核构建标定，当前系统是 " + profile.kernelRelease)
@@ -86,13 +92,12 @@ object OnuceEngine {
             ?: adapter?.takeIf { it.modulePath.isNotBlank() }
                 ?.let { runCatching { File(it.modulePath).readBytes() }.getOrNull() }
             ?: bundled
-            ?: run { log("缺少 LKM 组件：" + b); return false }
-        val ksudBytes = if (adapter != null) {
-            runCatching { File(adapter.ksudPath).readBytes() }.getOrNull()
-        } else {
-            val asset = if (b == "sukisu") "core/onuce/sukisu.ksud" else ksudAsset(b)
-            runCatching { context.assets.open(asset).use { it.readBytes() } }.getOrNull()
-        } ?: run { log("缺少 ksud 组件：" + b); return false }
+        if (moduleBytes == null) {
+            log("未提供内核模块：交给执行器使用管理器 ksud 自带的 late-load 数据")
+        }
+        val ksudBytes = adapter?.let { runCatching { File(it.ksudPath).readBytes() }.getOrNull() }
+            ?: runCatching { context.assets.open(ksudAsset(b)).use { it.readBytes() } }.getOrNull()
+            ?: run { log("缺少 ksud：请先安装所选管理器，App 不再内置 ksud 副本"); return false }
         val expected = version
         val conf = "onuce-runtime-v2\t" + b + "\t" + pkg + "\t" + version + "\t" + expected +
             "\t6\t" + cert + "\t" + sha256(ksudBytes) + "\t" + apkHash + "\n"
@@ -114,16 +119,21 @@ object OnuceEngine {
                 return false
             }
         }
-        if (ShizukuShell.stageBytes(moduleBytes, ws + "/" + b + ".ko", 644).code != 0 ||
-            ShizukuShell.stageBytes(ksudBytes, ws + "/" + b + ".ksud", 755).code != 0) {
-            log("管理器组件投放失败")
+        if (moduleBytes != null && ShizukuShell.stageBytes(moduleBytes, ws + "/" + b + ".ko", 644).code != 0) {
+            log("内核模块投放失败")
+            return false
+        }
+        if (ShizukuShell.stageBytes(ksudBytes, ws + "/" + b + ".ksud", 755).code != 0) {
+            log("管理器 ksud 投放失败")
             return false
         }
         if (ShizukuShell.stageBytes(conf.toByteArray(Charsets.UTF_8), ws + "/manager.conf", 644).code != 0) {
             log("运行配置投放失败")
             return false
         }
-        ShizukuShell.run("cd " + ws + " && cp -f " + b + ".ko current.ko && echo READY", 20)
+        if (moduleBytes != null) {
+            ShizukuShell.run("cd " + ws + " && cp -f " + b + ".ko current.ko && echo READY", 20)
+        }
         val prep = ShizukuShell.run("cd " + ws + " && ls -l 2>&1 && echo RC=\$?", 20)
         log("运行目录: " + prep.output.trim().take(1200))
         stage("执行器启动")
@@ -131,27 +141,93 @@ object OnuceEngine {
         val exec = ws + "/onuce"
         val cmd = "env ONUCE_SESSION_ID=onekey-" + System.currentTimeMillis() +
             " ONUCE_TIMEOUT=180 " + exec + " run " + ws + " " + b + " 2>&1"
-        log("开始执行越狱流程")
-        var r: ShizukuShell.Result
-        var busyAttempts = 0
-        while (true) {
-            if (!SystemReadinessGate.await(log, 75)) {
-                ShizukuShell.run("su -c \"pkill -9 -f 'onuce --plant' 2>/dev/null; true\" 2>&1", 20)
+        log("执行器已启动，正在寻找提权入口（快路径通常 10 秒内完成）")
+        stage("执行器运行中")
+        progress(20)
+        var exitCode = -1
+        var lastLineAt = System.currentTimeMillis()
+        var warnedIdle = false
+        var slideRound = 0
+        var abortRequested = false
+        var proc: ShizukuShell.LineProc? = null
+        val startedAt = System.currentTimeMillis()
+        try {
+            proc = ShizukuShell.start(cmd) { raw ->
+                val line = raw.trim()
+                if (line.isEmpty()) return@start
+                lastLineAt = System.currentTimeMillis()
+                // 执行器输出是 tab 分隔：ONUCE <kind> <detail...>
+                val body = line.removePrefix("ONUCE").trim().removePrefix("执行器").trim()
+                val parts = body.split('	', ' ').filter { it.isNotEmpty() }
+                val kind = parts.getOrNull(0).orEmpty()
+                val detail = parts.drop(1).joinToString(" ")
+                when {
+                    line.startsWith("SLIDE_TRY=") -> {
+                        slideRound = line.removePrefix("SLIDE_TRY=").trim().toIntOrNull() ?: (slideRound + 1)
+                        stage("校准内核地址（第 " + slideRound + " 轮）")
+                    }
+                    line.startsWith("SLIDE_MISS=") -> {
+                        val n = line.substringAfter('=').substringBefore(' ').toIntOrNull() ?: slideRound
+                        slideRound = n
+                        if (n == 1 || n % 4 == 0) log("第 " + n + " 轮滑动量校验未通过，继续重试")
+                        if (n >= 12 && !abortRequested) {
+                            abortRequested = true
+                            lastAbortStage = "slide"
+                            log("连续 12 轮校验未通过：当前内核的滑动量锚点与执行器不一致，已停止")
+                            log("下一步：需要为该内核构建重新标定锚点；本轮未改动内核状态")
+                        }
+                    }
+                    kind == "stage" -> stage(stageName(detail.substringBefore(' ')))
+                    kind == "detail" -> if (detail.isNotBlank()) log("  " + readable(detail))
+                    kind == "timing" -> Unit
+                    kind == "error" -> log("执行器：" + detail)
+                    kind == "backend" || kind == "device" || kind == "boot" -> Unit
+                    line.startsWith("UAF mode=") || line.startsWith("LEAK_") ||
+                        line.startsWith("RETRY=") || line.startsWith("SLIDE=") ||
+                        line.startsWith("SLIDE_PROBE") || line.startsWith("SLIDE_DERIVED") -> Unit
+                    else -> if (line.length in 3..200 && !line.startsWith("[")) log("  " + line)
+                }
+            }
+            while (proc.isRunning()) {
+                Thread.sleep(500)
+                if (abortRequested) { proc.destroy(); break }
+                val now = System.currentTimeMillis()
+                val idle = (now - lastLineAt) / 1000L
+                val total = (now - startedAt) / 1000L
+                if (!warnedIdle && idle >= 15) {
+                    warnedIdle = true
+                    log("执行器 " + idle + " 秒没有输出，仍在运行；若超过 2 分钟建议停止后重试")
+                    stage("执行器响应较慢")
+                }
+                if (total >= 200) {
+                    log("执行器超过 200 秒未结束，已终止本次运行")
+                    proc.destroy()
+                    return false
+                }
+            }
+            if (abortRequested) {
+                log("执行器已按计划停止，用时 " + ((System.currentTimeMillis() - startedAt) / 1000) + " 秒")
                 return false
             }
-            r = ShizukuShell.run(cmd, 180)
-            log("执行退出码: " + r.code)
-            log("执行输出: " + r.output.replace("ONUCE", "执行器").trim().take(3000))
-            val busy = r.code == 40 || r.output.contains("系统繁忙") || r.output.contains("runnable")
-            if (!busy) break
-            ShizukuShell.run("su -c \"pkill -9 -f 'onuce --plant' 2>/dev/null; true\" 2>&1", 20)
-            busyAttempts++
-            if (busyAttempts >= 2) {
-                log("系统持续繁忙，执行器已安全停止；请关闭后台应用后稍后重试")
-                return false
-            }
-            log("系统繁忙，执行器主动停止；等待 15 秒后重试一次")
-            Thread.sleep(15000)
+            exitCode = runCatching { proc.exitCode() }.getOrNull() ?: -1
+        } catch (e: Throwable) {
+            log("执行器异常：" + (e.message ?: e.javaClass.simpleName))
+            return false
+        } finally {
+            runCatching { proc?.destroy() }
+        }
+        if (exitCode == 5 || exitCode == 40) {
+            log("检测到上一轮残留任务，已清理并重试一次")
+            ShizukuShell.run("pkill -9 -x onuce 2>/dev/null; pkill -9 -f '/data/local/tmp/onuce/' 2>/dev/null; true", 10)
+            Thread.sleep(1500)
+            val retry = ShizukuShell.run(cmd, 60)
+            log("重试退出码: " + retry.code)
+            exitCode = retry.code
+        }
+        log("执行器结束，退出码 " + exitCode + "，用时 " + ((System.currentTimeMillis() - startedAt) / 1000) + " 秒")
+        // 中止或异常时残留的 plant 会占住下一次运行，这里统一清掉
+        if (abortRequested || exitCode != 0) {
+            ShizukuShell.run("pkill -9 -x onuce 2>/dev/null; pkill -9 -f '/data/local/tmp/onuce/' 2>/dev/null; true", 10)
         }
         // Verify root before any finalize/cleanup. A timeout does not mean
         // the native helper failed, but it must never be reported as a clean
@@ -179,8 +255,8 @@ object OnuceEngine {
             val shot = ScreenshotRepair.repair(log)
             log("截屏组件: " + if (shot.enabled) "已启用" else "恢复失败")
             progress(100)
-            stage(if (r.code == 124) "root 已获取（执行器超时）" else "越狱完成")
-            if (r.code == 124) {
+            stage(if (exitCode == 124) "root 已获取（执行器超时）" else "越狱完成")
+            if (exitCode == 124) {
                 log("执行器超时，但 root 已获取；残留进程已清理，请勿重复越狱")
             } else {
                 log("越狱完成：uid=0，manager=" + pkg)
@@ -284,6 +360,32 @@ object OnuceEngine {
             log("未取得 root；不执行旧链路")
         }
         return ok
+    }
+
+    /** 执行器阶段键 → 界面文案。 */
+    private fun stageName(key: String): String = when (key) {
+        "capture" -> "采集内核事件"
+        "calibration" -> "校准内核地址"
+        "credential" -> "提权与定位凭证"
+        "selinux" -> "切换安全策略"
+        "module" -> "加载内核模块"
+        "manager" -> "登记管理器"
+        "finalize" -> "收尾"
+        else -> if (key.isBlank()) "执行器运行中" else key
+    }
+
+    /** 执行器 detail 行 → 可读文案（已经是中文的原样保留）。 */
+    private fun readable(detail: String): String {
+        val body = detail.substringAfter(' ', detail).trim()
+        return when {
+            detail.startsWith("capture ") -> "采集内核事件 " + body
+            detail.startsWith("calibration ") -> body
+            detail.startsWith("module ") -> body
+            detail.startsWith("policy ") -> body
+            detail.startsWith("automatic ") -> body
+            detail.startsWith("chain ") -> body
+            else -> body.ifBlank { detail }
+        }
     }
 
     private fun shQuote(v: String): String = "'" + v.replace("'", "'\\''") + "'"

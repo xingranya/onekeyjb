@@ -48,6 +48,8 @@ class JailbreakController private constructor(private val context: Context) {
     private val prefs = context.getSharedPreferences("merged", Context.MODE_PRIVATE)
     private val legacyPrefs = context.getSharedPreferences("onekey", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(Dispatchers.IO)
+    // 必须早于 init 块初始化：init 里的 refreshState() 可能触发 addLog 的 synchronized(logLock)
+    private val logLock = Any()
     private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.US)
     private val expectedCert = mapOf(
         "next" to "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
@@ -62,17 +64,22 @@ class JailbreakController private constructor(private val context: Context) {
     var platformReason: String? by mutableStateOf(null); private set
     var managers: List<ManagerOption> by mutableStateOf(emptyList()); private set
     var selectedManager: String by mutableStateOf(loadSelectedManager()); private set
-    var adaptiveManagerEnabled: Boolean by mutableStateOf(prefs.getBoolean("adaptive_manager", true)); private set
-    var exploitKind: String by mutableStateOf(loadExploitKind()); private set
+    /** 不再提供开关：内核模块与 ksud 一律从已安装管理器 APK 运行时提取。 */
+    val adaptiveManagerEnabled: Boolean = true
     var runtimeAdapter: RuntimeExtractor.Adapter? by mutableStateOf(null); private set
     var preparing: Boolean by mutableStateOf(false); private set
     var antiRootGuard: Boolean by mutableStateOf(prefs.getBoolean("antiroot", true)); private set
     var cloudAuto: Boolean by mutableStateOf(prefs.getBoolean("cloud_auto", true)); private set
     var updateStatus: String by mutableStateOf("尚未检查更新"); private set
     var checkingUpdate: Boolean by mutableStateOf(false); private set
-    var defaultSuCompat: Boolean by mutableStateOf(false); private set
     /** ColorOS 17 安全机制会拦截原生内核调用；越狱后软重启用户态可恢复 su（内核 LKM 保持加载）。 */
     var softRebootFix: Boolean by mutableStateOf(prefs.getBoolean("soft_reboot_fix", true)); private set
+    /** 越狱后卸载内核安全防护（oplus_secure_guard 等）。 */
+    var unloadKernelGuard: Boolean by mutableStateOf(prefs.getBoolean("unload_kernel_guard", true)); private set
+    /** SUSFS 隐藏支持（需要执行器侧加载模块）。 */
+    var susfsEnabled: Boolean by mutableStateOf(prefs.getBoolean("susfs_enabled", false)); private set
+    /** VFS（hybridmount）支持，仅 6.18 内核。 */
+    var vfsEnabled: Boolean by mutableStateOf(prefs.getBoolean("vfs_enabled", false)); private set
     var running: Boolean by mutableStateOf(false); private set
     var elapsedSeconds: Long by mutableStateOf(0L); private set
     var progress: Float by mutableStateOf(0f); private set
@@ -120,25 +127,18 @@ class JailbreakController private constructor(private val context: Context) {
         }
     }
 
-    private fun loadExploitKind(): String {
-        if (profile != null && !profile.supportsStable) return "cve98260"
-        val saved = prefs.getString("exploit_kind", "cve64560")
-        return if (saved == "cve98260") "cve98260" else "cve64560"
-    }
-
-    fun updateExploitKind(kind: String) {
-        if (running) return
-        if (profile != null && !profile.supportsStable && kind != "cve98260") {
-            addLog(profile.displayName + " 仅支持 98260 新链")
-            return
-        }
-        exploitKind = if (kind == "cve98260") "cve98260" else "cve64560"
-        prefs.edit().putString("exploit_kind", exploitKind).apply()
-        addLog(if (exploitKind == "cve98260") "已切到 98260 实验链：仅临时 root，不加载管理器" else "已切回 64560 稳定越狱链")
-    }
-
     init {
         platformReason = SecurityCheck.reason(context)
+        // 软重启/进程被杀后仍能看到上一次运行的日志
+        runCatching {
+            val f = File(context.filesDir, "onekey-live.log")
+            if (f.isFile) {
+                val tail = f.readLines().takeLast(400)
+                if (tail.isNotEmpty()) {
+                    logs = tail + "—— 以上为上次运行记录（可能被软重启中断）——"
+                }
+            }
+        }
     }
 
     private fun loadSelectedManager(): String {
@@ -291,15 +291,6 @@ class JailbreakController private constructor(private val context: Context) {
         }
     }
 
-    fun updateAdaptiveManager(enabled: Boolean) {
-        if (running) { addLog("运行中不能切换自适应模式"); return }
-        adaptiveManagerEnabled = enabled
-        runtimeAdapter = null
-        managers = buildManagers()
-        prefs.edit().putBoolean("adaptive_manager", enabled).apply()
-        addLog(if (enabled) "已开启自适应管理器：只列出已安装的固定版本" else "已关闭自适应管理器：显示全部固定版本")
-    }
-
     private fun installedVersion(pkg: String): String? = try {
         context.packageManager.getPackageInfo(pkg, 0).versionName ?: "已安装"
     } catch (e: PackageManager.NameNotFoundException) { null }
@@ -343,20 +334,30 @@ class JailbreakController private constructor(private val context: Context) {
         }
     }
 
+    fun updateUnloadKernelGuard(enabled: Boolean) {
+        unloadKernelGuard = enabled
+        prefs.edit().putBoolean("unload_kernel_guard", enabled).apply()
+        addLog(if (enabled) "已开启：越狱后卸载内核安全防护" else "已关闭内核安全防护卸载")
+    }
+
+    fun updateSusfs(enabled: Boolean) {
+        susfsEnabled = enabled
+        prefs.edit().putBoolean("susfs_enabled", enabled).apply()
+        addLog(if (enabled) "已开启 SUSFS 支持（执行器加载模块后生效）" else "已关闭 SUSFS 支持")
+    }
+
+    fun updateVfs(enabled: Boolean) {
+        vfsEnabled = enabled
+        prefs.edit().putBoolean("vfs_enabled", enabled).apply()
+        addLog(if (enabled) "已开启 VFS 支持（仅 6.18 内核生效）" else "已关闭 VFS 支持")
+    }
+
     fun updateSoftRebootFix(enabled: Boolean) {
         softRebootFix = enabled
         prefs.edit().putBoolean("soft_reboot_fix", enabled).apply()
         addLog(if (enabled) "已开启「越狱后软重启修复」：ColorOS 安全机制拦截时自动软重启恢复 su" else "已关闭「越狱后软重启修复」")
     }
 
-    fun updateDefaultSuCompat(enabled: Boolean) {
-        defaultSuCompat = enabled
-        addLog(
-            if (enabled) "已开启「默认 SU 兼容」：下次越狱/修复会额外部署 /system_ext/bin/su（会多一个 su_compat 挂载，可被检测）"
-            else "已关闭「默认 SU 兼容」：完全使用内核原生 su，不创建任何挂载（推荐）"
-        )
-        if (!enabled) addLog("提示：如果之前开过兼容层，点一次「修复」即可清除现有挂载。")
-    }
 
     private fun cleanupStaleExecutor() {
         if (running) return
@@ -366,14 +367,6 @@ class JailbreakController private constructor(private val context: Context) {
         if (r.output.isNotBlank()) addLog("已清理残留执行器")
     }
 
-    fun requestUserSpaceReboot() {
-        if (running) { addLog("当前任务运行中，暂不执行用户态重启"); return }
-        addLog("用户手动请求用户态重启（内核模块保持加载）")
-        scope.launch {
-            val ok = RestartManager.request(context) { addLog(it) }
-            addLog(if (ok) "用户态重启请求已发送" else "用户态重启请求未发送或失败")
-        }
-    }
 
     fun repairScreenshot() {
         if (running) { addLog("当前任务运行中，暂不修复截屏"); return }
@@ -396,14 +389,18 @@ class JailbreakController private constructor(private val context: Context) {
         }
     }
 
-    private val logLock = Any()
-
     fun addLog(line: String) {
         val stamped = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date()) + "  " + line
         synchronized(logLock) {
             val next = logs + stamped
             logs = if (next.size > 3000) next.takeLast(3000) else next
-            runCatching { File(context.filesDir, "onekey-live.log").appendText(stamped + "\n") }
+            runCatching {
+                java.io.FileOutputStream(File(context.filesDir, "onekey-live.log"), true).use { out ->
+                    out.write((stamped + "\n").toByteArray(Charsets.UTF_8))
+                    out.flush()
+                    out.fd.sync()
+                }
+            }
             HistoryStore.append(stamped)
         }
     }
@@ -456,118 +453,7 @@ class JailbreakController private constructor(private val context: Context) {
             addLog("当前选择的管理器未安装或版本不匹配，已拒绝开始；请安装固定版本后重试")
             return
         }
-        if (profile != null && !profile.supportsStable) {
-            exploitKind = "cve98260"
-        }
-        if (exploitKind == "cve98260") {
-            runInfinity98260()
-            return
-        }
-        if (!acquireRunLock()) return
-        running = true
-        lastResultExploitKind = exploitKind
-        val runAdaptive = adaptiveManagerEnabled
-        val runKind = selectedManager
-        runCatching { JailbreakRunService.start(context) }
-        progress = 0.01f
-        stage = "检查 Stellar 服务"
-        elapsedSeconds = 0L
-        lastResultOk = null
-        logs = emptyList()
-        HistoryStore.start(context, exploitKind, runKind, runAdaptive, BuildConfig.VERSION_NAME)
-        addLog("========== OneKey · " + (profile?.displayName ?: "OnePlus") + " · v" + BuildConfig.VERSION_NAME + " ==========")
-        val t0 = System.currentTimeMillis()
-        scope.launch { while (running) { elapsedSeconds = (System.currentTimeMillis() - t0) / 1000L; delay(1000L) } }
-        scope.launch {
-            var ok = false
-            try {
-                if (!ensurePermission()) { stage = "未获得权限"; return@launch }
-                progress = 0.02f
-                var adapter = if (runAdaptive) runtimeAdapter else null
-                val chosen = managers.firstOrNull { it.kind == runKind } ?: run {
-                    addLog("选择的管理器已不在列表中，已停止")
-                    return@launch
-                }
-                if (runAdaptive && (adapter == null || adapter.pkg != chosen.pkg || adapter.versionCode != chosen.installedVersionCode)) {
-                    preparing = true
-                    stage = "读取管理器 APK 并提取模块"
-                    addLog("开始运行时适配：" + selectedManager)
-                    adapter = try {
-                        if (runKind == "finasu") {
-                            RuntimeExtractor.prepareFina(context, chosen.pkg, expectedCert[runKind] ?: throw IllegalStateException("缺少管理器信任证书")) { addLog(it) }
-                                .also { runtimeAdapter = it }
-                        } else {
-                            RuntimeExtractor.prepare(context, chosen.pkg, runKind, expectedCert[runKind] ?: throw IllegalStateException("缺少管理器信任证书")) { addLog(it) }
-                                .also { runtimeAdapter = it }
-                        }
-                    } catch (e: Throwable) {
-                        if (runKind == "finasu") {
-                            addLog("FinaSU 提取失败，改用内置兼容组件：" + e.message)
-                            runtimeAdapter = null
-                            null
-                        } else {
-                            addLog("适配失败，已停止：" + e.message)
-                            preparing = false
-                            stage = "适配失败"
-                            return@launch
-                        }
-                    } finally { preparing = false }
-                }
-                val engine = StableEngine(
-                    context,
-                    logSink = { line -> addLog(line) },
-                    stageSink = { title -> stage = title; HistoryStore.updateStage(title) },
-                    progressSink = { pct -> if (pct >= 100) progress = 1f else progress = pct / 100f }
-                )
-                ok = engine.run(runKind, antiRootGuard, defaultSuCompat, softRebootFix, adapter, chosen.pkg)
-            } catch (e: Throwable) {
-                addLog("异常: " + e)
-                ok = false
-            } finally {
-                running = false
-                runCatching {
-                    JailbreakRunService.update(context, if (ok) "完成" else "未完成", if (ok) 1f else progress)
-                }
-                if (ok) {
-                    scope.launch { kotlinx.coroutines.delay(3000); runCatching { JailbreakRunService.stop(context) } }
-                } else {
-                    runCatching { JailbreakRunService.stop(context) }
-                }
-                releaseRunLock()
-                lastResultOk = ok
-                lastResultExploitKind = exploitKind
-                if (ok) hardenAfterSuccess()
-                stage = if (ok) "越狱完成" else "未完成，请查看日志"
-                if (ok) progress = 1f
-                if (ok && softRebootFix) {
-                    addLog("ColorOS 17 安全机制修复：约 10 秒后软重启 Android 用户态（LKM 保持加载）。")
-                    addLog("软重启完成后重新打开本应用即可，不需要重新越狱。")
-                }
-                persistLogs()
-                if (serviceReady) {
-                    val nativeSu = StellarShell.run("timeout 6 su -c 'id -u' 2>/dev/null; true", 15).output.trim()
-                    val overlaySu = StellarShell.run("[ -x /system_ext/bin/su ] && grep -q su_compat /proc/mounts && echo READY || echo MISSING", 15)
-                    suCompatReady = nativeSu == "0" || overlaySu.output.contains("READY")
-                    if (!suCompatReady) addLog("提示：su 通道未就绪，请点「修复」重试")
-                }
-                runCatching {
-                    if (serviceReady) {
-                        StellarShell.run(
-                            "rm -rf /data/local/tmp/onekey /data/local/tmp/onekey-[0-9]* /data/local/tmp/onekey-su " +
-                                "/data/local/tmp/ksu_grant /data/local/tmp/root_stage.sh /data/local/tmp/onekey_dir " +
-                                "/data/local/tmp/ksu-op3.ko /data/local/tmp/ksud342 " +
-                                "/data/local/tmp/root_run /data/local/tmp/root_backend " +
-                                "/data/local/tmp/root_manager_pkg /data/local/tmp/root_manager_apk /data/local/tmp/root_expected_uapi " +
-                                "/data/local/tmp/root_expected_version /data/local/tmp/root_strict /data/local/tmp/root_antiroot 2>/dev/null; " +
-                                "echo TEMP_CLEANED",
-                            60
-                        )
-                    }
-                }
-                HistoryStore.finish(ok, stage, elapsedSeconds)
-                refreshState()
-            }
-        }
+        runInfinity98260()
     }
 
     private fun runInfinity98260() {
@@ -581,6 +467,7 @@ class JailbreakController private constructor(private val context: Context) {
         val runAdaptive = adaptiveManagerEnabled
         val runKind = selectedManager
         runCatching { JailbreakRunService.start(context) }
+        val startBootId = ShizukuShell.run("cat /proc/sys/kernel/random/boot_id 2>/dev/null", 8).output.trim()
         progress = 0.01f
         stage = "检查 Stellar 服务"
         elapsedSeconds = 0L
@@ -631,20 +518,44 @@ class JailbreakController private constructor(private val context: Context) {
                         preparing = false
                     }
                 }
-                stage = "运行 98260 实验链"
-                progress = 0.05f
-                ok = Cve98260Engine.run(
-                    context,
-                    chosen.pkg,
-                    runKind,
-                    adapter,
-                    antiRootGuard,
-                    defaultSuCompat,
-                    softRebootFix,
-                    logSink = { addLog(it) },
-                    stageSink = { stage = it; HistoryStore.updateStage(it) },
-                    progressSink = { progress = it / 100f }
-                )
+                RunReport.reset()
+                // 新内核优先：98260 执行引擎（若已放入 core/exec/onekey-98260）→ 自研执行器 → onuce
+                val isNewKernel = profile?.onuceAsset?.contains("_201") == true
+                if (isNewKernel && OneKeyEngine.available(context)) {
+                    stage = "运行 98260 执行引擎"
+                    progress = 0.05f
+                    ok = OneKeyEngine.run(
+                        context, chosen.kind,
+                        { addLog(it) },
+                        { stage = it; HistoryStore.updateStage(it) },
+                        { progress = it / 100f },
+                        susfsEnabled, vfsEnabled, unloadKernelGuard, antiRootGuard, softRebootFix
+                    )
+                } else if (isNewKernel && NativeExecutor.available(context)) {
+                    stage = "运行自研执行器"
+                    progress = 0.05f
+                    ok = NativeExecutor.run(
+                        context, chosen.kind,
+                        { addLog(it) },
+                        { stage = it; HistoryStore.updateStage(it) },
+                        { progress = it / 100f }
+                    )
+                } else {
+                    stage = "运行 98260 实验链"
+                    progress = 0.05f
+                    ok = Cve98260Engine.run(
+                        context,
+                        chosen.pkg,
+                        runKind,
+                        adapter,
+                        antiRootGuard,
+                        false,
+                        softRebootFix,
+                        logSink = { addLog(it) },
+                        stageSink = { stage = it; HistoryStore.updateStage(it) },
+                        progressSink = { progress = it / 100f }
+                    )
+                }
             } catch (e: Throwable) {
                 addLog("98260 异常: " + e)
                 ok = false
@@ -662,9 +573,30 @@ class JailbreakController private constructor(private val context: Context) {
                 lastResultOk = ok
                 lastResultExploitKind = "cve98260"
                 if (ok) hardenAfterSuccess()
-                stage = if (ok) "98260 全链完成" else "98260 未完成（需硬重启后再试）"
+                // 本 App 不主动软重启（避免与引擎/系统行为混淆）；
+                // 只做归因：若 boot_id 变了，说明发生了用户态重启
+                if (ok) {
+                    val nowBoot = ShizukuShell.run("cat /proc/sys/kernel/random/boot_id 2>/dev/null", 8).output.trim()
+                    if (startBootId.isNotBlank() && nowBoot.isNotBlank() && nowBoot != startBootId) {
+                        addLog("提示：检测到用户态重启（boot_id 变化），这不是 App 主动触发的软重启")
+                    }
+                }
+                val wrote = RunReport.wroteKernel
+                val where = RunReport.stoppedAt.ifBlank { stage }
+                stage = when {
+                    ok -> "98260 全链完成"
+                    !wrote -> "停在「" + where + "」（未写内核，可直接重试）"
+                    else -> "98260 未完成（已写内核，需重启后再试）"
+                }
                 if (ok) progress = 1f
-                addLog(if (ok) "98260 全链完成；重启后需要重新越狱。" else "98260 未完成；内核可能处于脏状态，切回 64560 或重试前必须先硬重启设备。")
+                addLog(
+                    when {
+                        ok -> "98260 全链完成；重启后需要重新越狱。"
+                        !wrote -> "本次停在「" + where + "」，没有写入内核；可以直接再点一次，不用重启。" +
+                            (if (RunReport.reason.isNotBlank()) "（原因：" + RunReport.reason + "）" else "")
+                        else -> "98260 已写入内核但未拿到 root；请重启后再试，或导出日志反馈。"
+                    }
+                )
                 persistLogs()
                 if (serviceReady) {
                     val nativeSu = StellarShell.run("timeout 6 su -c 'id -u' 2>/dev/null; true", 15).output.trim()
