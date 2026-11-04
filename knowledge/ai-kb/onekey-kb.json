@@ -1,0 +1,448 @@
+{
+  "name": "OneKey 越狱工具知识库",
+  "version": "2.17.16",
+  "generated_at": "2026-11-04",
+  "count": 44,
+  "paragraphs": [
+    {
+      "id": "01-产品概览与支持矩阵#一句话",
+      "title": "01 · 产品概览与支持矩阵 · 一句话",
+      "content": "OneKey 是给一加手机用的\"一键越狱\"App：通过漏洞链拿到内核态能力，加载 KernelSU 系内核模块，\n让你选定的管理器接管 root；重启后失效，需要重新执行。\n\n当前版本 **2.17.16（versionCode 164）**。",
+      "tags": [
+        "01-产品概览与支持矩阵",
+        "一句话"
+      ],
+      "source": "knowledge/01-产品概览与支持矩阵.md"
+    },
+    {
+      "id": "01-产品概览与支持矩阵#支持矩阵",
+      "title": "01 · 产品概览与支持矩阵 · 支持矩阵",
+      "content": "| 机型 | 型号 | 内核 release | 稳定链 64560 | 实验链 98260 |\n| --- | --- | --- | --- | --- |\n| 一加 16 | `PYB110` / `OP64E1L1` | `6.18.21-android17-5-gf957accaf563-ab15926176-4k` | 支持 | 支持 |\n| 一加 Ace 7 Pro | `PMS110` | `6.12.69-android16-6-g242e1a07f878-ab15865446-4k` | 不支持 | 支持（GhostKey 6.12 优先，失败回落 Onuce） |\n\n门槛是硬校验，任一不满足直接拒绝执行，不会\"尽力尝试\"：\n\n1. `Build.MODEL` + `Build.DEVICE` 与机型表一致；\n2. `System.getProperty(\"os.version\")` 与表中 release 字符串完全相等；\n3. 安装包签名证书 SHA-256 = `a023f95cd5c4aa99d64444215c9bd605e17d90c3140fa97e1fefe1c537be487e`（必须是本项目签名出的包）。",
+      "tags": [
+        "01-产品概览与支持矩阵",
+        "支持矩阵"
+      ],
+      "source": "knowledge/01-产品概览与支持矩阵.md"
+    },
+    {
+      "id": "01-产品概览与支持矩阵#功能清单",
+      "title": "01 · 产品概览与支持矩阵 · 功能清单",
+      "content": "**越狱**\n- 一键越狱（64560 / 98260 两条链，按机型自动收敛）\n- 权限修复：不跑漏洞链，只重建 su 通道、刷新授权、重建管理器登记\n- 自检 / 环境诊断 / 模块冲突自检 / 收集设备诊断（可导出 TXT）\n\n**运行通道**\n- Root 服务通道用 Stellar（Shizuku 深度分支，包名 `roro.stellar.manager`），shell uid 2000\n- 支持运行时自适应：从已安装管理器 APK 里提取内核模块与 ksud，不锁死版本号\n\n**管理器**：KernelSU 官方、KernelSU-Next、SukiSU Ultra、BakaSU、FinaSU（详见 03）\n\n**收尾与维护**\n- 停用安全组件（仅 `com.coloros.securityguard`、`com.oplus.safecenter`，不动截屏组件）\n- 恢复安全组件（只恢复本会话停用过的那部分）\n- 越狱后软重启修复（ColorOS 安全机制拦截原生 su 时，软重启用户态恢复 su，内核模块保持加载）\n- 终端 su 兼容层（给 MT 管理器 / Termux 提供 `/system_ext/bin/su`，会多一个 `su_compat` 挂载）\n- 截屏扩展修复（`com.oplus.exsystemservice`）\n- 清理旧兼容挂载\n\n**其它**：历史记录（最多 60 条，含每次运行的完整日志）、在线更新（含分版本更新日志）、环境隐藏建议。",
+      "tags": [
+        "01-产品概览与支持矩阵",
+        "功能清单"
+      ],
+      "source": "knowledge/01-产品概览与支持矩阵.md"
+    },
+    {
+      "id": "01-产品概览与支持矩阵#明确不做的事",
+      "title": "01 · 产品概览与支持矩阵 · 明确不做的事",
+      "content": "- 不刷写任何分区，不动 bootloader；\n- 不改系统 APK、不持久化内核模块（重启即失效）；\n- 不内置任何第三方 APK 的分发链接，管理器由用户自行安装，App 只做签名与版本校验。",
+      "tags": [
+        "01-产品概览与支持矩阵",
+        "明确不做的事"
+      ],
+      "source": "knowledge/01-产品概览与支持矩阵.md"
+    },
+    {
+      "id": "02-越狱链路原理#总览",
+      "title": "02 · 越狱链路原理 · 总览",
+      "content": "两条链都是\"零特权 → 内核态能力 → 加载未签名内核模块 → 管理器接管\"，\n区别在于漏洞与执行方式：64560 是一次性稳定链（走自研脚本编排），98260 是每次开机只能用一次的实验链（走原生执行器）。\n\n```\n64560 稳定链（一加 16 专用）\n  采集内核事件 → 校准内核地址 → 生成内核补丁 → 切换安全策略 → 定位内核凭证 → 加载内核模块 → 初始化管理器 → 完成\n\n98260 实验链（一加 16 / Ace 7 Pro）\n  boot_id 一次性许可 → 已有 root 短接 → 选后端（GhostKey / Onuce）→ 原生执行器 plant → root 校验 → finalize → 清理\n```",
+      "tags": [
+        "02-越狱链路原理",
+        "总览"
+      ],
+      "source": "knowledge/02-越狱链路原理.md"
+    },
+    {
+      "id": "02-越狱链路原理#64560 稳定链",
+      "title": "02 · 越狱链路原理 · 64560 稳定链",
+      "content": "入口 `StableEngine.run()`，整条流程在一个可控的 shell 会话里逐阶段推进，任一阶段失败立即停，不会\"带病继续\"。\n\n**执行前闸门**\n1. Stellar 服务在线且已授权（没有就提示去启动，不会静默降级）；\n2. `uname -r` 读得到，机型/内核在支持矩阵内；\n3. `getenforce` 与 `/proc/modules` 可读，SELinux 不能处于 `Disabled`；\n4. 若已有 `kernelsu` 模块加载，先用 `ksud debug info` 识别它是哪个管理器，识别不出就停，避免\"跨管理器修复\"把内核搞脏；\n5. 运行锁：`filesDir/run.lock` + 进程内 `RunState`，防重入。\n\n**阶段与日志标记**\n\n| 脚本标记 | 界面阶段名 | 说明 |\n| --- | --- | --- |\n| `@STAGE=cap` | 采集内核事件 | `trace` 抓 300 条事件，先开 tracing 再读，读完再关，避免空采样 |\n| `@STAGE=solve` | 校准内核地址 | 由事件推导 slide 与目标地址 |\n| `@STAGE=patch` | 生成内核补丁 | 按当前 slide 重打模块（`SHN_ABS` 符号化 + cred/noenforce 补丁） |\n| `@STAGE=permissive` | 切换安全策略 | 置 permissive（保留 initialized） |\n| `@STAGE=inject` | 定位内核凭证 | 定位候选进程 cred 并两阶段写 |\n| `@STAGE=load` | 加载内核模块 | 由已提权进程 `finit_module` 加载未签名 LKM |\n| `@STAGE=init` | 初始化管理器 | `ksud install`、登记管理器、开特性 |\n| `@STAGE=done` | 越狱完成 | 收尾校验 |\n\n配合 `@TICK=<阶段> <计数>` 做心跳：界面据此更新\"正在校准内核地址（最多约 2 分钟）\"这类文案，并推进进度条。\n`@WARN=` 是黄色提示，`@EXIT=` 是真实退出码。\n\n**收尾（post.sh）**\n- 管理器登记：`ksud` 侧 `set-apk` / `set-uid` / `set-hash` / `grant` 四步，FinaSU 优先走 `set-apk`（签名路径），失败再退回 `set-uid`；\n- 可选 `su_compat`：为没有 `/system/bin/su` 的场景补 `/system_ext/bin/su` 挂载；\n- 可选软重启：ColorOS 安全机制拦截原生 su 时，软重启用户态让 su 生效，内核模块不卸载；\n- 截屏组件 `com.oplus.exsystemservice` 保持可用，不参与停用。",
+      "tags": [
+        "02-越狱链路原理",
+        "64560 稳定链"
+      ],
+      "source": "knowledge/02-越狱链路原理.md"
+    },
+    {
+      "id": "02-越狱链路原理#98260 实验链",
+      "title": "02 · 越狱链路原理 · 98260 实验链",
+      "content": "入口 `Cve98260Engine.run()`。这条链**一次开机只能尝试一次**，用 `/proc/sys/kernel/random/boot_id` 记账，\n失败必须硬重启，否则内核状态不可信。\n\n**流程**\n1. 读 `boot_id`，与偏好里记录的一致就拒绝：\"本次开机已经尝试过\"；\n2. 先用 `/system/bin/su -c id` / `su -c id` 探测是否已有可用 root，有就直接返回成功，避免重复 plant；\n3. 取管理器组件：优先运行时自适应（`RuntimeExtractor.prepare`），失败则用内置模块；\n4. 选后端：\n   - **Ace 7 Pro（6.12）**：先试 GhostKey 原生后端，返回 `null` 才回落 Onuce；\n   - **一加 16（6.18）**：**不会**自动回落 GhostKey——6.18 的 profile 未经真机验证，slide/task 偏移错了会直接 panic；\n5. 写一次性许可（`markBootAttempt`）后启动执行器；\n6. 执行器（Onuce 1.11）在独立工作目录里跑：`/data/local/tmp/onuce/<uuid>-2000-<backend>`，目录 0700，\n   配置文件是 `manager.conf`（6.18 用 `onuce-runtime-v2`，Ace 用 `onuce-runtime-manager-v1`）；\n7. 退出码 `40` 或输出含\"系统繁忙/runnable\" → 清理残留进程，等 15 秒重试一次，仍繁忙就安全停止；\n8. root 校验通过后调 `finalize`（best-effort，身份不符会被执行器拒绝，不影响结论），再 `pkill -9 -f 'onuce --plant'` 清残留；\n9. 退出码 `124`（超时）但 root 已拿到 → 判成功并提示\"执行器超时，但 root 已获取；残留进程已清理，请勿重复越狱\"。",
+      "tags": [
+        "02-越狱链路原理",
+        "98260 实验链"
+      ],
+      "source": "knowledge/02-越狱链路原理.md"
+    },
+    {
+      "id": "02-越狱链路原理#安全闸门与失败语义",
+      "title": "02 · 越狱链路原理 · 安全闸门与失败语义",
+      "content": "- `SystemReadinessGate`：执行器启动前等 `sys.boot_completed=1`、屏幕 Awake、`procs_running` 连续 3 次低于阈值，最多等 75 秒；\n  开机自启/高负载时直接跑，panic 概率明显更高。\n- 运行锁：串行化，避免两个任务同时改内核内存。\n- 失败不\"重试到底\"：64560 失败就停并保留日志；98260 失败要求硬重启，App 不提供自动重试。\n- 所有结论都来自实测输出（`su -c id` 里出现 `uid=0`），不看\"应该成功了\"。",
+      "tags": [
+        "02-越狱链路原理",
+        "安全闸门与失败语义"
+      ],
+      "source": "knowledge/02-越狱链路原理.md"
+    },
+    {
+      "id": "03-管理器适配#支持的五个管理器",
+      "title": "03 · 管理器适配 · 支持的五个管理器",
+      "content": "| 管理器 | 包名 | 适配版本 | versionCode | 证书 SHA-256 |\n| --- | --- | --- | --- | --- |\n| KernelSU 官方 | `me.weishu.kernelsu` | v3.3.1 | 32680 | `c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6` |\n| KernelSU-Next | `com.rifsxd.ksunext` | v3.4.2 | 33355 | `79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7` |\n| SukiSU Ultra | `com.sukisu.ultra` | v4.3.0-r1 | 41140 | `947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef` |\n| BakaSU | `com.resukisu.resukisu` | v4.2.0-rc3 | 35171 | `d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64` |\n| FinaSU | `me.yuki.fina` | v1.4.4 | 33167 | `2d89b50aaf1db013c2b6738f973f48b62ea21a3a8d7216bfec3521065d448458` |\n\n证书是硬锚：管理器 APK 换签名 = 直接拒绝，不会\"版本对就放行\"。版本号只在关闭自适应后用于严格比对。",
+      "tags": [
+        "03-管理器适配",
+        "支持的五个管理器"
+      ],
+      "source": "knowledge/03-管理器适配.md"
+    },
+    {
+      "id": "03-管理器适配#三档取材顺序",
+      "title": "03 · 管理器适配 · 三档取材顺序",
+      "content": "同一份 `kind`（official / next / sukisu / bakasu / finasu）会按下面顺序找内核模块与 ksud，前一级可用就不看后一级：\n\n1. **云端模块**：`cloud-catalog.json` 里 `manager + versionCode + vermagic` 全中，且 SHA-256/证书/UAPI 校验通过；\n2. **运行时自适应**：从已安装管理器 APK 现场提取（`RuntimeExtractor`）；\n3. **内置模块**：打进 APK 的 `assets/core/*.ko` 与 `assets/core/ksud_*`。\n\n### 运行时自适应做了什么\n\n- `prepare()`（official / next / sukisu / bakasu）：把管理器 APK 拷到 `/data/local/tmp/onekey-adapters/<nanos>/`，\n  扫 `lib/arm64-v8a/*.so`，从裸 DEFLATE 流里 carve 出内核模块（先按 `0xED` 快筛，找不到再全量扫描，单次上限 60 秒），\n  按 `vermagic` 只保留 6.18 的那一份，必须以唯一候选收场，然后 `patchVermagic` 对齐设备 release，最后连同 `libksud.so` 落到\n  `filesDir/adapters/<apkSha 前 24 位>/`。\n- `prepareFina()`：FinaSU 的 APK 只带 `libksud.so`、不带 LKM，所以 ksud 取管理器自己的，\n  内核模块按内核系列取内置的（`core/finasu.ko` 给 6.18、`core/finasu-6.12.ko` 给 6.12），再按需重写 vermagic。\n\n### vermagic 重写\n\n`RuntimeExtractor.patchVermagic()` 的做法：定位 `.modinfo` section，把 `vermagic=` 的 release 前缀换成 `uname -r`，\n保留后缀（`SMP preempt mod_unload modversions aarch64`），把重建后的 `.modinfo` 追加到文件末尾并改写 section 头的\n`sh_offset` / `sh_size`。不改其他 section，模块结构保持合法。",
+      "tags": [
+        "03-管理器适配",
+        "三档取材顺序"
+      ],
+      "source": "knowledge/03-管理器适配.md"
+    },
+    {
+      "id": "03-管理器适配#内置模块对照",
+      "title": "03 · 管理器适配 · 内置模块对照",
+      "content": "| 资产 | manager | onuce_version | 6.18 模块来源 |\n| --- | --- | --- | --- |\n| `core/official.ko` | official | 32680 | 原生 6.18.21 构建，仅重写元数据 |\n| `core/next.ko` | next | 33355 | 原生 6.18.21 构建，仅重写元数据 |\n| `core/bakasu.ko` | bakasu | 35171 | 原生 6.18.21 构建，仅重写元数据 |\n| `core/sukisu.ko`、`core/onuce/sukisu.ko` | sukisu | 41140 | v4.3.0-r1 的 `lkm-aarch64-android17-6.18`，vermagic 重写 |\n| `core/finasu.ko` | finasu | 33167 | v1.4.4 kernel-bundle 的 `arm64/android17-6.18`，vermagic 重写 |\n| `core/finasu-6.12.ko` | finasu | — | v1.4.4 的 `arm64/android16-6.12`，运行时按 6.12 release 重写 |\n\n不变量：**每个模块的 `onuce_version` 必须等于对应管理器的当前 versionCode**。版本对不上时，\n云端匹配会落空、执行器可能以\"身份不符\"拒绝收尾。",
+      "tags": [
+        "03-管理器适配",
+        "内置模块对照"
+      ],
+      "source": "knowledge/03-管理器适配.md"
+    },
+    {
+      "id": "03-管理器适配#已加载内核的识别",
+      "title": "03 · 管理器适配 · 已加载内核的识别",
+      "content": "64560 修复模式下需要知道\"现在跑的是哪个管理器\"，避免跨管理器修复：\n\n1. 优先读 `ksud debug info` 的 `full_version`，匹配 bakasu/resukisu、finasu、sukisu、next/ksun、kernelsu；\n2. 老版 ksud 只有数字，按 `version:` 映射（41140/41027/40994→sukisu，35171/35235→bakasu，33167/33156/33034→finasu，33355/33311→next，32680→kernelsu）；\n3. 都没有且只装了一个管理器时，按已安装项兜底。\n\n识别结果与所选管理器不一致时直接停止，提示\"请完整重启后再切换\"。",
+      "tags": [
+        "03-管理器适配",
+        "已加载内核的识别"
+      ],
+      "source": "knowledge/03-管理器适配.md"
+    },
+    {
+      "id": "03-管理器适配#常见误区",
+      "title": "03 · 管理器适配 · 常见误区",
+      "content": "- **\"自适应开着就不用管版本\"**：自适应只解决模块/ksud 来源，管理器本身仍需签名匹配；版本差异只影响提示，不影响继续。\n- **FinaSU 的版本自述**：1.4.2 的内核模块自述是 `v1.4.1-96104eac@dev`（上游遗留），1.4.3 起已修正为自身版本；\n  所以 1.4.2 时期看到的\"管理器 1.4.2 / 模块 1.4.1\"不是适配错误。\n- **不要预patch内置 `finasu.ko`**：用 `tools/ko_vermagic.py` 之类外部脚本预patch 会让 ELF 结构损坏，\n  自适应会报 \"finasu.ko ELF 结构无效\"；内置模块保持上游原样，由 `RuntimeExtractor` 运行时对齐。",
+      "tags": [
+        "03-管理器适配",
+        "常见误区"
+      ],
+      "source": "knowledge/03-管理器适配.md"
+    },
+    {
+      "id": "04-云端模块与校验协议#04 · 云端模块与校验协议",
+      "title": "04 · 云端模块与校验协议 · 04 · 云端模块与校验协议",
+      "content": "云端模块的意义：把\"用哪个内核模块\"从客户端挪到发布侧，客户端只认签名、版本与内核指纹，\n不发版也能补新管理器版本。",
+      "tags": [
+        "04-云端模块与校验协议",
+        "04 · 云端模块与校验协议"
+      ],
+      "source": "knowledge/04-云端模块与校验协议.md"
+    },
+    {
+      "id": "04-云端模块与校验协议#发布源",
+      "title": "04 · 云端模块与校验协议 · 发布源",
+      "content": "```\nhttps://cnb.cool/xingranya/onekeyjb/-/releases/download/update/cloud-catalog.json\nhttps://cnb.cool/xingranya/onekeyjb/-/releases/download/update/<manager>-<version>-<sha16>.ko\n```\n\n客户端只允许 `cnb.cool`、`asset.cnb.cool`、`github.com`、`release-assets.githubusercontent.com`、\n`objects.githubusercontent.com` 这几家主机，重定向后再校验一次主机名，非 https 直接拒绝。",
+      "tags": [
+        "04-云端模块与校验协议",
+        "发布源"
+      ],
+      "source": "knowledge/04-云端模块与校验协议.md"
+    },
+    {
+      "id": "04-云端模块与校验协议#catalog 结构",
+      "title": "04 · 云端模块与校验协议 · catalog 结构",
+      "content": "```json\n{\n  \"schema\": 1,\n  \"generated_at\": \"2026-11-04\",\n  \"modules\": [\n    {\n      \"manager\": \"finasu\",\n      \"version\": 33167,\n      \"name\": \"finasu-33167-c39431f6998806b8.ko\",\n      \"size\": 549260,\n      \"sha256\": \"6b7a9da8...\",\n      \"vermagic\": \"6.18.21-android17-5-gf957accaf563-ab15926176-4k\",\n      \"url\": \"https://cnb.cool/.../finasu-33167-c39431f6998806b8.ko\"\n    }\n  ]\n}\n```\n\n字段约束（客户端会丢弃不合规条目）：\n\n| 字段 | 约束 |\n| --- | --- |\n| `manager` | 仅小写字母，`^[a-z]+$` |\n| `version` | 正整数 |\n| `name` | `^[A-Za-z0-9_.-]{1,160}$` |\n| `size` | `0 < size <= 8 MiB` |\n| `sha256` | 64 位小写十六进制 |\n| `url` | https + 白名单主机 |\n| `vermagic` | 可选；有值时必须是合法 release 字符串，且与设备 `uname -r` 完全相等才使用 |\n\n`vermagic` 的作用：同一管理器版本可能对不同内核各发一份模块。匹配规则是\n\"先找 `vermagic` 完全相等的条目，再找不带 `vermagic` 的条目\"，都不中就当云端没有这个模块，\n**直接回落本地组件**，不会下载完再报错。\n\n文件名约定：`<manager>-<versionCode>-<sha256(release) 前 16 位>.ko`。",
+      "tags": [
+        "04-云端模块与校验协议",
+        "catalog 结构"
+      ],
+      "source": "knowledge/04-云端模块与校验协议.md"
+    },
+    {
+      "id": "04-云端模块与校验协议#`.modinfo` 契约字段",
+      "title": "04 · 云端模块与校验协议 · `.modinfo` 契约字段",
+      "content": "模块必须是 6.18/6.12 的 `.ko`，并在 `.modinfo` 里带这些键（NUL 分隔，不是换行）：\n\n| 键 | 期望值 | 说明 |\n| --- | --- | --- |\n| `vermagic` | `<设备 release> SMP preempt mod_unload modversions aarch64` | 必须以设备 release 开头 |\n| `onuce_schema` | `2` | 协议版本 |\n| `onuce_key` | manager 名 | 与 catalog 的 `manager` 一致 |\n| `onuce_version` | versionCode | 与 catalog 的 `version` 一致 |\n| `onuce_uapi` | `6` | 管理器 UAPI |\n| `onuce_certificate` | 管理器证书 SHA-256 | 与 APK 实际签名一致 |\n| `onuce_certificate_size` | 证书 DER 字节数 | 827 / 998 / 887 / 860 / 716 |\n| `onuce_kernel` | 内核 commit 前缀 | 必须等于 release 里 `-g` 与 `-ab` 之间的 commit |\n| `onuce_package` | 管理器包名 | |\n| `onuce_repo` | 上游仓库 | |\n| `onuce_su` | `manager-v1` | |\n| `onuce_allowlist` | `cred-v1` | |\n| `onuce_vermagic_rewritten` | `0`/`1` | 1 表示由上游 GKI 模块重写 vermagic 得到，0 表示原生按设备内核构建 |\n\n禁止出现 `onuce_terminal=` 与 `onuce_app_su=`（出现即判为不合规模块）。",
+      "tags": [
+        "04-云端模块与校验协议",
+        "`.modinfo` 契约字段"
+      ],
+      "source": "knowledge/04-云端模块与校验协议.md"
+    },
+    {
+      "id": "04-云端模块与校验协议#客户端校验清单",
+      "title": "04 · 云端模块与校验协议 · 客户端校验清单",
+      "content": "下载前：主机白名单 → 声明体积不超限 → `size` 精确相等 → `sha256` 相等。\n下载后逐项验证，任一项失败即 `云端模块校验失败，已拒绝` 并回落：\n\n1. 体积、SHA-256；\n2. ELF64 小端（`0x7f ELF` + class=2 + data=1）；\n3. `onuce_schema=2`、`onuce_key`、`onuce_version`、`onuce_uapi=6`；\n4. `onuce_certificate` 与设备上管理器实际签名一致；\n5. `vermagic` == 设备 release（或以其 + 空格开头）；\n6. `onuce_kernel` 以 release 里的 commit 开头；\n7. `onuce_su=manager-v1`、`onuce_allowlist=cred-v1`、无 `onuce_terminal=`/`onuce_app_su=`。\n\n通过后写入 `filesDir/cloud/modules/`，同名同内容直接复用缓存（`.part` 写完再 rename）。",
+      "tags": [
+        "04-云端模块与校验协议",
+        "客户端校验清单"
+      ],
+      "source": "knowledge/04-云端模块与校验协议.md"
+    },
+    {
+      "id": "04-云端模块与校验协议#生成模块",
+      "title": "04 · 云端模块与校验协议 · 生成模块",
+      "content": "```bash\npython3 tools/ko_stamp.py IN.ko OUT.ko \\\n  --release 6.18.21-android17-5-gf957accaf563-ab15926176-4k \\\n  --set onuce_schema=2 \\\n  --set onuce_key=sukisu \\\n  --set onuce_version=41140 \\\n  --set onuce_uapi=6 \\\n  --set onuce_certificate=947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef \\\n  --set onuce_certificate_size=860 \\\n  --set onuce_source=<上游 commit> \\\n  --set onuce_package=com.sukisu.ultra \\\n  --set onuce_repo=SukiSU-Ultra/SukiSU-Ultra \\\n  --set onuce_kernel=f957accaf5634f841071adb4f35286ef2779d5b1 \\\n  --set onuce_abi=100 \\\n  --set onuce_vermagic_rewritten=1 \\\n  --set onuce_su=manager-v1 \\\n  --set onuce_allowlist=cred-v1\n```\n\n### 两个容易踩的坑\n\n1. **旧 `.modinfo` 必须清零**：`ko_stamp.py` 把新 `.modinfo` 追加到文件末尾并改 section 头，\n   如果不清掉旧的字节，文件里会同时出现两条 `vermagic=`，按\"首个匹配\"解析的校验方会读到旧值（6.18.32），\n   于是体积/SHA 都对、vermagic 却永远不匹配。脚本里已内置清零。\n2. **NUL 分隔**：`.ko` 的 `.modinfo` 用 `\\0` 分隔条目，不是换行。校验前必须先把 `\\0` 换成 `\\n` 再做行解析，\n   否则所有键都\"找不到\"。",
+      "tags": [
+        "04-云端模块与校验协议",
+        "生成模块"
+      ],
+      "source": "knowledge/04-云端模块与校验协议.md"
+    },
+    {
+      "id": "04-云端模块与校验协议#发新模块的步骤",
+      "title": "04 · 云端模块与校验协议 · 发新模块的步骤",
+      "content": "1. 取对应管理器最新 release 的 6.18 LKM（或原生按设备内核构建的产物）；\n2. `ko_stamp.py` 打 `onuce_*` 与 vermagic；\n3. 用与客户端同规则的校验脚本自查（体积/SHA/ELF/全部 `onuce_*`/唯一 `vermagic`）；\n4. 上传 `.ko` 与新的 `cloud-catalog.json`；\n5. 下载回来复核 `sha256`，确认 CDN 没有缓存旧文件。",
+      "tags": [
+        "04-云端模块与校验协议",
+        "发新模块的步骤"
+      ],
+      "source": "knowledge/04-云端模块与校验协议.md"
+    },
+    {
+      "id": "05-更新协议#清单地址",
+      "title": "05 · 更新协议 · 清单地址",
+      "content": "```\nhttps://cnb.cool/xingranya/onekeyjb/-/releases/download/update/update.json\nhttps://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk\n```\n\nCNB 的 `update` 是固定标签，每次发版覆盖同名资产，所以客户端地址永远不变。",
+      "tags": [
+        "05-更新协议",
+        "清单地址"
+      ],
+      "source": "knowledge/05-更新协议.md"
+    },
+    {
+      "id": "05-更新协议#update.json",
+      "title": "05 · 更新协议 · update.json",
+      "content": "```json\n{\n  \"versionCode\": 164,\n  \"versionName\": \"2.17.16\",\n  \"publishedAt\": \"2026-11-04T08:35:00+08:00\",\n  \"size\": 42839435,\n  \"sha256\": \"3f087b7d...c58cf1\",\n  \"apkUrl\": \"https://cnb.cool/.../OneKeyJB-latest.apk\",\n  \"changelog\": \"v2.17.16\\n\\n- …\",\n  \"versions\": [\n    {\n      \"versionName\": \"2.17.16\",\n      \"versionCode\": 164,\n      \"publishedAt\": \"2026-11-04T08:35:00+08:00\",\n      \"size\": 42839435,\n      \"notes\": [\"五个管理器全部对齐当前最新版…\", \"内置 6.18 模块全部换成…\"]\n    }\n  ]\n}\n```\n\n| 字段 | 必填 | 用途 |\n| --- | --- | --- |\n| `versionCode` | 是 | 与 `BuildConfig.VERSION_CODE` 比较，`<= 当前` 视为已最新 |\n| `versionName` | 是 | 弹窗标题里的版本名 |\n| `publishedAt` | 是 | ISO-8601 带时区，弹窗显示\"更新时间\"，按本地时区格式化 |\n| `size` | 是 | 安装包字节数，界面按两位小数渲染（`40.85 MB`） |\n| `sha256` | 是 | 下载完成后的完整性校验，不匹配即删包报错 |\n| `apkUrl` | 否 | 缺省用 `OneKeyJB-latest.apk` |\n| `changelog` | 否 | 纯文本兜底，`versions` 缺失时直接展示 |\n| `versions[]` | 否 | 分版本更新日志，客户端按 `versionCode` 倒序展示 |\n\n`versions[]` 每项含 `versionName`、`versionCode`、`publishedAt`、`size`、`notes[]`。\n`notes` 缺失时会从该条的 `changelog` 文本按行拆出来（去掉行首 `-`），所以两种写法都能被吃下。",
+      "tags": [
+        "05-更新协议",
+        "update.json"
+      ],
+      "source": "knowledge/05-更新协议.md"
+    },
+    {
+      "id": "05-更新协议#界面行为",
+      "title": "05 · 更新协议 · 界面行为",
+      "content": "打开 App 时后台静默检查一次，有新版就弹窗：\n\n```\n发现新版本 · v2.17.16 (164)\n更新时间 2026-11-04 08:35 · 安装包 40.85 MB\n┌ v2.17.16 · 164                     40.85 MB ┐\n│ 更新时间 2026-11-04 08:35                   │\n│   · 五个管理器全部对齐当前最新版…           │\n└────────────────────────────────────────────┘\n┌ v2.17.15 · 163                     40.82 MB ┐\n└────────────────────────────────────────────┘\n[稍后]                    [下载并安装]\n```\n\n- 版本卡片可点开/收起，默认展开最新版；\n- 下载中显示进度条 + `下载中 43%` + `2.41 MB/s · 剩余 23.15 MB`；\n- 速度每 ≥250 ms 采一次，做指数平滑（`(3*旧 + 新)/4`），避免数字乱跳；\n- 下载期间\"稍后\"与\"下载并安装\"都禁用，避免重复下载。",
+      "tags": [
+        "05-更新协议",
+        "界面行为"
+      ],
+      "source": "knowledge/05-更新协议.md"
+    },
+    {
+      "id": "05-更新协议#下载与安装",
+      "title": "05 · 更新协议 · 下载与安装",
+      "content": "1. `HttpURLConnection`，连接 15 s / 读取 120 s，跟随重定向；\n2. 总量优先取 `Content-Length`，没有就用 `update.json` 的 `size`；\n3. 写入 `getExternalFilesDir(DOWNLOADS)/OneKeyJB-update.apk`；\n4. 全量 SHA-256 比对，不一致删除文件并抛\"APK SHA-256 校验失败\"；\n5. 未授予\"安装未知应用\"权限时，先跳 `ACTION_MANAGE_UNKNOWN_APP_SOURCES`；\n6. 通过项目 `FileProvider`（`<applicationId>.fileprovider`）拉起系统安装器。",
+      "tags": [
+        "05-更新协议",
+        "下载与安装"
+      ],
+      "source": "knowledge/05-更新协议.md"
+    },
+    {
+      "id": "05-更新协议#发版检查清单",
+      "title": "05 · 更新协议 · 发版检查清单",
+      "content": "- [ ] `versionCode` 比线上大，`versionName` 与 commit 描述一致\n- [ ] APK 用项目密钥签名（证书 `a023f95c…be487e`），否则装上也会被 `SecurityCheck` 拒绝执行\n- [ ] `size` 与 `sha256` 取自实际产物（`shasum -a 256`）\n- [ ] `versions[]` 补上本次条目，`notes` 写\"改了什么/影响谁\"\n- [ ] 上传顺序：先 `update.json` 再 APK，或同时上传后立刻复核远端 `sha256`\n- [ ] 远端下载回来跑一次 `aapt2 dump badging`，确认 versionCode 正确",
+      "tags": [
+        "05-更新协议",
+        "发版检查清单"
+      ],
+      "source": "knowledge/05-更新协议.md"
+    },
+    {
+      "id": "06-构建与发布#环境",
+      "title": "06 · 构建与发布 · 环境",
+      "content": "| 项 | 要求 | 说明 |\n| --- | --- | --- |\n| JDK | **21**（`/opt/homebrew/opt/openjdk@21`） | Stellar API 的 class 文件版本是 65.0，JDK 17 直接编译会报\"程序包 Stellar 不存在 / 类文件具有错误的版本 65.0\" |\n| Android SDK | compileSdk 37、build-tools 37.0.0 | `compileSdk { version = release(37) } ` |\n| Gradle | 9.7.1（wrapper 自带） | 不需要本机装 |\n| minSdk / targetSdk | 33 / 37 | |\n\n```bash\nexport JAVA_HOME=/opt/homebrew/opt/openjdk@21\nexport PATH=\"$JAVA_HOME/bin:$PATH\"\ncd merged-app\n./gradlew assembleRelease\n```\n\n产物：`merged-app/app/build/outputs/apk/release/app-release.apk`。",
+      "tags": [
+        "06-构建与发布",
+        "环境"
+      ],
+      "source": "knowledge/06-构建与发布.md"
+    },
+    {
+      "id": "06-构建与发布#签名",
+      "title": "06 · 构建与发布 · 签名",
+      "content": "`merged-app/keystore.properties`（不入库）指向证书文件，模板见 `keystore.properties.example`。\ndebug 与 release 共用同一把密钥，保证 debug 包也能覆盖安装。\n\n签名证书 SHA-256 必须等于 `a023f95cd5c4aa99d64444215c9bd605e17d90c3140fa97e1fefe1c537be487e`，\n这是 `SecurityCheck` 的硬编码信任根——换密钥出的包能装，但一点\"一键越狱\"就会被签名校验拒绝。",
+      "tags": [
+        "06-构建与发布",
+        "签名"
+      ],
+      "source": "knowledge/06-构建与发布.md"
+    },
+    {
+      "id": "06-构建与发布#目录速查",
+      "title": "06 · 构建与发布 · 目录速查",
+      "content": "```\nmerged-app/app/src/main/java/com/pyb110/onekey/\n  MainActivity.kt          UI（Compose + COUI）\n  JailbreakController.kt   状态机：管理器表、运行锁、日志、更新检查\n  StableEngine.kt          64560 稳定链编排\n  Cve98260Engine.kt        98260 入口：boot_id 许可、后端选择\n  OnuceEngine.kt           98260 原生执行器调用\n  RuntimeExtractor.kt      运行时自适应（carve LKM、patch vermagic）\n  CloudComponents.kt       云端模块下载与校验\n  UpdateChecker.kt         在线更新\n  HistoryStore.kt          历史记录（JSON + 日志文件，最多 60 条）\n  Safer.kt / ScreenshotRepair.kt / RestartManager.kt / TempJanitor.kt / SystemReadinessGate.kt\nmerged-app/app/src/main/assets/core/    越狱载荷、各管理器 .ko 与 ksud\n```",
+      "tags": [
+        "06-构建与发布",
+        "目录速查"
+      ],
+      "source": "knowledge/06-构建与发布.md"
+    },
+    {
+      "id": "06-构建与发布#版本号",
+      "title": "06 · 构建与发布 · 版本号",
+      "content": "改 `merged-app/app/build.gradle.kts`：\n\n```kotlin\nversionCode = 164\nversionName = \"2.17.16\"\n```\n\n`versionCode` 只增不减；界面顶栏会显示 `v<versionName> · #<versionCode>`，方便对版本。",
+      "tags": [
+        "06-构建与发布",
+        "版本号"
+      ],
+      "source": "knowledge/06-构建与发布.md"
+    },
+    {
+      "id": "06-构建与发布#发版流程",
+      "title": "06 · 构建与发布 · 发版流程",
+      "content": "1. 改版本号 → `assembleRelease`；\n2. `cp app-release.apk dist/OneKeyJB-v<版本>.apk`，`shasum -a 256` 记下体积与哈希；\n3. 生成 `update.json`（含 `publishedAt`、`size`、`sha256`、`versions[]`）；\n4. 需要时重发云端模块与 `cloud-catalog.json`（见 04）；\n5. 上传到 CNB `update` 标签，再下载回来复核哈希；\n6. 同步仓库 `artifacts/` 与 `knowledge/`。",
+      "tags": [
+        "06-构建与发布",
+        "发版流程"
+      ],
+      "source": "knowledge/06-构建与发布.md"
+    },
+    {
+      "id": "06-构建与发布#CNB 上传接口",
+      "title": "06 · 构建与发布 · CNB 上传接口",
+      "content": "```python\n# 1) 申请上传地址\nPOST https://api.cnb.cool/xingranya/onekeyjb/-/releases/<RELEASE_ID>/asset-upload-url\n     {\"asset_name\": \"OneKeyJB-latest.apk\", \"size\": 42839435}\n# 2) PUT 到返回的 upload_url\n# 3) POST 返回的 verify_url 确认\n```\n\nToken 在 `~/.cnb/token`，形如 `{\"access_token\": \"...\"}`，请求头 `Authorization: Bearer <token>`。\n同名资产会被覆盖，上传完务必重新下载一次比对 `sha256`——CDN 有缓存，偶尔要等几秒。",
+      "tags": [
+        "06-构建与发布",
+        "CNB 上传接口"
+      ],
+      "source": "knowledge/06-构建与发布.md"
+    },
+    {
+      "id": "06-构建与发布#常见构建问题",
+      "title": "06 · 构建与发布 · 常见构建问题",
+      "content": "| 现象 | 原因 | 处理 |\n| --- | --- | --- |\n| `程序包 Stellar 不存在` / `类文件具有错误的版本 65.0` | 用了 JDK 17 | 切到 JDK 21 再编译 |\n| `无法访问 StellarRemoteProcess` | 同上 | 同上 |\n| 安装后点越狱立刻\"签名校验失败\" | 换过签名密钥 | 用项目密钥重签 |\n| 装不上（INSTALL_FAILED_UPDATE_INCOMPATIBLE） | 与已装包签名不同 | 卸载旧包或换回原密钥 |",
+      "tags": [
+        "06-构建与发布",
+        "常见构建问题"
+      ],
+      "source": "knowledge/06-构建与发布.md"
+    },
+    {
+      "id": "07-故障排查#先看这三样",
+      "title": "07 · 故障排查 · 先看这三样",
+      "content": "1. **首页状态**：\"Root 服务通道\"是否显示已连接并授权；\n2. **日志页**最后 20 行，特别是 `@WARN=` / `执行退出码` / `root 检查`；\n3. **历史 → 详情**（含当次完整日志，可复制/导出）。",
+      "tags": [
+        "07-故障排查",
+        "先看这三样"
+      ],
+      "source": "knowledge/07-故障排查.md"
+    },
+    {
+      "id": "07-故障排查#报错对照表",
+      "title": "07 · 故障排查 · 报错对照表",
+      "content": "| 日志/现象 | 原因 | 处理 |\n| --- | --- | --- |\n| `Stellar 未运行` | 没有启动服务 | 打开 Stellar，用「无线调试」启动服务后回到 App 点授权 |\n| `未获得 Stellar 权限` | 授权弹窗被拒/超时 | 重新点授权，弹窗点允许 |\n| `已安装 … 签名不匹配，已拒绝` | 管理器不是官方签名（改包/第三方重签） | 装官方原版管理器 |\n| `版本不匹配：需要 X，当前 Y` | 关了自适应且版本不同 | 打开「运行时自适应管理器」，或装到对应版本 |\n| `当前已加载内核与所选管理器不一致` | 模块没卸载就换管理器 | 完整重启手机后再切换 |\n| `无法识别当前已加载的内核` | `ksud debug info` 输出异常 | 完整重启后重试，仍失败导出诊断日志 |\n| `执行退出码: 2`（98260） | 配置模式/模块不匹配 | 确认不是把 6.12 模块塞给 6.18；云模块关掉再试一次 |\n| `云端模块校验失败，已拒绝` | 模块被改过、vermagic 不再匹配、或 `.modinfo` 有两条 vermagic | 见 04 的\"两个容易踩的坑\"；也可以直接关掉\"自动匹配云端组件\"用本地模块 |\n| `FinaSU 自适应失败…finasu.ko ELF 结构无效` | 内置模块被外部脚本预patch 坏了 | 恢复未预patch 的上游 LKM，让 `RuntimeExtractor` 运行时对齐 |\n| `系统繁忙` / 退出码 40 | 设备正在高负载或刚开机 | 等 15 秒自动重试一次；仍繁忙就关后台应用再试 |\n| `98260 本次开机已经尝试过` | 一次性许可已用 | 硬重启手机（不是软重启） |\n| `su 通道未就绪` | 模块加载了但用户态没接上 | 点「修复」或「权限修复」；仍不行看下一条 |\n| 原生 su 被 ColorOS 拦截 | 安全机制拦截 | 打开「越狱后软重启修复」，成功后约 10 秒软重启用户态 |\n| 应用拿不到 root，shell 能拿到 | 部分 ROM 对 `su` 入口有策略差异 | 用「root 诊断」逐条试；必要时开「终端 su 兼容层」 |\n| 截屏异常/无法截图 | `com.oplus.exsystemservice` 被停用 | 诊断 → 「修复截屏扩展」 |",
+      "tags": [
+        "07-故障排查",
+        "报错对照表"
+      ],
+      "source": "knowledge/07-故障排查.md"
+    },
+    {
+      "id": "07-故障排查#日志标记",
+      "title": "07 · 故障排查 · 日志标记",
+      "content": "| 标记 | 含义 |\n| --- | --- |\n| `== 阶段名 ==` | 进入某个步骤 |\n| `@STAGE=<key>` | 脚本阶段切换（cap/solve/patch/permissive/inject/load/init/done） |\n| `@TICK=<阶段> <计数>` | 心跳，界面据此更新文案与进度 |\n| `@WARN=…` | 黄色警告，不致命 |\n| `@EXIT=<code>` | 真实退出码 |\n| `执行退出码: N` | 98260 执行器退出码（124=超时，40=忙） |\n| `root 检查: uid=0(root)` | 判定成功的唯一依据 |",
+      "tags": [
+        "07-故障排查",
+        "日志标记"
+      ],
+      "source": "knowledge/07-故障排查.md"
+    },
+    {
+      "id": "07-故障排查#一键诊断脚本",
+      "title": "07 · 故障排查 · 一键诊断脚本",
+      "content": "App 内「导出设备诊断」会跑一段等价命令，也可以手动执行：\n\n```bash\nuname -r; getenforce\ngrep -i kernelsu /proc/modules\nls -l /system/bin/su /system_ext/bin/su\n/data/adb/ksud debug info | head -20\n/data/adb/ksud feature list\ngrep -iE 'onekey|ksu' /proc/mounts\ndmesg | grep -i kernelsu | tail -40\n```\n\n判读要点：\n- `/proc/modules` 里有 `kernelsu` 但 `su` 不通 → 用户态问题，点修复；\n- 有 `onekey-su`/`su_compat` 挂载但原生 su 能用 → 兼容层多余，点「清理旧兼容挂载」；\n- `dmesg` 里出现 `module verification failed` → 模块与新内核不匹配，换模块或改用云端/自适应。",
+      "tags": [
+        "07-故障排查",
+        "一键诊断脚本"
+      ],
+      "source": "knowledge/07-故障排查.md"
+    },
+    {
+      "id": "07-故障排查#什么时候必须硬重启",
+      "title": "07 · 故障排查 · 什么时候必须硬重启",
+      "content": "- 98260 失败后（无论什么原因）；\n- 出现 `内核可能处于脏状态`；\n- 越狱过程中设备卡死、自动重启后仍要再越狱。\n\n64560 失败通常可以原地重试，但同一 boot 内连续失败 3 次以上建议先重启再试。",
+      "tags": [
+        "07-故障排查",
+        "什么时候必须硬重启"
+      ],
+      "source": "knowledge/07-故障排查.md"
+    },
+    {
+      "id": "08-UI与交互规范#08 · UI 与交互规范",
+      "title": "08 · UI 与交互规范 · 08 · UI 与交互规范",
+      "content": "技术栈：Jetpack Compose + COUI（`io.github.suqi8.coui.kmp`），色板走 Monet 动态取色，默认主题粉 `#FFC0CB`。",
+      "tags": [
+        "08-UI与交互规范",
+        "08 · UI 与交互规范"
+      ],
+      "source": "knowledge/08-UI与交互规范.md"
+    },
+    {
+      "id": "08-UI与交互规范#页面结构",
+      "title": "08 · UI 与交互规范 · 页面结构",
+      "content": "```\nScaffold(contentWindowInsets = 0)          // 避免二次 inset 叠加\n├─ 状态栏遮罩（背景色实心，防 edge-to-edge 内容穿透）\n├─ TopBar（固定，高 54dp + 版本行）\n│    ├─ 标题 + 当前页图标\n│    └─ \"v2.17.16 · #164\"   ← 所有页面左上角常驻，10sp，主色\n├─ AnimatedContent（4 个 Tab，淡入淡出 200ms）\n│    ├─ 0 首页：越狱方式、管理器、环境、维护、诊断\n│    ├─ 1 日志：实时日志、复制、导出、清空\n│    ├─ 2 历史：运行记录、详情（含复制/导出）\n│    └─ 3 关于：主题、更新、开源组件、声明\n└─ AppBottomBar（自绘玻璃栏，70dp，图标 + 文字，毛玻璃背景）\n```\n\n内容区 padding：左右 16dp，top = 状态栏高 + 92dp，bottom = 导航栏高 + 92dp（给顶栏与底栏留位）。",
+      "tags": [
+        "08-UI与交互规范",
+        "页面结构"
+      ],
+      "source": "knowledge/08-UI与交互规范.md"
+    },
+    {
+      "id": "08-UI与交互规范#顶栏版本号（硬性要求）",
+      "title": "08 · UI 与交互规范 · 顶栏版本号（硬性要求）",
+      "content": "每个页面左上角都必须能看到 `v<versionName> · #<versionCode>`，来源是 `BuildConfig`，不写死：\n\n```kotlin\nText(\n    \"v\" + BuildConfig.VERSION_NAME + \" · #\" + BuildConfig.VERSION_CODE,\n    fontSize = 10.sp,\n    color = COUITheme.colorScheme.primary\n)\n```\n\n目的：用户截图反馈时能一眼确认版本，避免\"你用的是哪个版本\"的来回。",
+      "tags": [
+        "08-UI与交互规范",
+        "顶栏版本号（硬性要求）"
+      ],
+      "source": "knowledge/08-UI与交互规范.md"
+    },
+    {
+      "id": "08-UI与交互规范#组件规范",
+      "title": "08 · UI 与交互规范 · 组件规范",
+      "content": "| 组件 | 规格 |\n| --- | --- |\n| 弹窗 | `WindowDialog(title, show, onDismissRequest)`，内容 Column 内边距 `horizontal = 4.dp` |\n| 弹窗按钮 | 自绘 `DialogActions`：高 46dp、圆角 14dp、左右 8dp 内缩、两个按钮等分 |\n| 列表项 | `BasicComponent(title, summary, startAction, endAction)` |\n| 开关项 | `BasicComponent` + `Switch`，切换即生效并写日志 |\n| 卡片 | `Card { Column(Modifier.padding(4.dp)) { … } } ` |\n| 进度 | `LinearProgressIndicator(progress = pct / 100f)` |\n| 版本卡片 | 12dp 圆角 + `surfaceContainer` 背景，点开显示 `notes[]`，展开用 `AnimatedVisibility(expandVertically)` |\n\n颜色只用语义 token：`background`、`surfaceContainer`、`primary`、`onSurface`、`onSurfaceContainerVariant`、`error`、`onError`、`onPrimary`。",
+      "tags": [
+        "08-UI与交互规范",
+        "组件规范"
+      ],
+      "source": "knowledge/08-UI与交互规范.md"
+    },
+    {
+      "id": "08-UI与交互规范#文案基调",
+      "title": "08 · UI 与交互规范 · 文案基调",
+      "content": "- 陈述事实，不喊口号：\"98260 全链完成；重启后需要重新越狱。\"\n- 失败要说清下一步：\"98260 未完成；内核可能处于脏状态，重试前必须先硬重启设备。\"\n- 不写\"可能/大概\"当结论；不确定就标明条件（\"需实测确认\"）。\n- 数值一律带单位：`40.85 MB`、`2.41 MB/s`、`剩余 23.15 MB`。",
+      "tags": [
+        "08-UI与交互规范",
+        "文案基调"
+      ],
+      "source": "knowledge/08-UI与交互规范.md"
+    },
+    {
+      "id": "08-UI与交互规范#关键交互",
+      "title": "08 · UI 与交互规范 · 关键交互",
+      "content": "| 场景 | 行为 |\n| --- | --- |\n| 点「一键越狱」（98260） | 先弹\"运行前确认\"，说明一次开机只能用一次、失败需硬重启，确认后才执行 |\n| 点「一键越狱」（64560） | 直接执行并切到日志页 |\n| 越狱成功后（98260） | 弹\"越狱完成\"，提示重启后需重新越狱 |\n| 运行中 | 顶栏与底栏不隐藏，但所有会改状态的开关/选择被禁用 |\n| 检查更新 | 有新版自动弹窗；下载中禁用两个按钮 |\n| 历史详情 | 复制全文、导出 TXT（`CreateDocument`） |",
+      "tags": [
+        "08-UI与交互规范",
+        "关键交互"
+      ],
+      "source": "knowledge/08-UI与交互规范.md"
+    },
+    {
+      "id": "08-UI与交互规范#无障碍与细节",
+      "title": "08 · UI 与交互规范 · 无障碍与细节",
+      "content": "- 图标都带 `contentDescription = null`（装饰性），可点击区域用文案承担语义；\n- 触感统一 `rememberCouiHaptic()`，切换类交互用 `CouiHapticEffect.Switch`；\n- 长文本 `maxLines` + `TextOverflow.Ellipsis`，日志用等宽字体并保留滚动位置；\n- 弹窗内容超过屏幕时内部 `verticalScroll` + `heightIn(max = 240.dp)`，不撑破弹窗。",
+      "tags": [
+        "08-UI与交互规范",
+        "无障碍与细节"
+      ],
+      "source": "knowledge/08-UI与交互规范.md"
+    }
+  ]
+}

@@ -15,7 +15,26 @@ OnePlus 16（PYB110 / 6.18.21）与 OnePlus Ace 7 Pro（PMS110 / 6.12.69）的�
 | `merged-app/app/src/main/assets/core/` | 越狱载荷、各管理器 6.18/6.12 内核模块与 ksud |
 | `tools/ko_stamp.py` | 内核模块 `.modinfo` 重写工具（vermagic 对齐 + onuce 契约字段） |
 | `artifacts/` | 发布产物：APK、update 清单、云端模块与 catalog |
+| `knowledge/` | **技术知识库**：产品矩阵、链路原理、模块协议、更新协议、排障、UI 规范，含 AI 可导入 JSON |
 | `docs/` | 漏洞链研究记录（历史归档，非构建依赖） |
+
+## 知识库
+
+`knowledge/` 是给用户、二次开发和 AI 助手看的技术资料，入口见 [knowledge/README.md](knowledge/README.md)：
+
+| 文件 | 内容 |
+| --- | --- |
+| `01-产品概览与支持矩阵.md` | 能力边界、机型/内核矩阵、功能清单 |
+| `02-越狱链路原理.md` | 64560 阶段表、98260 一次性许可与后端选择 |
+| `03-管理器适配.md` | 五管理器版本/证书、三档取材顺序、自适应细节 |
+| `04-云端模块与校验协议.md` | catalog 结构、`onuce_*` 契约、校验清单、发模块步骤 |
+| `05-更新协议.md` | `update.json` 字段、弹窗行为、下载与安装 |
+| `06-构建与发布.md` | JDK 21、签名、发版流程、CNB 上传 |
+| `07-故障排查.md` | 报错对照表、日志标记、诊断命令 |
+| `08-UI与交互规范.md` | 页面结构、组件规格、文案基调 |
+
+AI 导入用：`knowledge/ai-kb/onekey-kb.json`（段落式，44 段）、`knowledge/ai-kb/onekey-kb.docs.json`（整篇式，8 篇）。
+改完 Markdown 跑 `python3 knowledge/ai-kb/build_kb.py` 同步。
 
 ## 五个管理器支持状态
 
