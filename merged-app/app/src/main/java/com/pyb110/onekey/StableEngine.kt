@@ -89,7 +89,7 @@ class StableEngine(
         ),
         ManagerSpec(
             kind = "finasu", backend = "finasu", pkg = "me.yuki.fina", label = "FinaSU",
-            expectedVersion = "v1.4.4", certSha256 = null,
+            expectedVersion = "v1.4.5", certSha256 = null,
             templateAsset = "core/finasu.ko", bundledKsud = "core/ksud_finasu",
             expectedKsudVersion = null, strict = false,
             perfLoader = "perf_cred_sukisu", bootstrapPath = "/data/local/tmp/onekey/ksud_sukisu",
@@ -433,15 +433,20 @@ class StableEngine(
             "core/cred.bin" to "cred.bin",
             "core/writer.bin" to "writer.bin",
             "core/loadgen.bin" to "loadgen.bin",
-            "core/symbols.txt" to "symbols.txt",
+            (DeviceProfiles.current()?.symbolsAsset ?: "core/symbols.txt") to "symbols.txt",
         )
-        if (adapter == null) {
-            files.add(lkmAsset to lkmDest)
-        }
+        val useBundledLkm = adapter == null || adapter.modulePath.isBlank()
         for ((asset, dest) in files) {
             val mode = if (dest.endsWith(".ko") || dest == "symbols.txt") 644 else 755
             if (!stageAssetCached(asset, listOf(workDir + "/" + dest), mode, cache)) {
                 log("投放失败 " + dest)
+                return false
+            }
+        }
+        if (useBundledLkm) {
+            val rel = ShizukuShell.run("uname -r", 5).output.trim()
+            if (!stageAlignedLkm(lkmAsset, workDir + "/" + lkmDest, rel, cache)) {
+                log("投放内核模块失败 " + lkmDest)
                 return false
             }
         }
@@ -462,7 +467,7 @@ class StableEngine(
         } else {
             log("管理器未提供 libksud.so，使用内置 ksud 副本")
         }
-        if (adapter != null) {
+        if (adapter != null && adapter.modulePath.isNotBlank()) {
             try {
                 val mod = java.io.File(adapter.modulePath).readBytes()
                 val ks = java.io.File(adapter.ksudPath).readBytes()
@@ -744,6 +749,7 @@ class StableEngine(
             RootDiagnostics.hasLine(info, "version: 41027") -> "sukisu"
             RootDiagnostics.hasLine(info, "version: 40994") -> "sukisu"
             RootDiagnostics.hasLine(info, "version: 35235") -> "bakasu"
+            RootDiagnostics.hasLine(info, "version: 33168") -> "finasu"
             RootDiagnostics.hasLine(info, "version: 33167") -> "finasu"
             RootDiagnostics.hasLine(info, "version: 33156") -> "finasu"
             RootDiagnostics.hasLine(info, "version: 33155") -> "finasu"
@@ -866,6 +872,22 @@ class StableEngine(
             return false
         }
         return true
+    }
+
+    /** 内置模块按设备 release 现场对齐 vermagic：同版本换 OTA 后依旧能载入。 */
+    private fun stageAlignedLkm(asset: String, dest: String, release: String, cache: String): Boolean {
+        val raw = try {
+            ctx.assets.open(asset).use { it.readBytes() }
+        } catch (e: Throwable) {
+            log("读取内置模块失败：" + (e.message ?: e.javaClass.simpleName))
+            return false
+        }
+        val aligned = runCatching { RuntimeExtractor.alignVermagic(raw, release) }.getOrElse {
+            log("对齐 vermagic 失败，按原样投放：" + (it.message ?: "未知错误"))
+            raw
+        }
+        if (aligned.size != raw.size) log("内置模块 vermagic 已对齐到 " + release)
+        return stageBytesCached(aligned, "lkm-" + asset + "-" + release, listOf(dest), 644, cache)
     }
 
     private fun extractKsud(spec: ManagerSpec): ByteArray? {

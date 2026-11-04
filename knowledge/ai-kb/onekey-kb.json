@@ -2,7 +2,7 @@
   "name": "OneKey 越狱工具知识库",
   "version": "2.17.16",
   "generated_at": "2026-11-04",
-  "count": 44,
+  "count": 49,
   "paragraphs": [
     {
       "id": "01-产品概览与支持矩阵#一句话",
@@ -443,6 +443,56 @@
         "无障碍与细节"
       ],
       "source": "knowledge/08-UI与交互规范.md"
+    },
+    {
+      "id": "09-新系统17.0.1.201适配#一、这次换的是什么",
+      "title": "09 · ColorOS 17.0.1.201 适配说明 · 一、这次换的是什么",
+      "content": "| 项 | 17.0.0.x（旧） | 17.0.1.201（新） |\n| --- | --- | --- |\n| 内核 release | `6.18.21-android17-5-gf957accaf563-ab15926176-4k` | `6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k` |\n| 内核 commit | `f957accaf563` | `7fcbffcad3e1` |\n| 内核基址 | `ffffffc080000000` | 同 |\n| kallsyms 条数 | 137,991 | 143,616（`vmlinux-to-elf` 导出 143,616 行符号表） |\n| 同名符号 | — | 137,848 条；地址相同仅 169 条（0.12%） |\n\n也就是说：**版本号没变（还是 6.18.21），但是一次重新构建**。所有 pin 构建串的东西都要跟着换。",
+      "tags": [
+        "09-新系统17.0.1.201适配",
+        "一、这次换的是什么"
+      ],
+      "source": "knowledge/09-新系统17.0.1.201适配.md"
+    },
+    {
+      "id": "09-新系统17.0.1.201适配#二、哪些能在电脑上适配完",
+      "title": "09 · ColorOS 17.0.1.201 适配说明 · 二、哪些能在电脑上适配完",
+      "content": "1. **机型档案**：`DeviceProfiles.PYB110_201` 匹配新 release，旧档案保留，两台都能用。\n2. **符号表**：从 boot.img 的 kernel 镜像里重导 kallsyms（`vmlinux-to-elf` + `analysis/tools/dump_syms.py`），\n   产出 `core/symbols-1701201.txt`；64560 的 `resolve.bin` / `patch.bin` 直接读新表即可。\n3. **模块 vermagic**：内置模块不再固定内核串，投放前用 `RuntimeExtractor.alignVermagic()` 现场对齐到 `uname -r`，\n   以后再换 OTA 不需要重发五个管理器的模块。\n4. **云端模块**：catalog 支持 `vermagic` 精确匹配；新内核上若没有对应条目，会干净跳过并回落到内置模块（不报错）。",
+      "tags": [
+        "09-新系统17.0.1.201适配",
+        "二、哪些能在电脑上适配完"
+      ],
+      "source": "knowledge/09-新系统17.0.1.201适配.md"
+    },
+    {
+      "id": "09-新系统17.0.1.201适配#三、哪些必须真机",
+      "title": "09 · ColorOS 17.0.1.201 适配说明 · 三、哪些必须真机",
+      "content": "| 项 | 原因 |\n| --- | --- |\n| 64560 触发与收尾 | trace 采样、slide 校准、cred 定位、LKM 加载都要在真内核上跑，符号表只是\"能算对地址\"的前提 |\n| 98260 一次性 plant | 原生执行器内部偏移按旧构建标定，新构建属首次尝试；一次开机只能一次 |\n| ColorOS 安全策略 | 17.0.1.201 是否新增 su 拦截/LKM 校验，只能实测 |\n| 模块 CRC 兼容 | `modversions` 下 `module_layout` 版本号是否一致，需 load 时才知道 |",
+      "tags": [
+        "09-新系统17.0.1.201适配",
+        "三、哪些必须真机"
+      ],
+      "source": "knowledge/09-新系统17.0.1.201适配.md"
+    },
+    {
+      "id": "09-新系统17.0.1.201适配#四、真机试的步骤",
+      "title": "09 · ColorOS 17.0.1.201 适配说明 · 四、真机试的步骤",
+      "content": "1. 系统更新完成后确认 `uname -r` 与上表新串一致（不一致说明还有小版本差异，需要再导一次符号表）；\n2. 先试 **64560 稳定链**（失败可原地重试，不会要求硬重启）；\n3. 若稳定链卡在 `加载内核模块`，导出诊断日志，重点看 `dmesg | grep -i module` 的 CRC 报错；\n4. 稳定链通了再试 **98260**（一次开机一次，失败必须硬重启）；\n5. 两条都失败时保留 `/data/local/tmp/onekey-console.log` 与 App 内导出的日志。",
+      "tags": [
+        "09-新系统17.0.1.201适配",
+        "四、真机试的步骤"
+      ],
+      "source": "knowledge/09-新系统17.0.1.201适配.md"
+    },
+    {
+      "id": "09-新系统17.0.1.201适配#五、重新导符号表（换任何 OTA 都这么做）",
+      "title": "09 · ColorOS 17.0.1.201 适配说明 · 五、重新导符号表（换任何 OTA 都这么做）",
+      "content": "```bash\ncd analysis && . .venv/bin/activate\npython3 - <<'PY'\nimport struct\np=\"/path/to/boot.img\"; d=open(p,'rb').read()\nks=struct.unpack_from('<I',d,8)[0]; hs=struct.unpack_from('<I',d,20)[0]\noff=((hs+4095)//4096)*4096\nopen('kernel.Image','wb').write(d[off:off+ks])\nPY\nvmlinux-to-elf kernel.Image vmlinux.elf\npython3 tools/dump_syms.py vmlinux.elf symbols.txt\n```\n\n把 `symbols.txt` 放进 `assets/core/`，在 `DeviceProfiles` 里给对应 release 加一条档案即可。",
+      "tags": [
+        "09-新系统17.0.1.201适配",
+        "五、重新导符号表（换任何 OTA 都这么做）"
+      ],
+      "source": "knowledge/09-新系统17.0.1.201适配.md"
     }
   ]
 }

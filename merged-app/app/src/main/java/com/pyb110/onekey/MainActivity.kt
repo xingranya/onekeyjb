@@ -1129,7 +1129,7 @@ private fun managerHint(kind: String): String = when (kind) {
     "kernelsu" -> "KernelSU 官方 v3.3.1（versionCode 32680，支持自适应与云端模块）"
     "sukisu" -> "SukiSU Ultra v4.3.0-r1（versionCode 41140，支持自适应与云端模块）"
     "bakasu" -> "BakaSU v4.2.0-rc3（versionCode 35171，支持自适应与云端模块）"
-    "finasu" -> "FinaSU v1.4.4（versionCode 33167，支持自适应与云端模块）"
+    "finasu" -> "FinaSU v1.4.5（versionCode 33168，支持自适应与云端模块）"
     else -> ""
 }
 
@@ -1181,7 +1181,7 @@ private fun AdaptiveManagerCard(controller: JailbreakController, haptic: (CouiHa
         Column(Modifier.padding(4.dp)) {
             BasicComponent(
                 title = "运行时自适应管理器",
-                summary = "从已安装管理器提取内核模块和 ksud，不限版本号",
+                summary = "按已装管理器取 ksud 与内核模块；管理器 APK 不再内嵌模块时自动改用云端/内置组件",
                 startAction = { Icon(COUIIcons.Update, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
                 endActions = {
                     Switch(

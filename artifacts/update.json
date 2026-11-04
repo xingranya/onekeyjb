@@ -1,12 +1,27 @@
 {
-  "versionCode": 164,
-  "versionName": "2.17.16",
-  "publishedAt": "2026-11-04T08:35:00+08:00",
-  "size": 42839435,
-  "sha256": "3f087b7d103c569558be0a190f78c889c648ffcaded7dee7b5c77dafc6c58cf1",
+  "versionCode": 165,
+  "versionName": "2.17.17",
+  "publishedAt": "2026-11-04T20:20:00+08:00",
+  "size": 44178916,
+  "sha256": "5a25b16af2b3d0ff554662682f58ec782cad6d4e0b8a5aab30e8e4baf965e56b",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.17.16\n\n- 五个管理器全部对齐当前最新版：KernelSU 官方 v3.3.1/32680、KernelSU-Next v3.4.2/33355、SukiSU Ultra v4.3.0-r1/41140、BakaSU v4.2.0-rc3/35171、FinaSU v1.4.4/33167\n- 内置 6.18 模块全部换成与最新管理器同版本的内核镜像，模块自述版本与管理器 versionCode 一致\n- FinaSU 升级到 1.4.4：6.18 与 6.12 双内核模块、libksud 全部更新到 33167\n- 云端模块重发五个条目，覆盖最新 versionCode，并按内核 release 精确匹配\n- 管理器说明文案修正，之前仍显示 v1.0.5 / v0.9.5 / v2.0.0-alpha 等旧版本号\n- 保留 FinaSU 1.4.4 自适应、更新弹窗的更新时间/包大小/分版本日志/下载速度",
+  "changelog": "v2.17.17\n\n- 适配 ColorOS 17.0.1.201 新内核：6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k\n- 从新 boot.img 重新导出 143,616 条 kallsyms，生成 core/symbols-1701201.txt，64560 稳定链按新符号表解析地址\n- 内核模块不再绑定旧内核串：内置模块按设备 uname -r 现场对齐 vermagic，同版本换 OTA 不用重发模块\n- 新增机型档案 PYB110_201（17.0.1.201），App 会自动选符号表；旧 17.0.0.x 档案保留\n- 98260 链标为「未验证构建」：执行器按旧内核标定，运行前会明确提示，失败不算适配回归\n- 修复自适应管理器：管理器 APK 已不再内嵌 LKM，现在会快速判定并回落云端/内置，不再白等 60 秒甚至直接中断\n- FinaSU 升级到 1.4.5（versionCode 33168）：6.18/6.12 模块与 libksud 全部更新，云端模块同步",
   "versions": [
+    {
+      "versionName": "2.17.17",
+      "versionCode": 165,
+      "publishedAt": "2026-11-04T20:20:00+08:00",
+      "size": 44178916,
+      "notes": [
+        "适配 ColorOS 17.0.1.201 新内核：6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k",
+        "从新 boot.img 重新导出 143,616 条 kallsyms，生成 core/symbols-1701201.txt，64560 稳定链按新符号表解析地址",
+        "内核模块不再绑定旧内核串：内置模块按设备 uname -r 现场对齐 vermagic，同版本换 OTA 不用重发模块",
+        "新增机型档案 PYB110_201（17.0.1.201），App 会自动选符号表；旧 17.0.0.x 档案保留",
+        "98260 链标为「未验证构建」：执行器按旧内核标定，运行前会明确提示，失败不算适配回归",
+        "修复自适应管理器：管理器 APK 已不再内嵌 LKM，现在会快速判定并回落云端/内置，不再白等 60 秒甚至直接中断",
+        "FinaSU 升级到 1.4.5（versionCode 33168）：6.18/6.12 模块与 libksud 全部更新，云端模块同步"
+      ]
+    },
     {
       "versionName": "2.17.16",
       "versionCode": 164,

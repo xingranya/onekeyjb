@@ -3,7 +3,7 @@
 OnePlus 16（PYB110 / 6.18.21）与 OnePlus Ace 7 Pro（PMS110 / 6.12.69）的一键越狱 App。
 稳定链 CVE-2026-64560，实验链 CVE-2026-98260；内置 KernelSU 系管理器适配、云端模块与在线更新。
 
-- 当前版本：**2.17.16（versionCode 164）**
+- 当前版本：**2.17.17（versionCode 165）**
 - 产物：`artifacts/OneKeyJB-v2.17.16.apk`
 - 发布源：`https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/`
 
@@ -17,6 +17,16 @@ OnePlus 16（PYB110 / 6.18.21）与 OnePlus Ace 7 Pro（PMS110 / 6.12.69）的�
 | `artifacts/` | 发布产物：APK、update 清单、云端模块与 catalog |
 | `knowledge/` | **技术知识库**：产品矩阵、链路原理、模块协议、更新协议、排障、UI 规范，含 AI 可导入 JSON |
 | `docs/` | 漏洞链研究记录（历史归档，非构建依赖） |
+
+## 支持的内核
+
+| 机型 | 内核 release | 稳定链 | 实验链 |
+| --- | --- | --- | --- |
+| 一加 16 | `6.18.21-android17-5-gf957accaf563-ab15926176-4k` | 支持 | 已标定 |
+| 一加 16 | `6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k`（17.0.1.201） | 支持（新符号表） | 未标定，真机验证中 |
+| 一加 Ace 7 Pro | `6.12.69-android16-6-g242e1a07f878-ab15865446-4k` | — | 支持 |
+
+内置内核模块在投放前会按 `uname -r` 现场对齐 vermagic，换小版本 OTA 不需要重发模块。
 
 ## 知识库
 
@@ -32,6 +42,7 @@ OnePlus 16（PYB110 / 6.18.21）与 OnePlus Ace 7 Pro（PMS110 / 6.12.69）的�
 | `06-构建与发布.md` | JDK 21、签名、发版流程、CNB 上传 |
 | `07-故障排查.md` | 报错对照表、日志标记、诊断命令 |
 | `08-UI与交互规范.md` | 页面结构、组件规格、文案基调 |
+| `09-新系统17.0.1.201适配.md` | 新 OTA 的内核变化、符号表重导、哪些必须真机 |
 
 AI 导入用：`knowledge/ai-kb/onekey-kb.json`（段落式，44 段）、`knowledge/ai-kb/onekey-kb.docs.json`（整篇式，8 篇）。
 改完 Markdown 跑 `python3 knowledge/ai-kb/build_kb.py` 同步。
@@ -44,7 +55,7 @@ AI 导入用：`knowledge/ai-kb/onekey-kb.json`（段落式，44 段）、`knowl
 | KernelSU-Next | `com.rifsxd.ksunext` | v3.4.2 | 33355 | `79e590113c4c4c0c` |
 | SukiSU Ultra | `com.sukisu.ultra` | v4.3.0-r1 | 41140 | `947ae944f3de4ed4` |
 | BakaSU | `com.resukisu.resukisu` | v4.2.0-rc3 | 35171 | `d3469712b6214462` |
-| FinaSU | `me.yuki.fina` | v1.4.4 | 33167 | `2d89b50aaf1db013` |
+| FinaSU | `me.yuki.fina` | v1.4.5 | 33168 | `2d89b50aaf1db013` |
 
 三档取材顺序：**云端模块 → 管理器 APK 运行时自适应 → 内置模块**。
 云端模块按 `manager + versionCode + vermagic` 精确匹配，vermagic 对不上会直接跳过并回落本地组件。

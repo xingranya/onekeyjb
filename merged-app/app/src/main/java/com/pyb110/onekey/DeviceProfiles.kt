@@ -13,9 +13,12 @@ data class DeviceProfile(
     val symbolsAsset: String,
     val onuceSymbolsAsset: String,
     val onuceAsset: String,
+    /** 98260 原生执行器是否按当前内核构建标定过；未标定时只允许尝试，失败不算回归。 */
+    val onuceVerified: Boolean = true,
 )
 
 object DeviceProfiles {
+    /** 一加 16 · ColorOS 17.0.0.x（内核 commit f957acc）。 */
     val PYB110 = DeviceProfile(
         id = "pyb110",
         displayName = "OnePlus 16",
@@ -27,6 +30,22 @@ object DeviceProfiles {
         symbolsAsset = "core/symbols.txt",
         onuceSymbolsAsset = "core/symbols.txt",
         onuceAsset = "core/onuce/onuce_111_98260",
+    )
+
+    /** 一加 16 · ColorOS 17.0.1.201（内核 commit 7fcbffcad3e1，符号表按本 boot.img 重导）。 */
+    val PYB110_201 = DeviceProfile(
+        id = "pyb110",
+        displayName = "OnePlus 16",
+        model = "PYB110",
+        device = "OP64E1L1",
+        kernelRelease = "6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k",
+        supportsStable = true,
+        supportsNew = true,
+        symbolsAsset = "core/symbols-1701201.txt",
+        onuceSymbolsAsset = "core/symbols-1701201.txt",
+        onuceAsset = "core/onuce/onuce_111_98260",
+        // 98260 原生执行器只在 f957acc 构建上验证过；新构建未验证，失败不代表适配错误。
+        onuceVerified = false,
     )
 
     val PMS110 = DeviceProfile(
@@ -42,7 +61,7 @@ object DeviceProfiles {
         onuceAsset = "core/onuce/onuce_111_64560",
     )
 
-    val all = listOf(PYB110, PMS110)
+    val all = listOf(PYB110, PYB110_201, PMS110)
 
     fun current(): DeviceProfile? {
         val model = Build.MODEL.trim().uppercase()
@@ -63,4 +82,8 @@ object DeviceProfiles {
                 (p.device == null || p.device.equals(device, ignoreCase = true))
         }
     }
+
+    /** 机型命中但内核串不认识时，返回它支持的内核列表用于提示。 */
+    fun knownReleasesFor(profile: DeviceProfile?): List<String> =
+        profile?.let { p -> all.filter { it.id == p.id }.map { it.kernelRelease } } ?: emptyList()
 }

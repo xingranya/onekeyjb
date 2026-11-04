@@ -3,13 +3,22 @@
   "generated_at": "2026-11-04",
   "modules": [
     {
-      "manager": "official",
-      "version": 32680,
-      "name": "official-32680-c39431f6998806b8.ko",
-      "size": 385501,
-      "sha256": "b9bb10bb682dd19a9077ceea6ffbdeee7c3c2582ff2460eb7e3e356cef1cf9db",
+      "manager": "bakasu",
+      "version": 35171,
+      "name": "bakasu-35171-c39431f6998806b8.ko",
+      "size": 439018,
+      "sha256": "d0a483ffa13cee835ebad1c0b7dc76f82934604515a836732c18cbccd37291d0",
       "vermagic": "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
-      "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/official-32680-c39431f6998806b8.ko"
+      "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/bakasu-35171-c39431f6998806b8.ko"
+    },
+    {
+      "manager": "finasu",
+      "version": 33168,
+      "name": "finasu-33168-c39431f6998806b8.ko",
+      "size": 549260,
+      "sha256": "b24daa3cc7d60992ab3b054cbcb109cba9615c9a3b664933ba5dacf9814f1b16",
+      "vermagic": "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
+      "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/finasu-33168-c39431f6998806b8.ko"
     },
     {
       "manager": "next",
@@ -21,13 +30,13 @@
       "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/next-33355-c39431f6998806b8.ko"
     },
     {
-      "manager": "bakasu",
-      "version": 35171,
-      "name": "bakasu-35171-c39431f6998806b8.ko",
-      "size": 439018,
-      "sha256": "d0a483ffa13cee835ebad1c0b7dc76f82934604515a836732c18cbccd37291d0",
+      "manager": "official",
+      "version": 32680,
+      "name": "official-32680-c39431f6998806b8.ko",
+      "size": 385501,
+      "sha256": "b9bb10bb682dd19a9077ceea6ffbdeee7c3c2582ff2460eb7e3e356cef1cf9db",
       "vermagic": "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
-      "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/bakasu-35171-c39431f6998806b8.ko"
+      "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/official-32680-c39431f6998806b8.ko"
     },
     {
       "manager": "sukisu",
@@ -37,15 +46,6 @@
       "sha256": "f6433df85e525f2ed1ee258fb18d48aa7210f3a690974e9365ddfd814244f335",
       "vermagic": "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
       "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/sukisu-41140-c39431f6998806b8.ko"
-    },
-    {
-      "manager": "finasu",
-      "version": 33167,
-      "name": "finasu-33167-c39431f6998806b8.ko",
-      "size": 549260,
-      "sha256": "6b7a9da8663410d144de793d374c8ae4110234766eab1d383512630face5a1c7",
-      "vermagic": "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
-      "url": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/finasu-33167-c39431f6998806b8.ko"
     }
   ]
 }

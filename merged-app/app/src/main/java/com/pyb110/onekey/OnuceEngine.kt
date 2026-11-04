@@ -42,6 +42,10 @@ object OnuceEngine {
         progress: (Int) -> Unit,
     ): Boolean {
         val profile = DeviceProfiles.current()
+        if (profile != null && !profile.onuceVerified) {
+            log("提示：98260 执行器按旧内核构建标定，当前系统是 " + profile.kernelRelease)
+            log("      本次为首次适配，失败请导出日志并硬重启；64560 稳定链不受影响。")
+        }
         if (profile?.id == "pms110") {
             return runAce(context, pkg, kind, adapter, log, stage, progress)
         }
@@ -73,13 +77,16 @@ object OnuceEngine {
                 log, progress
             )
         } else null
+        val rel = KernelProbe.read().trim()
+        val bundledAsset = if (b == "sukisu") "core/onuce/sukisu.ko" else koAsset(b)
+        val bundled = runCatching {
+            context.assets.open(bundledAsset).use { RuntimeExtractor.alignVermagic(it.readBytes(), rel) }
+        }.getOrNull()
         val moduleBytes = cloudModule?.let { runCatching { it.readBytes() }.getOrNull() }
-            ?: if (adapter != null) {
-                runCatching { File(adapter.modulePath).readBytes() }.getOrNull()
-            } else {
-                val asset = if (b == "sukisu") "core/onuce/sukisu.ko" else koAsset(b)
-                runCatching { context.assets.open(asset).use { it.readBytes() } }.getOrNull()
-            } ?: run { log("缺少 LKM 组件：" + b); return false }
+            ?: adapter?.takeIf { it.modulePath.isNotBlank() }
+                ?.let { runCatching { File(it.modulePath).readBytes() }.getOrNull() }
+            ?: bundled
+            ?: run { log("缺少 LKM 组件：" + b); return false }
         val ksudBytes = if (adapter != null) {
             runCatching { File(adapter.ksudPath).readBytes() }.getOrNull()
         } else {
@@ -99,7 +106,7 @@ object OnuceEngine {
         }
         val assetStages = listOf(
             runtimeAsset() to ws + "/onuce",
-            "core/symbols.txt" to ws + "/device-symbols.txt",
+            (profile?.onuceSymbolsAsset ?: "core/symbols.txt") to ws + "/device-symbols.txt",
         )
         for ((asset, dest) in assetStages) {
             if (ShizukuShell.stageAsset(context, asset, dest, 755).code != 0) {

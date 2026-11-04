@@ -216,7 +216,7 @@ class JailbreakController private constructor(private val context: Context) {
             Triple("kernelsu", "KernelSU 官方", "me.weishu.kernelsu") to 32680,
             Triple("sukisu", "SukiSU Ultra", "com.sukisu.ultra") to 41140,
             Triple("bakasu", "BakaSU", "com.resukisu.resukisu") to 35171,
-            Triple("finasu", "FinaSU", "me.yuki.fina") to 33167,
+            Triple("finasu", "FinaSU", "me.yuki.fina") to 33168,
         )
         return defs.map { (triple, expected) ->
             val (kind, label, staticPkg) = triple

@@ -35,6 +35,17 @@ object RuntimeExtractor {
         val certSha256: String
     )
 
+    /**
+     * 把内置模块的 vermagic 对齐到设备实际 release。
+     * 同一 6.18.21 换 OTA 时 release 串会变（-g<commit>-ab<build>），内置模块不能硬跟旧串。
+     */
+    fun alignVermagic(bytes: ByteArray, release: String): ByteArray {
+        if (release.isBlank()) return bytes
+        val info = inspect(bytes) ?: return bytes
+        if (info.first == release || info.first.startsWith(release + " ")) return bytes
+        return patchVermagic(Module(bytes, sha256(bytes), info.first, info.second), release).bytes
+    }
+
     private fun shq(s: String): String = "'" + s.replace("'", "'\\''") + "'"
 
     private fun sha256(data: ByteArray): String =
@@ -57,8 +68,7 @@ object RuntimeExtractor {
         app.splitSourceDirs?.let { for (p in it) if (!paths.contains(p)) paths.add(p) }
         if (paths.isEmpty()) throw IllegalStateException("管理器 APK 路径为空")
         val tmpDir = "/data/local/tmp/onekey-adapters/" + System.nanoTime()
-        val exactLibs = ArrayList<Pair<String, ByteArray>>()
-        val fallbackLibs = ArrayList<Pair<String, ByteArray>>()
+        val libs = ArrayList<Pair<String, ByteArray>>()
         val apkHashes = ArrayList<String>()
         try {
             for ((idx, path) in paths.withIndex()) {
@@ -72,43 +82,37 @@ object RuntimeExtractor {
                 val bytes = readAll(apk)
                 apkHashes.add(sha256(bytes))
                 ZipFile(apk).use { z ->
-                    val entries = z.entries().asSequence()
-                        .filter { it.name.startsWith("lib/arm64-v8a/") && it.name.endsWith(".so") }
-                        .toList()
-                    val exact = entries.filter { it.name == "lib/arm64-v8a/libksud.so" }
-                    val picks = if (exact.isNotEmpty()) exact else entries.sortedByDescending { it.size }.take(1)
-                    for (e in picks) {
-                        val pair = e.name to z.getInputStream(e).use { it.readBytes() }
-                        if (exact.isNotEmpty()) exactLibs.add(pair) else fallbackLibs.add(pair)
+                    for (e in z.entries().asSequence().filter { it.name.startsWith("lib/arm64-v8a/") && it.name.endsWith(".so") }) {
+                        libs.add(e.name to z.getInputStream(e).use { it.readBytes() })
                     }
                 }
             }
-            val libs = exactLibs + fallbackLibs
             if (libs.isEmpty()) throw IllegalStateException("APK 不含 arm64 库")
             val apkSha = sha256(apkHashes.joinToString("").toByteArray(Charsets.US_ASCII))
             emit("APK: " + paths.size + " 个, 合并 sha256=" + apkSha.take(16) + "…")
-            var chosen: Pair<String, ByteArray>? = null
+            // ksud 永远是 libksud.so；个别分支改了库名，退化为最大库。
+            val ksud = libs.firstOrNull { it.first.endsWith("/libksud.so") } ?: libs.maxByOrNull { it.second.size }!!
+            // 内核模块可能放在任意库里：按体积从大到小逐个找，命中即停。
             var mod: Module? = null
-            for ((name, data) in libs) {
-                emit("尝试库: " + name + " " + data.size + " B")
-                val c = try { carve(data, log) } catch (e: Throwable) {
-                    emit("库 " + name + " 提取失败：" + (e.message ?: e.javaClass.simpleName))
-                    continue
+            for ((name, data) in libs.sortedByDescending { it.second.size }) {
+                val found = findModule(data, name, emit)
+                if (found != null) {
+                    mod = found
+                    break
                 }
-                chosen = name to data
-                mod = c
-                break
             }
-            if (chosen == null || mod == null) throw IllegalStateException("未找到可用的 kernelsu 模块")
             val rel = ShizukuShell.run("uname -r", 5).output.trim()
-            val patched = patchVermagic(mod, rel)
-            emit("module: " + patched.bytes.size + " B, vermagic=" + patched.vermagic + ", parms=" + patched.parms)
             val dir = File(ctx.filesDir, "adapters/" + apkSha.take(24))
             dir.mkdirs()
-            val moduleFile = File(dir, "module.ko")
-            val ksudFile = File(dir, "ksud")
-            moduleFile.writeBytes(patched.bytes)
-            ksudFile.writeBytes(chosen.second)
+            val ksudFile = File(dir, "ksud").apply { writeBytes(ksud.second) }
+            if (mod == null) {
+                // 当前各家管理器的 APK 都不再内嵌 LKM：ksud 照用管理器的，模块交给云端/内置。
+                emit("管理器 APK 未内嵌内核模块（已检查 " + libs.size + " 个 arm64 库），内核模块改用云端或内置组件")
+                return Adapter(pkg, kind, versionCode, versionName, apkSha, "", ksudFile.absolutePath, "", 0, "", certSha)
+            }
+            val patched = patchVermagic(mod, rel)
+            emit("module: " + patched.bytes.size + " B, vermagic=" + patched.vermagic + ", parms=" + patched.parms)
+            val moduleFile = File(dir, "module.ko").apply { writeBytes(patched.bytes) }
             emit("已准备 adapter: " + dir.absolutePath)
             return Adapter(pkg, kind, versionCode, versionName, apkSha, moduleFile.absolutePath, ksudFile.absolutePath, patched.sha256, patched.bytes.size, patched.vermagic, certSha)
         } finally {
@@ -160,31 +164,115 @@ object RuntimeExtractor {
         }
     }
 
-    private fun carve(raw: ByteArray, log: (String) -> Unit, onlyEd: Boolean = true): Module {
+    /**
+     * 在管理器 .so 里找内核模块。两条路径，都带时间上限：
+     * 1) 裸 ELF（当前各家管理器的实际做法，模块被原样拼进 libksud.so 一类的大库里）；
+     * 2) 裸 DEFLATE 流（历史格式，起始字节多为 0xED）。
+     * 找不到返回 null —— 由调用方回落到云端或内置模块，绝不在这里抛超时。
+     */
+    private fun findModule(raw: ByteArray, name: String, log: (String) -> Unit): Module? {
+        val started = System.currentTimeMillis()
+        val elf = rawElf(raw)
+        if (elf != null) {
+            log("库 " + name + " 内嵌裸 ELF 模块 " + elf.bytes.size + " B")
+            return elf
+        }
+        val fast = deflate(raw, false, 12_000L)
+        val picked = pick618(fast)
+        if (picked != null) {
+            log("库 " + name + " 内嵌压缩模块 " + picked.bytes.size + " B（候选 " + fast.size + "）")
+            return picked
+        }
+        // 只有体积不大的库才值得全量扫描，避免把 6 MB 的二进制拖成 60 秒。
+        if (raw.size <= 3_000_000) {
+            val full = deflate(raw, true, 15_000L)
+            val deep = pick618(full)
+            if (deep != null) {
+                log("库 " + name + " 全量扫描命中模块 " + deep.bytes.size + " B")
+                return deep
+            }
+        }
+        log("库 " + name + " 无内核模块（" + (System.currentTimeMillis() - started) + " ms）")
+        return null
+    }
+
+    /** 6.18 候选选择：唯一最好；多个时取体积最大的并说明，避免整条链路无谓失败。 */
+    private fun pick618(list: List<Module>): Module? {
+        val target = list.filter { it.vermagic.contains("6.18") || it.vermagic.startsWith("6.18") }
+        if (target.isEmpty()) return null
+        if (target.size == 1) return target[0]
+        return target.maxByOrNull { it.bytes.size }
+    }
+
+    /** 直接在库里扫裸 ELF（ET_REL + AArch64 + 有 .modinfo），按 section 表算真实长度。 */
+    private fun rawElf(raw: ByteArray): Module? {
+        var i = 0
+        var seen = 0
+        while (i < raw.size - 64 && seen < 64) {
+            if (raw[i] != 0x7f.toByte() || raw[i + 1] != 'E'.code.toByte() ||
+                raw[i + 2] != 'L'.code.toByte() || raw[i + 3] != 'F'.code.toByte()
+            ) {
+                i++
+                continue
+            }
+            seen++
+            readElfAt(raw, i)?.let { return it }
+            i++
+        }
+        return null
+    }
+
+    private fun readElfAt(raw: ByteArray, off: Int): Module? {
+        if (off + 64 > raw.size) return null
+        if (raw[off + 4] != 2.toByte() || raw[off + 5] != 1.toByte()) return null
+        val bb = java.nio.ByteBuffer.wrap(raw).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        if (bb.getShort(off + 16).toInt() != 1) return null      // ET_REL
+        if (bb.getShort(off + 18).toInt() != 183) return null    // AArch64
+        val shoff = bb.getLong(off + 0x28)
+        val shent = bb.getShort(off + 0x3A).toInt() and 0xffff
+        val shnum = bb.getShort(off + 0x3C).toInt() and 0xffff
+        val shstr = bb.getShort(off + 0x3E).toInt() and 0xffff
+        if (shoff <= 0 || shent != 64 || shnum <= 0 || shnum > 256 || shstr >= shnum) return null
+        val base = off + shoff.toInt()
+        if (base.toLong() + shnum.toLong() * shent > raw.size) return null
+        var end = (base + shnum * shent).toLong()
+        for (i in 0 until shnum) {
+            val b = base + i * shent
+            val type = bb.getInt(b + 4)
+            val sOff = bb.getLong(b + 0x18)
+            val sSize = bb.getLong(b + 0x20)
+            if (type != 8 && sOff > 0 && sSize > 0) {           // 非 NOBITS
+                val e = off + sOff + sSize
+                if (e > raw.size || e < off) return null
+                if (e > end) end = e
+            }
+        }
+        if (end - off < 4096) return null
+        val bytes = raw.copyOfRange(off, end.toInt())
+        val info = inspect(bytes) ?: return null
+        return Module(bytes, sha256(bytes), info.first, info.second)
+    }
+
+    /** 扫裸 DEFLATE 流；full=true 时逐个偏移尝试（耗时，调用方必须限体积与时间）。 */
+    private fun deflate(raw: ByteArray, full: Boolean, budgetMs: Long): List<Module> {
         val started = System.currentTimeMillis()
         val out = ArrayList<Module>()
         var i = 0
-        var tried = 0
         while (i < raw.size - 2) {
-            if (System.currentTimeMillis() - started > 60_000) throw IllegalStateException("扫描超时（>60s），无法完成准备")
-            // 实测这些管理器内嵌的裸 DEFLATE 流起始字节为 0xED/0xEB（动态 Huffman）。
-            // 先按起始字节快筛，找不到再退回全量扫描，避免 5.5MB 每个偏移都创建 Inflater。
-            val b = raw[i].toInt() and 0xff
-            if (onlyEd && b != 0xED) { i++; continue }
-            tried++
-            if (tried % 20000 == 0) android.util.Log.i("OneKeyAdaptive", "carve tried=" + tried + " off=" + i)
+            if (System.currentTimeMillis() - started > budgetMs) break
+            if (!full && (raw[i].toInt() and 0xff) != 0xED) { i++; continue }
             if (((raw[i].toInt() shr 1) and 3) == 3) { i++; continue }
             val inf = Inflater(true)
-            var produced = 0
             try {
                 inf.setInput(raw, i, raw.size - i)
                 val probe = ByteArray(4)
                 val n0 = try { inf.inflate(probe) } catch (e: Exception) { 0 }
-                if (tried <= 3 || (i in 1_121_000..1_122_000)) android.util.Log.i("OneKeyAdaptive", "probe off=" + i + " n0=" + n0 + " b=" + String.format("%02x %02x %02x %02x", probe[0], probe[1], probe[2], probe[3]))
-                if (n0 < 4 || probe[0] != 0x7f.toByte() || probe[1] != 'E'.code.toByte() || probe[2] != 'L'.code.toByte() || probe[3] != 'F'.code.toByte()) {
+                if (n0 < 4 || probe[0] != 0x7f.toByte() || probe[1] != 'E'.code.toByte() ||
+                    probe[2] != 'L'.code.toByte() || probe[3] != 'F'.code.toByte()
+                ) {
                     i++; continue
                 }
-                produced = 4
+                var produced = 4
                 val buf = ByteArray(64 * 1024)
                 while (!inf.finished() && produced <= 900_000) {
                     val n = try { inf.inflate(buf) } catch (e: Exception) { break }
@@ -192,24 +280,21 @@ object RuntimeExtractor {
                     produced += n
                 }
                 if (produced in 65536..900_000) {
-                    // 重新完整解压该流，拿到准确字节
                     val inf2 = Inflater(true)
                     inf2.setInput(raw, i, raw.size - i)
                     val data = ByteArray(produced)
-                    var off = 0
-                    while (!inf2.finished() && off < data.size) {
-                        val n = try { inf2.inflate(data, off, data.size - off) } catch (e: Exception) { break }
+                    var pos = 0
+                    while (!inf2.finished() && pos < data.size) {
+                        val n = try { inf2.inflate(data, pos, data.size - pos) } catch (e: Exception) { break }
                         if (n <= 0) break
-                        off += n
+                        pos += n
                     }
                     inf2.end()
-                    if (inf2.finished() && off == data.size) {
+                    if (inf2.finished() && pos == data.size) {
                         val info = inspect(data)
-                        android.util.Log.i("OneKeyAdaptive", "decompressed off=" + i + " size=" + data.size + " info=" + (info != null))
                         if (info != null) {
                             out.add(Module(data, sha256(data), info.first, info.second))
-                            val consumed = inf.bytesRead
-                            i += maxOf(1, consumed.toInt())
+                            i += maxOf(1, inf.bytesRead.toInt())
                             continue
                         }
                     }
@@ -219,18 +304,7 @@ object RuntimeExtractor {
             }
             i++
         }
-        android.util.Log.i("OneKeyAdaptive", "carve done tried=" + tried + " out=" + out.size)
-        if (out.isEmpty()) {
-            if (onlyEd) {
-                log("按 0xED 快筛未命中，执行完整扫描（可能较慢）")
-                return carve(raw, log, false)
-            }
-            throw IllegalStateException("未找到内嵌的 kernelsu 模块")
-        }
-        // 目标 KMI：6.18 且 vermagic 含 6.18；若多个，必须唯一
-        val target = out.filter { it.vermagic.contains("6.18") || it.vermagic.startsWith("6.18") }
-        if (target.size != 1) throw IllegalStateException("6.18 模块候选数量=" + target.size + "，无法唯一确定")
-        return target[0]
+        return out
     }
 
     private fun patchVermagic(m: Module, release: String): Module {
