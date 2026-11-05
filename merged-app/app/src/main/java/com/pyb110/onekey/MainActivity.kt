@@ -210,8 +210,11 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
         val screenContentPadding = PaddingValues(
             start = 16.dp,
             end = 16.dp,
-            top = if (topBarPx > 0) with(density) { topBarPx.toDp() } + 10.dp else statusBarTop + 92.dp,
-            bottom = if (navBarPx > 0) with(density) { navBarPx.toDp() } + 6.dp else navBarBottom + 92.dp
+            // topBarPx 是栏体内容高度（不含状态栏内边距），所以这里要再加一次 statusBarTop
+            top = if (topBarPx > 0) statusBarTop + with(density) { topBarPx.toDp() } + 10.dp
+                  else statusBarTop + 92.dp,
+            bottom = if (navBarPx > 0) navBarBottom + with(density) { navBarPx.toDp() } + 6.dp
+                     else navBarBottom + 92.dp
         )
 
         Box(Modifier.fillMaxSize()) {
@@ -793,12 +796,12 @@ private fun RunFlow(
 }
 
 private object BarBlurDefaults {
-    const val topRadius = 14f
+    const val topRadius = 18f
     const val bottomRadius = 16f
     val topFade = 0.dp          // 顶栏不做淡出，滚动内容彻底被挡住
     val bottomFade = 16.dp
-    const val topScrim = 1.0f   // 顶栏完全不透明，内容绝不透出
-    const val bottomScrim = 0.98f
+    const val topScrim = 0.82f  // 磨砂可透视，但下方内容已被模糊，不再出现清晰叠字
+    const val bottomScrim = 0.88f
 }
 
 /** 只对调用它的那一层做竖向 alpha 淡出。 */

@@ -1,12 +1,23 @@
 {
-  "versionCode": 176,
-  "versionName": "2.18.9",
-  "publishedAt": "2026-11-05T13:50:00+08:00",
-  "size": 14560299,
-  "sha256": "d719a85034c627ebd6b1dc64c6639fb9bdedadcc6e11fb9dc0df71b570ca4695",
+  "versionCode": 177,
+  "versionName": "2.18.10",
+  "publishedAt": "2026-11-05T13:56:00+08:00",
+  "size": 14560295,
+  "sha256": "363d7fefe008a5fddfa19da83a1e2f2821158e6f598d579e3f472725b090fd49",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.9\n\n- 顶栏改为完全不透明，滚动内容不会再透出（各页面统一生效）\n- 底栏不透明度同步提高，仅保留 16dp 上沿淡出",
+  "changelog": "v2.18.10\n\n- 修正内容区顶部留白：整块内容下移到顶栏之下，不再被栏体遮挡\n- 顶栏磨砂恢复可透视（0.82），滚动时下方内容为模糊态，不出现清晰叠字\n- 底栏上沿留白同步修正",
   "versions": [
+    {
+      "versionName": "2.18.10",
+      "versionCode": 177,
+      "publishedAt": "2026-11-05T13:56:00+08:00",
+      "size": 14560295,
+      "notes": [
+        "修正内容区顶部留白：整块内容下移到顶栏之下，不再被栏体遮挡",
+        "顶栏磨砂恢复可透视（0.82），滚动时下方内容为模糊态，不出现清晰叠字",
+        "底栏上沿留白同步修正"
+      ]
+    },
     {
       "versionName": "2.18.9",
       "versionCode": 176,
