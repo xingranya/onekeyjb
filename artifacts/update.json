@@ -1,12 +1,23 @@
 {
-  "versionCode": 183,
-  "versionName": "2.18.16",
-  "publishedAt": "2026-11-05T19:30:00+08:00",
-  "size": 14563144,
-  "sha256": "9650197ee0f7c7ce41be5deaf8a6198a78e30b0ef01cc8db4b98fb5082016d99",
+  "versionCode": 184,
+  "versionName": "2.18.17",
+  "publishedAt": "2026-11-06T01:15:00+08:00",
+  "size": 14579628,
+  "sha256": "2c4550aa0b71ffb708dc65bef1958ed2ce7dad62d52a3b0400b8d8fce4d41c9b",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.16\n\n- 用户协议新增条款：禁止以本项目名义骚扰厂商或官方渠道、禁止冒充官方\n- 开源仓库转为公开并采用 GPL-3.0，关于页署名同步",
+  "changelog": "v2.18.17\n\n- 拓展功能新增管理器热切换：五家管理器之间直接切换，不重启、不重新越狱\n- 热切换仅在加载了通用多管理器内核模块（提供 /proc/kernelsu_manager）时可用，其余情况明确禁用\n- 第三方组件说明补充 KSU-Universal 署名与许可证",
   "versions": [
+    {
+      "versionName": "2.18.17",
+      "versionCode": 184,
+      "publishedAt": "2026-11-06T01:15:00+08:00",
+      "size": 14579628,
+      "notes": [
+        "拓展功能新增管理器热切换：五家管理器之间直接切换，不重启、不重新越狱",
+        "热切换仅在加载了通用多管理器内核模块（提供 /proc/kernelsu_manager）时可用，其余情况明确禁用",
+        "第三方组件说明补充 KSU-Universal 署名与许可证"
+      ]
+    },
     {
       "versionName": "2.18.16",
       "versionCode": 183,

@@ -68,6 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.suqi8.coui.kmp.basic.*
+
 import io.github.suqi8.coui.kmp.blur.LayerBackdrop
 import io.github.suqi8.coui.kmp.blur.layerBackdrop
 import io.github.suqi8.coui.kmp.blur.drawBackdrop
@@ -1476,6 +1477,103 @@ private fun OptionsCard(
                 summary = "越狱成功后自动生效，可随时关掉",
                 startAction = { Icon(COUIIcons.Settings, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }
             )
+            // 管理器热切换：需要内核模块暴露 /proc/kernelsu_manager 节点。
+            Surface(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = COUITheme.colorScheme.surface
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(COUIIcons.Refresh, contentDescription = null, modifier = Modifier.size(20.dp), tint = COUITheme.colorScheme.primary)
+                        Spacer(Modifier.width(8.dp))
+                        Text("管理器热切换", style = COUITheme.textStyles.headline2)
+                    }
+                    Text(
+                        text = if (controller.hotSwitchAvailable)
+                            "当前 " + controller.activeKernelManager.ifBlank { "未知" } + "；切换只改内核 profile，不重启、不重新越狱。"
+                        else
+                            "当前内核模块未启用热切换节点，切换不可用。",
+                        style = COUITheme.textStyles.body2,
+                        color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
+                    )
+                    var selectorOpen by remember { mutableStateOf(false) }
+                    val installed = controller.managers.filter { it.installedVersionCode != null && it.certOk }
+                    var selectedTarget by remember { mutableStateOf(installed.firstOrNull()?.kind.orEmpty()) }
+                    LaunchedEffect(installed.map { it.kind }, controller.activeKernelManager) {
+                        if (installed.none { it.kind == selectedTarget }) selectedTarget = installed.firstOrNull()?.kind.orEmpty()
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(COUITheme.colorScheme.surfaceContainer)
+                            .clickable(enabled = controller.hotSwitchAvailable && installed.isNotEmpty()) { selectorOpen = true }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("目标管理器", style = COUITheme.textStyles.body2)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                controller.managers.firstOrNull { it.kind == selectedTarget }?.label ?: "未安装",
+                                style = COUITheme.textStyles.body2,
+                                color = COUITheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("选择", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant)
+                        }
+                    }
+                    if (selectorOpen) {
+                        WindowDialog(title = "选择目标管理器", show = true, onDismissRequest = { selectorOpen = false }) {
+                            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)) {
+                                controller.managers.forEach { option ->
+                                    val available = option.installedVersionCode != null && option.certOk
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                            .clickable(enabled = available) { selectedTarget = option.kind; selectorOpen = false }
+                                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(option.label, style = COUITheme.textStyles.body1, color = if (available) COUITheme.colorScheme.onSurface else COUITheme.colorScheme.onSurfaceContainerVariant)
+                                        when {
+                                            option.kind == selectedTarget && available -> Icon(COUIIcons.Ok, contentDescription = "已选", tint = COUITheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                            option.installedVersionCode == null -> Text("未安装", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.error)
+                                            !option.certOk -> Text("签名不符", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.error)
+                                        }
+                                    }
+                                }
+                                DialogActions(DialogAction("取消", COUIIcons.Close) { selectorOpen = false })
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    val canSwitch = controller.hotSwitchAvailable && controller.suCompatReady && !controller.running && !controller.preparing && selectedTarget.isNotBlank() && !controller.isSwitchingManager
+                    Surface(
+                        onClick = {
+                            haptic(CouiHapticEffect.Switch)
+                            controller.executeHotSwitch(selectedTarget) { _, _ -> }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = canSwitch,
+                        color = if (canSwitch) COUITheme.colorScheme.primary else COUITheme.colorScheme.surfaceContainer
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                if (controller.isSwitchingManager) "切换中…" else "切换",
+                                style = COUITheme.textStyles.body1,
+                                color = if (canSwitch) COUITheme.colorScheme.onPrimary else COUITheme.colorScheme.onSurfaceContainerVariant
+                            )
+                        }
+                    }
+                    if (controller.hotSwitchMessage.isNotBlank()) {
+                        Text(controller.hotSwitchMessage, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+            }
             BasicComponent(
                 title = "越狱后禁用安全弹窗",
                 summary = "停用安全守护与安全中心，不影响截屏",

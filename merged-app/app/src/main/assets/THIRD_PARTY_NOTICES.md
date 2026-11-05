@@ -31,6 +31,7 @@ OneKey（下称"本应用"）在运行过程中会调用、加载或以二进制
 
 | 组件 | 作者 | 许可证 | 上游 |
 | --- | --- | --- | --- |
+| KSU-Universal | Yunnijian | GPL-3.0（内核源码文件标注 GPL-2.0） | 多管理器运行时 profile 切换架构与 /proc/kernelsu_manager 协议（https://github.com/Yunnijian/KSU-Universal） |
 | COUI（Compose 组件库、模糊与偏好组件） | suqi8 | Apache-2.0 | https://github.com/suqi8/coui |
 | Stellar（特权命令服务通道） | roro2239 | 见其仓库 | https://github.com/roro2239/Stellar |
 | AndroidX / Jetpack Compose / Kotlin | Google、JetBrains | Apache-2.0 | https://developer.android.com/jetpack |

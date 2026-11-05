@@ -91,6 +91,10 @@ class JailbreakController private constructor(private val context: Context) {
     var lastResultOk: Boolean? by mutableStateOf(null); private set
     var lastResultExploitKind: String? by mutableStateOf(null); private set
     var suCompatReady: Boolean by mutableStateOf(false); private set
+    var hotSwitchAvailable: Boolean by mutableStateOf(false); private set
+    var activeKernelManager: String by mutableStateOf(""); private set
+    var isSwitchingManager: Boolean by mutableStateOf(false); private set
+    var hotSwitchMessage: String by mutableStateOf(""); private set
 
     private var autoRepairTried = false
 
@@ -153,6 +157,7 @@ class JailbreakController private constructor(private val context: Context) {
     }
 
     fun refreshState() {
+        if (isSwitchingManager) return
         serviceReady = StellarShell.available()
         serviceGranted = StellarShell.hasPermission()
         if (!RunState.active && lockFile().isFile()) {
@@ -180,6 +185,17 @@ class JailbreakController private constructor(private val context: Context) {
             val nativeSu = if (serviceReady) StellarShell.run("timeout 6 su -c 'id -u' 2>/dev/null; true", 15).output.trim() else ""
             val overlaySu = if (serviceReady) StellarShell.run("[ -x /system_ext/bin/su ] && grep -q su_compat /proc/mounts && echo READY || echo MISSING", 15).output else "MISSING"
             suCompatReady = nativeSu == "0" || overlaySu.contains("READY")
+
+            if (serviceReady && serviceGranted && suCompatReady && !running && !isSwitchingManager) {
+                val node = StellarShell.run("timeout 5 su -c 'test -f /proc/kernelsu_manager && echo EXISTS || echo NO'", 15).output.trim()
+                hotSwitchAvailable = node == "EXISTS"
+                activeKernelManager = if (hotSwitchAvailable) managerLabelFromProfile(
+                    StellarShell.run("timeout 5 su -c 'cat /proc/kernelsu_manager'", 15).output.trim()
+                ) else ""
+            } else {
+                hotSwitchAvailable = false
+                activeKernelManager = ""
+            }
             deviceInfo = buildString {
                 append((profile?.model ?: "UNKNOWN") + " · Android ").append(Build.VERSION.RELEASE)
                 append(" · SELinux ").append(selinux)
@@ -352,6 +368,73 @@ class JailbreakController private constructor(private val context: Context) {
         addLog(if (enabled) "已开启 VFS 支持（仅 6.18 内核生效）" else "已关闭 VFS 支持")
     }
 
+    fun executeHotSwitch(targetKind: String, onDone: (Boolean, String) -> Unit) {
+        if (isSwitchingManager || running || preparing) return
+        if (!hotSwitchAvailable) return finishSwitch(false, "当前内核模块未启用热切换", onDone)
+        val target = managers.firstOrNull { it.kind == targetKind }
+        if (target == null || target.installedVersionCode == null) return finishSwitch(false, "目标管理器未安装，无法切换", onDone)
+        if (!target.certOk) return finishSwitch(false, "目标管理器签名不匹配，已拒绝切换", onDone)
+        if (!serviceReady || !suCompatReady) return finishSwitch(false, "请先完成一键越狱", onDone)
+        isSwitchingManager = true
+        hotSwitchMessage = "正在切换到 " + target.label
+        addLog("发起管理器热切换 → " + target.label + " (" + target.pkg + ")")
+        scope.launch {
+            try {
+                val payload = managerSwitchPayload(target.pkg)
+                val command = ManagerSwitchProtocol.command(payload)
+                val result = StellarShell.run(command, 20)
+                val output = result.output.trim()
+                val active = managerLabelFromProfile(output)
+                val rootOk = StellarShell.run("timeout 5 su -c 'id -u'", 12).output.trim() == "0"
+                if (result.code == 0 && active == target.label && rootOk) {
+                    activeKernelManager = active
+                    hotSwitchMessage = "已切换到 " + active
+                    addLog("热切换成功，内核 profile 已指向 " + active)
+                    val stopped = StellarShell.run("am force-stop " + target.pkg, 10)
+                    if (stopped.code != 0) addLog("目标管理器状态刷新失败，请手动关闭后重开：" + stopped.output.take(100))
+                    withContext(Dispatchers.Main) {
+                        runCatching {
+                            context.packageManager.getLaunchIntentForPackage(target.pkg)?.let { intent ->
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(intent)
+                            }
+                        }.onFailure { addLog("请手动打开目标管理器：" + it.message) }
+                    }
+                    finishSwitch(true, "已切换到 " + target.label, onDone)
+                } else {
+                    val reason = when {
+                        output.contains("ERR_NO_APK") -> "未获取到目标 APK 路径"
+                        output.contains("ERR_NO_UID") -> "未获取到目标应用 UID"
+                        output.isBlank() -> "内核节点不存在或拒绝写入"
+                        else -> output.lineSequence().first().take(120)
+                    }
+                    finishSwitch(false, "热切换失败：" + reason, onDone)
+                }
+            } catch (e: Throwable) {
+                finishSwitch(false, "热切换失败：" + (e.message ?: e.javaClass.simpleName), onDone)
+            }
+        }
+    }
+
+    private fun finishSwitch(ok: Boolean, message: String, onDone: (Boolean, String) -> Unit) {
+        isSwitchingManager = false
+        hotSwitchMessage = message
+        if (!ok) addLog(message)
+        onDone(ok, message)
+    }
+
+    private fun managerSwitchPayload(pkg: String): String {
+        val info = context.packageManager.getPackageInfo(pkg, PackageManager.GET_SIGNING_CERTIFICATES)
+        check(signerCert(info) == expectedCert[managers.first { it.pkg == pkg }.kind]) { "管理器签名已变化，请刷新后重试" }
+        val app = info.applicationInfo ?: error("未获取到管理器信息")
+        return ManagerSwitchProtocol.payload(pkg, app.uid, app.sourceDir)
+    }
+
+    private fun managerLabelFromProfile(profile: String): String {
+        val status = ManagerSwitchProtocol.parse(profile) ?: return ""
+        return managers.firstOrNull { it.pkg == status.packageName }?.label.orEmpty()
+    }
+
     fun updateSoftRebootFix(enabled: Boolean) {
         softRebootFix = enabled
         prefs.edit().putBoolean("soft_reboot_fix", enabled).apply()
@@ -457,6 +540,7 @@ class JailbreakController private constructor(private val context: Context) {
     }
 
     private fun runInfinity98260() {
+        if (isSwitchingManager) { addLog("正在切换管理器，请稍后再试"); return }
         platformReason = SecurityCheck.reason(context)
         if (platformReason != null) {
             addLog("设备、内核或签名校验失败：" + platformReason)

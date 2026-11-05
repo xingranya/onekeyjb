@@ -5,7 +5,7 @@
 **一加 16 / Ace 7 Pro 本地越狱工具 · ColorOS 17 适配**
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue?logo=gnu&logoColor=white)](./LICENSE)
-[![Release](https://img.shields.io/badge/release-v2.18.16-ff69b4?logo=android&logoColor=white)](https://github.com/xingranya/onekeyjb/releases)
+[![Release](https://img.shields.io/badge/release-v2.18.17-ff69b4?logo=android&logoColor=white)](https://github.com/xingranya/onekeyjb/releases)
 [![Platform](https://img.shields.io/badge/Android-12%2B-3ddc84?logo=android&logoColor=white)]()
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7f52ff?logo=kotlin&logoColor=white)]()
 [![Compose](https://img.shields.io/badge/Jetpack-Compose-4285f4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
@@ -38,6 +38,7 @@ OneKey 是一个运行在 Android 上的**本地越狱辅助工具**：通过公
 | --- | --- |
 | 一键越狱 | 首页点一次，约 3 秒拿到 root（`su` 可用，SELinux 保持 Enforcing） |
 | 失败可重试 | 只有真的写入内核才提示重启；未写入可直接再点 |
+| 管理器热切换 | 已越狱的设备可在五家管理器之间切换，不重启、不重新越狱（需内核模块提供 /proc/kernelsu_manager） |
 | 五个拓展功能 | 禁用安全弹窗、软重启、卸载内核安全防护、SUSFS、VFS |
 | 日志可追溯 | 每行日志实时落盘，软重启或被杀后重开仍能回看上次记录 |
 | 管理器自适应 | KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU / FinaSU |
@@ -94,7 +95,7 @@ tools/             签名与模块处理脚本
 
 完整清单（组件、作者、许可证、上游地址）见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
 
-特别致谢：**SUSFS（susfs4ksu）**、**Hybrid Mount（maxsteeel）**、**KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU / FinaSU**、**COUI（suqi8）**、**Stellar（roro2239）**、**Shark**、**onuce**、**InfinityCore**。
+特别致谢：**KSU-Universal（Yunnijian）**、**SUSFS（susfs4ksu）**、**Hybrid Mount（maxsteeel）**、**KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU / FinaSU**、**COUI（suqi8）**、**Stellar（roro2239）**、**Shark**、**onuce**、**InfinityCore**。
 
 其中内核模块与执行引擎为 GPL 许可，源码可从上游获取；本应用未修改模块逻辑，仅按内核版本重编译并对齐 vermagic。
 
