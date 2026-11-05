@@ -42,6 +42,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -793,12 +797,23 @@ private fun TopBar(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp) },
-                effects = { progressiveBlur(20f, 0f, ProgressiveBlur.Top) }
+                effects = { blur(18f) }
             )
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0f to Color.White,
+                        0.65f to Color.White,
+                        1f to Color.Transparent
+                    ),
+                    blendMode = BlendMode.DstIn
+                )
+            }
             .background(
                 Brush.verticalGradient(listOf(COUITheme.colorScheme.background.copy(alpha = 0.35f), COUITheme.colorScheme.background.copy(alpha = 0f))),
                 RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
@@ -896,12 +911,23 @@ private fun AppBottomBar(
             .navigationBarsPadding()
             .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
             .height(70.dp)
-            .clip(shape)
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { shape },
-                effects = { progressiveBlur(20f, 0f, ProgressiveBlur.Bottom) }
+                effects = { blur(20f) }
             )
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.35f to Color.White,
+                        1f to Color.White
+                    ),
+                    blendMode = BlendMode.DstIn
+                )
+            }
             .background(
                 Brush.verticalGradient(
                     listOf(

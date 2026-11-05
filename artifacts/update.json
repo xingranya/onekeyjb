@@ -1,12 +1,22 @@
 {
-  "versionCode": 171,
-  "versionName": "2.18.4",
-  "publishedAt": "2026-11-05T10:52:00+08:00",
-  "size": 14560303,
-  "sha256": "3e7e5f14efdc0503ec1f8a03895cfa9e778a756f514e58f7e59e87130a8dc856",
+  "versionCode": 172,
+  "versionName": "2.18.5",
+  "publishedAt": "2026-11-05T11:00:00+08:00",
+  "size": 14560299,
+  "sha256": "745a5f09b22a7da238f2b3f5b5ee8ce19b4dee0546967509a38179ce1562e47c",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.4\n\n- 顶栏与底栏的渐变模糊方向修正：模糊强度由屏幕外沿向内衰减\n- 模糊半径收敛到 20，叠色进一步减淡，避免出现整块灰带",
+  "changelog": "v2.18.5\n\n- 顶栏与底栏改为磨砂玻璃做法：整条高斯模糊 + 竖向 alpha 遮罩淡出，边缘不再有硬切线\n- 模糊半径分栏设定（顶栏 18 / 底栏 20），叠色取消重力遮罩",
   "versions": [
+    {
+      "versionName": "2.18.5",
+      "versionCode": 172,
+      "publishedAt": "2026-11-05T11:00:00+08:00",
+      "size": 14560299,
+      "notes": [
+        "顶栏与底栏改为磨砂玻璃做法：整条高斯模糊 + 竖向 alpha 遮罩淡出，边缘不再有硬切线",
+        "模糊半径分栏设定（顶栏 18 / 底栏 20），叠色取消重力遮罩"
+      ]
+    },
     {
       "versionName": "2.18.4",
       "versionCode": 171,
