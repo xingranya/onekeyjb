@@ -833,7 +833,11 @@ private fun BlurBar(
     contentAlignment: Alignment = Alignment.TopStart,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    Box(modifier = modifier.onSizeChanged { onHeight(it.height) }) {
+    Box(
+        modifier = modifier.onSizeChanged { onHeight(it.height) },
+        contentAlignment = contentAlignment
+    ) {
+        // 模糊层与实底层只填充父布局，不参与尺寸计算
         Box(
             Modifier
                 .matchParentSize()
@@ -845,7 +849,8 @@ private fun BlurBar(
                 .matchParentSize()
                 .background(COUITheme.colorScheme.surfaceContainer.copy(alpha = BarBlurDefaults.scrim), shape)
         )
-        Box(Modifier.matchParentSize(), contentAlignment = contentAlignment) { content() }
+        // 内容层负责撑开尺寸，绝对不能用 matchParentSize
+        content()
     }
 }
 

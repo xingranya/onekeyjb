@@ -1,12 +1,22 @@
 {
-  "versionCode": 173,
-  "versionName": "2.18.6",
-  "publishedAt": "2026-11-05T11:05:00+08:00",
-  "size": 14560303,
-  "sha256": "2603c0600df5dde5e81306b835f4722cf878c6a62a94e65069687dda64c469ff",
+  "versionCode": 174,
+  "versionName": "2.18.7",
+  "publishedAt": "2026-11-05T11:08:00+08:00",
+  "size": 14560299,
+  "sha256": "bd6c46e29b2ce1a9b32aa8fc9a21d07ef5050192a4a7e8677e2b47feb4b0d65e",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.6\n\n- 顶栏与底栏改为三层结构：模糊层、实底层、文字层分离，文字不再被淡化\n- 滚动内容不再透过栏体与标题重叠\n- 栏高改为实测值，内容顶部留白随之自适应",
+  "changelog": "v2.18.7\n\n- 修复顶栏/底栏高度塌陷导致栏体不可见的问题\n- 栏体尺寸恢复由内容撑开，模糊层与实底层只负责填充",
   "versions": [
+    {
+      "versionName": "2.18.7",
+      "versionCode": 174,
+      "publishedAt": "2026-11-05T11:08:00+08:00",
+      "size": 14560299,
+      "notes": [
+        "修复顶栏/底栏高度塌陷导致栏体不可见的问题",
+        "栏体尺寸恢复由内容撑开，模糊层与实底层只负责填充"
+      ]
+    },
     {
       "versionName": "2.18.6",
       "versionCode": 173,
