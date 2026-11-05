@@ -163,6 +163,8 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
     var showClearHistoryConfirm by remember { mutableStateOf(false) }
     var showManual by remember { mutableStateOf(false) }
     var showThirdParty by remember { mutableStateOf(false) }
+    val termsPrefs = LocalContext.current.getSharedPreferences("onekey", Context.MODE_PRIVATE)
+    var showTerms by remember { mutableStateOf(!termsPrefs.getBoolean("terms_accepted_v2", false)) }
     var reloadHistoryTick by remember { mutableIntStateOf(0) }
 
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -348,6 +350,13 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
             }
 
             if (showThirdParty) {
+                val ctx = LocalContext.current
+                val noticeText = remember {
+                    runCatching {
+                        ctx.assets.open("THIRD_PARTY_NOTICES.md").bufferedReader().use { it.readText() }
+                            .replace("**", "").replace("## ", "").replace("# ", "")
+                    }.getOrDefault("第三方声明加载失败，请查看应用仓库中的 THIRD_PARTY_NOTICES.md")
+                }
                 WindowDialog(title = "第三方组件说明", show = true, onDismissRequest = { showThirdParty = false }) {
                     Column(
                         Modifier
@@ -356,25 +365,83 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 20.dp)
                     ) {
-                        ManualSection("感谢以下项目", listOf(
-                            "COUI（github.com/suqi8/coui）",
-                            "Stellar（github.com/roro2239/Stellar）",
-                            "onuce",
-                            "Shark",
-                            "InfinityCore",
-                            "KernelSU、KernelSU-Next、SukiSU Ultra、BakaSU、FinaSU"
-                        ))
-                        ManualSection("说明", listOf(
-                            "以上项目的版权归各自作者所有，在此一并致谢。",
-                            "完整许可见项目 THIRD_PARTY_NOTICES.md 与各上游仓库。"
-                        ))
+                        Text(
+                            noticeText,
+                            style = COUITheme.textStyles.body2,
+                            color = COUITheme.colorScheme.onSurfaceContainerVariant
+                        )
                         DialogActions(
+                            DialogAction("复制全文", COUIIcons.Copy) {
+                                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                cm.setPrimaryClip(ClipData.newPlainText("notices", noticeText))
+                            },
                             DialogAction("知道了", COUIIcons.Ok, primary = true) { showThirdParty = false }
                         )
                     }
                 }
             }
-            if (showNotice) {
+
+            if (showTerms) {
+                val ctx = LocalContext.current
+                val termsText = remember {
+                    runCatching {
+                        ctx.assets.open("TERMS.md").bufferedReader().use { it.readText() }
+                            .replace("**", "").replace("## ", "").replace("# ", "")
+                    }.getOrDefault("协议加载失败")
+                }
+                val scrollState = rememberScrollState()
+                var remain by remember { mutableStateOf(10) }
+                val reachedBottom = remember { derivedStateOf { scrollState.maxValue > 0 && scrollState.value >= scrollState.maxValue - 4 } }
+                LaunchedEffect(Unit) {
+                    while (remain > 0) {
+                        kotlinx.coroutines.delay(1000)
+                        remain -= 1
+                    }
+                }
+                val canAgree = remain <= 0 && (reachedBottom.value || scrollState.maxValue == 0)
+                WindowDialog(title = "用户协议与免责声明", show = true, onDismissRequest = { }) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 470.dp)
+                            .padding(horizontal = 20.dp)
+                    ) {
+                        Column(
+                            Modifier
+                                .weight(1f, fill = false)
+                                .fillMaxWidth()
+                                .verticalScroll(scrollState)
+                        ) {
+                            Text(
+                                termsText,
+                                style = COUITheme.textStyles.body2,
+                                color = COUITheme.colorScheme.onSurfaceContainerVariant
+                            )
+                        }
+                        Text(
+                            when {
+                                canAgree -> "已阅读并滚动到底部，可以继续"
+                                scrollState.maxValue > 0 && !reachedBottom.value -> "请向下滚动阅读全文（还需 " + remain + " 秒）"
+                                else -> "请阅读 " + remain + " 秒后继续"
+                            },
+                            style = COUITheme.textStyles.body2,
+                            color = if (canAgree) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurfaceContainerVariant,
+                            modifier = Modifier.padding(top = 10.dp)
+                        )
+                        DialogActions(
+                            DialogAction("退出", COUIIcons.Close) {
+                                (ctx as? android.app.Activity)?.finish()
+                            },
+                            DialogAction("同意并继续", COUIIcons.Ok, primary = true, enabled = canAgree) {
+                                termsPrefs.edit().putBoolean("terms_accepted_v2", true).apply()
+                                showTerms = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            if (showNotice && !showTerms) {
                 AppreciationDialog(
                     onMessage = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
                     onDismiss = { suppress ->

@@ -1,12 +1,23 @@
 {
-  "versionCode": 179,
-  "versionName": "2.18.12",
-  "publishedAt": "2026-11-05T14:06:00+08:00",
-  "size": 14560295,
-  "sha256": "8245dbae6f121105da1615747863189f9274f661cdeca358b66b5b44d47797b6",
+  "versionCode": 181,
+  "versionName": "2.18.14",
+  "publishedAt": "2026-11-05T18:16:00+08:00",
+  "size": 14562892,
+  "sha256": "6b062a0767d88771517fd6e642f3f2af4514d47bee8a327587d598c2069be4bf",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.12\n\n- 弹窗内容统一 20dp 左右留白：正文、开关行、按钮都不再贴边\n- 按钮行保留 16dp 上间距与 14dp 底部间距",
+  "changelog": "v2.18.14\n\n- 首次启动新增《用户协议与免责声明》：需阅读满 10 秒并滚动到底部才能同意，明确风险由用户自行承担\n- 第三方组件说明改为完整许可清单：逐项列出组件、作者、许可证与上游地址，内核模块标注 GPL 与源码获取方式\n- 弹窗内容与按钮统一 20dp 留白",
   "versions": [
+    {
+      "versionName": "2.18.14",
+      "versionCode": 181,
+      "publishedAt": "2026-11-05T18:16:00+08:00",
+      "size": 14562892,
+      "notes": [
+        "首次启动新增《用户协议与免责声明》：需阅读满 10 秒并滚动到底部才能同意，明确风险由用户自行承担",
+        "第三方组件说明改为完整许可清单：逐项列出组件、作者、许可证与上游地址，内核模块标注 GPL 与源码获取方式",
+        "弹窗内容与按钮统一 20dp 留白"
+      ]
+    },
     {
       "versionName": "2.18.12",
       "versionCode": 179,
