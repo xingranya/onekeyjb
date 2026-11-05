@@ -62,6 +62,8 @@ import io.github.suqi8.coui.kmp.blur.LayerBackdrop
 import io.github.suqi8.coui.kmp.blur.layerBackdrop
 import io.github.suqi8.coui.kmp.blur.drawBackdrop
 import io.github.suqi8.coui.kmp.blur.blur
+import io.github.suqi8.coui.kmp.blur.progressiveBlur
+import io.github.suqi8.coui.kmp.blur.ProgressiveBlur
 import io.github.suqi8.coui.kmp.blur.rememberLayerBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Back
@@ -795,10 +797,10 @@ private fun TopBar(
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp) },
-                effects = { blur(22f) }
+                effects = { progressiveBlur(26f, 0f, ProgressiveBlur.Bottom) }
             )
             .background(
-                Brush.verticalGradient(listOf(COUITheme.colorScheme.background.copy(alpha = 0.72f), COUITheme.colorScheme.background.copy(alpha = 0.38f))),
+                Brush.verticalGradient(listOf(COUITheme.colorScheme.background.copy(alpha = 0.55f), COUITheme.colorScheme.background.copy(alpha = 0f))),
                 RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
             )
             .padding(top = 3.dp, bottom = 2.dp)
@@ -898,13 +900,13 @@ private fun AppBottomBar(
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { shape },
-                effects = { blur(24f) }
+                effects = { progressiveBlur(26f, 0f, ProgressiveBlur.Top) }
             )
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        COUITheme.colorScheme.surfaceContainer.copy(alpha = 0.82f),
-                        COUITheme.colorScheme.surfaceContainer.copy(alpha = 0.72f)
+                        COUITheme.colorScheme.surfaceContainer.copy(alpha = 0.55f),
+                        COUITheme.colorScheme.surfaceContainer.copy(alpha = 0.80f)
                     )
                 ),
                 shape

@@ -1,12 +1,22 @@
 {
-  "versionCode": 169,
-  "versionName": "2.18.2",
-  "publishedAt": "2026-11-05T10:52:00+08:00",
-  "size": 14560303,
-  "sha256": "fab37be409397368775d10dd3516a16c912bdfbef4125ef900e49e3a0ff6fe8d",
+  "versionCode": 170,
+  "versionName": "2.18.3",
+  "publishedAt": "2026-11-05T10:56:00+08:00",
+  "size": 14560299,
+  "sha256": "6627808bbb6bf06670d366ec57a08460258fe5521227f2bad0c7d2df604cd9d8",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.2\n\n- 关于页新增第三方组件致谢页\n- 顶栏与底栏模糊参数调整，观感更自然\n- 栏体对比度提升，滚动时文字更清晰",
+  "changelog": "v2.18.3\n\n- 顶栏与底栏改为渐变高斯模糊，模糊强度随高度衰减，不再出现硬切边\n- 栏体叠色改为渐变，滚动时过渡更自然",
   "versions": [
+    {
+      "versionName": "2.18.3",
+      "versionCode": 170,
+      "publishedAt": "2026-11-05T10:56:00+08:00",
+      "size": 14560299,
+      "notes": [
+        "顶栏与底栏改为渐变高斯模糊，模糊强度随高度衰减，不再出现硬切边",
+        "栏体叠色改为渐变，滚动时过渡更自然"
+      ]
+    },
     {
       "versionName": "2.18.2",
       "versionCode": 169,
