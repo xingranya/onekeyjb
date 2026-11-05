@@ -46,6 +46,12 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -196,13 +202,16 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { _ ->
         val backdrop = rememberLayerBackdrop()
+        var topBarPx by remember { mutableStateOf(0) }
+        var navBarPx by remember { mutableStateOf(0) }
+        val density = LocalDensity.current
         val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val screenContentPadding = PaddingValues(
             start = 16.dp,
             end = 16.dp,
-            top = statusBarTop + 92.dp,
-            bottom = navBarBottom + 92.dp
+            top = if (topBarPx > 0) with(density) { topBarPx.toDp() } + 10.dp else statusBarTop + 92.dp,
+            bottom = if (navBarPx > 0) with(density) { navBarPx.toDp() } + 6.dp else navBarBottom + 92.dp
         )
 
         Box(Modifier.fillMaxSize()) {
@@ -278,6 +287,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                 onLogClear = { controller.clearLogs(); scope.launch { snackbarHostState.showSnackbar("日志已清空") } },
                 onHistoryRefresh = { reloadHistoryTick++; scope.launch { snackbarHostState.showSnackbar("已刷新历史记录") } },
                 onHistoryClear = { showClearHistoryConfirm = true },
+                onHeight = { topBarPx = it },
                 modifier = Modifier.align(Alignment.TopCenter)
             )
 
@@ -285,6 +295,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                 backdrop = backdrop,
                 selected = tab,
                 onSelect = { haptic(CouiHapticEffect.Switch); tab = it },
+                onHeight = { navBarPx = it },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
 
@@ -781,9 +792,125 @@ private fun RunFlow(
     }
 }
 
+private object BarBlurDefaults {
+    const val topRadius = 14f
+    const val bottomRadius = 16f
+    val topFade = 28.dp
+    val bottomFade = 24.dp
+    const val scrim = 0.90f
+}
+
+/** 只对调用它的那一层做竖向 alpha 淡出。 */
+private fun Modifier.edgeFade(fadeDp: Dp, fromBottom: Boolean): Modifier = this.drawWithCache {
+    val h = size.height
+    if (h <= 0f) {
+        onDrawWithContent { drawContent() }
+    } else {
+        val fade = fadeDp.toPx().coerceAtMost(h * 0.6f)
+        val solid = (h - fade) / h
+        val brush = if (fromBottom) {
+            Brush.verticalGradient(0f to Color.White, solid to Color.White, 1f to Color.Transparent, startY = 0f, endY = h)
+        } else {
+            Brush.verticalGradient(0f to Color.Transparent, (1f - solid) to Color.White, 1f to Color.White, startY = 0f, endY = h)
+        }
+        onDrawWithContent {
+            drawContent()
+            drawRect(brush = brush, blendMode = BlendMode.DstIn)
+        }
+    }
+}
+
+/** 磨砂栏：模糊层 + 实底层 + 内容层，内容永远不参与遮罩。 */
+@Composable
+private fun BlurBar(
+    backdrop: LayerBackdrop,
+    shape: Shape,
+    radius: Float,
+    fade: Dp,
+    fromBottom: Boolean,
+    modifier: Modifier = Modifier,
+    onHeight: (Int) -> Unit = {},
+    contentAlignment: Alignment = Alignment.TopStart,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Box(modifier = modifier.onSizeChanged { onHeight(it.height) }) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .drawBackdrop(backdrop = backdrop, shape = { shape }, effects = { blur(radius) })
+                .edgeFade(fade, fromBottom)
+        )
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(COUITheme.colorScheme.surfaceContainer.copy(alpha = BarBlurDefaults.scrim), shape)
+        )
+        Box(Modifier.matchParentSize(), contentAlignment = contentAlignment) { content() }
+    }
+}
+
 @Composable
 private fun TopBar(
     backdrop: LayerBackdrop,
+    controller: JailbreakController,
+    tab: Int,
+    onLogCopy: () -> Unit,
+    onLogExport: () -> Unit,
+    onLogClear: () -> Unit,
+    onHistoryRefresh: () -> Unit,
+    onHistoryClear: () -> Unit,
+    onHeight: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BlurBar(
+        backdrop = backdrop,
+        shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+        radius = BarBlurDefaults.topRadius,
+        fade = BarBlurDefaults.topFade,
+        fromBottom = true,
+        modifier = modifier.fillMaxWidth().statusBarsPadding(),
+        onHeight = onHeight,
+    ) {
+        TopBarContent(
+            controller = controller,
+            tab = tab,
+            onLogCopy = onLogCopy,
+            onLogExport = onLogExport,
+            onLogClear = onLogClear,
+            onHistoryRefresh = onHistoryRefresh,
+            onHistoryClear = onHistoryClear,
+        )
+    }
+}
+
+@Composable
+private fun AppBottomBar(
+    backdrop: LayerBackdrop,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    onHeight: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BlurBar(
+        backdrop = backdrop,
+        shape = RoundedCornerShape(30.dp),
+        radius = BarBlurDefaults.bottomRadius,
+        fade = BarBlurDefaults.bottomFade,
+        fromBottom = false,
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
+            .height(70.dp),
+        onHeight = onHeight,
+        contentAlignment = Alignment.Center,
+    ) {
+        AppBottomBarContent(selected = selected, onSelect = onSelect)
+    }
+}
+
+@Composable
+private fun TopBarContent(
     controller: JailbreakController,
     tab: Int,
     onLogCopy: () -> Unit,
@@ -796,29 +923,7 @@ private fun TopBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawBackdrop(
-                backdrop = backdrop,
-                shape = { RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp) },
-                effects = { blur(18f) }
-            )
-            .drawWithContent {
-                drawContent()
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        0f to Color.White,
-                        0.65f to Color.White,
-                        1f to Color.Transparent
-                    ),
-                    blendMode = BlendMode.DstIn
-                )
-            }
-            .background(
-                Brush.verticalGradient(listOf(COUITheme.colorScheme.background.copy(alpha = 0.35f), COUITheme.colorScheme.background.copy(alpha = 0f))),
-                RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
-            )
-            .padding(top = 3.dp, bottom = 2.dp)
+            .padding(top = 3.dp, bottom = 6.dp)
     ) {
         Text(
             "v" + BuildConfig.VERSION_NAME + " · #" + BuildConfig.VERSION_CODE,
@@ -896,47 +1001,15 @@ private fun TopBar(
 }
 
 @Composable
-private fun AppBottomBar(
-    backdrop: LayerBackdrop,
+private fun AppBottomBarContent(
     selected: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(30.dp)
     val labels = listOf("首页", "日志", "历史", "关于")
     val icons = listOf(COUIIcons.Home, COUIIcons.Notes, COUIIcons.Recent, COUIIcons.Info)
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
-            .height(70.dp)
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawBackdrop(
-                backdrop = backdrop,
-                shape = { shape },
-                effects = { blur(20f) }
-            )
-            .drawWithContent {
-                drawContent()
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        0.35f to Color.White,
-                        1f to Color.White
-                    ),
-                    blendMode = BlendMode.DstIn
-                )
-            }
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        COUITheme.colorScheme.surfaceContainer.copy(alpha = 0.55f),
-                        COUITheme.colorScheme.surfaceContainer.copy(alpha = 0.80f)
-                    )
-                ),
-                shape
-            ),
+        modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Row(
