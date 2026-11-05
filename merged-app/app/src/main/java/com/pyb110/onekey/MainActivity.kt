@@ -1067,7 +1067,7 @@ data class DialogAction(
 @Composable
 private fun DialogActions(vararg actions: DialogAction) {
     Row(
-        Modifier.fillMaxWidth().padding(top = 14.dp, start = 8.dp, end = 8.dp),
+        Modifier.fillMaxWidth().padding(top = 16.dp, start = 10.dp, end = 10.dp, bottom = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
