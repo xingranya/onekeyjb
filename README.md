@@ -5,11 +5,12 @@
 **一加 16 / Ace 7 Pro 本地越狱工具 · ColorOS 17 适配**
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue?logo=gnu&logoColor=white)](./LICENSE)
-[![Release](https://img.shields.io/badge/release-v2.18.15-ff69b4?logo=android&logoColor=white)](https://github.com/xingranya/onekeyjb-private/releases)
+[![Release](https://img.shields.io/badge/release-v2.18.16-ff69b4?logo=android&logoColor=white)](https://github.com/xingranya/onekeyjb/releases)
 [![Platform](https://img.shields.io/badge/Android-12%2B-3ddc84?logo=android&logoColor=white)]()
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7f52ff?logo=kotlin&logoColor=white)]()
 [![Compose](https://img.shields.io/badge/Jetpack-Compose-4285f4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Kernel](https://img.shields.io/badge/Kernel-6.18.21%20%2F%206.12.69-orange)]()
+[![Build](https://github.com/xingranya/onekeyjb/actions/workflows/android.yml/badge.svg)](https://github.com/xingranya/onekeyjb/actions/workflows/android.yml)
 
 </div>
 
@@ -26,10 +27,9 @@ OneKey 是一个运行在 Android 上的**本地越狱辅助工具**：通过公
 ## 截图
 
 <div align="center">
-  <img src="docs/images/home.png" width="220" alt="首页" />
-  <img src="docs/images/terms.png" width="220" alt="用户协议" />
-  <img src="docs/images/dialog.png" width="220" alt="弹窗" />
-  <img src="docs/images/about.png" width="220" alt="关于" />
+  <img src="docs/images/home.png" width="230" alt="首页" />
+  <img src="docs/images/features.png" width="230" alt="拓展功能" />
+  <img src="docs/images/about.png" width="230" alt="关于与设置" />
 </div>
 
 ## 功能
@@ -70,6 +70,8 @@ cd merged-app
 # 产物：app/build/outputs/apk/release/app-release.apk
 ```
 
+仓库自带 GitHub Actions（`.github/workflows/android.yml`），push 或手动触发即会构建并产出 APK 工件。
+
 原生执行器（可选，自研链路）单独编译：
 
 ```bash
@@ -94,12 +96,15 @@ tools/             签名与模块处理脚本
 
 特别致谢：**SUSFS（susfs4ksu）**、**Hybrid Mount（maxsteeel）**、**KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU / FinaSU**、**COUI（suqi8）**、**Stellar（roro2239）**、**Shark**、**onuce**、**InfinityCore**。
 
-其中内核模块为 GPL 许可，源码可从上游获取；本应用未修改模块逻辑，仅按内核版本重编译并对齐 vermagic。
+其中内核模块与执行引擎为 GPL 许可，源码可从上游获取；本应用未修改模块逻辑，仅按内核版本重编译并对齐 vermagic。
 
 ## 免责声明
 
 越狱、刷机、加载内核模块属于高风险操作，可能导致设备无法开机、数据丢失、保修失效或部分应用不可用。
-**风险由使用者自行承担**，作者不对任何直接或间接损失负责。请在完全理解风险后使用，并遵守所在地法律法规。
+**风险由使用者自行承担**，作者不对任何直接或间接损失负责。
+
+同时禁止以本项目名义骚扰、攻击手机厂商或系统团队及其官方渠道，禁止冒充官方；由此产生的责任由行为人自负。
+请在完全理解风险后使用，并遵守所在地法律法规。
 
 ## 许可证
 
