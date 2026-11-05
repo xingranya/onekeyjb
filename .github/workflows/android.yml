@@ -19,11 +19,13 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Grant execute permission
-        run: chmod +x merged-app/gradlew || true
+      - name: Install Android SDK packages
+        continue-on-error: true
+        run: |
+          SDK=${ANDROID_HOME:-/usr/local/lib/android/sdk}
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" "build-tools;37.0.0" >/dev/null 2>&1 ||           "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || true
+          echo "sdk.dir=$SDK" > merged-app/local.properties
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -37,15 +39,19 @@ jobs:
 
       - name: Build release APK
         working-directory: merged-app
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Collect artifacts
+        if: always()
         run: |
           mkdir -p out
-          find merged-app/app/build/outputs/apk -name "*.apk" -exec cp {} out/ \;
-          ls -lh out
+          find merged-app/app/build/outputs/apk -name "*.apk" -exec cp {} out/ \; 2>/dev/null || true
+          ls -lh out || true
 
       - name: Upload APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: onekey-apk
