@@ -318,7 +318,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             .fillMaxWidth()
                             .heightIn(max = 460.dp)
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 4.dp)
+                            .padding(horizontal = 20.dp)
                     ) {
                         ManualSection("一、准备", listOf(
                             "安装要用的管理器（KernelSU / KernelSU-Next / SukiSU / BakaSU / FinaSU 之一），App 不再内置管理器和模块。",
@@ -354,7 +354,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             .fillMaxWidth()
                             .heightIn(max = 480.dp)
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 4.dp)
+                            .padding(horizontal = 20.dp)
                     ) {
                         ManualSection("感谢以下项目", listOf(
                             "COUI（github.com/suqi8/coui）",
@@ -392,7 +392,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
 
             if (show98260Warning) {
                 WindowDialog(title = "98260 运行前确认", show = true, onDismissRequest = { show98260Warning = false }) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
                         Text("失败后可直接再点一次；只有内核状态异常时才需要硬重启。", style = COUITheme.textStyles.body2)
                         Text(
                             "执行过程中将短暂提权并向内核装载特权模块。",
@@ -414,7 +414,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
 
             if (showFolkPrompt) {
                 WindowDialog(title = "98260 越狱完成", show = true, onDismissRequest = { showFolkPrompt = false }) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
                         Text("98260 临时 root 通道已就绪，特权内核模块已加载。本次开机不再允许重复运行。", style = COUITheme.textStyles.body2)
                         DialogActions(
                             DialogAction("稍后", COUIIcons.Close) { showFolkPrompt = false },
@@ -439,7 +439,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                     show = true,
                     onDismissRequest = { showClearHistoryConfirm = false }
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
                         Text(
                             "确定清空全部越狱历史与诊断日志吗？\n此操作为物理删除且无法恢复。",
                             style = COUITheme.textStyles.body2
@@ -466,7 +466,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                     show = true,
                     onDismissRequest = { if (!updateDownloading) updateInfo = null }
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
                         Text(
                             "更新时间 " + UpdateChecker.formatTime(info.publishedAt) +
                                 (if (info.size > 0) " · 安装包 " + UpdateChecker.formatSize(info.size) else ""),
@@ -1067,7 +1067,7 @@ data class DialogAction(
 @Composable
 private fun DialogActions(vararg actions: DialogAction) {
     Row(
-        Modifier.fillMaxWidth().padding(top = 16.dp, start = 10.dp, end = 10.dp, bottom = 14.dp),
+        Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1829,7 +1829,7 @@ private fun AppreciationDialog(onMessage: (String) -> Unit, onDismiss: (Boolean)
         onDismiss(s)
     }
     WindowDialog(title = "免费声明 · 禁止倒卖", show = true, onDismissRequest = { close() }) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("倒卖必究", style = COUITheme.textStyles.subtitle, color = COUITheme.colorScheme.error)
             Text("本工具免费分享，禁止倒卖。QQ群：1121682811。赞赏完全自愿，不影响任何功能。", style = COUITheme.textStyles.body2, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
             Image(painterResource(R.drawable.appreciation), contentDescription = "作者赞赏码", modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(12.dp)))

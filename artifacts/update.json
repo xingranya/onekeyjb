@@ -1,12 +1,22 @@
 {
-  "versionCode": 178,
-  "versionName": "2.18.11",
-  "publishedAt": "2026-11-05T14:00:00+08:00",
+  "versionCode": 179,
+  "versionName": "2.18.12",
+  "publishedAt": "2026-11-05T14:06:00+08:00",
   "size": 14560295,
-  "sha256": "64d5cd6ff0f24ce4ec80e241fc729355a6a2f25fe66244b619807c2c882a9ff1",
+  "sha256": "8245dbae6f121105da1615747863189f9274f661cdeca358b66b5b44d47797b6",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.11\n\n- 统一弹窗按钮与弹窗边缘的间距（左右 10dp、底部 14dp）\n- 内容区顶部留白沿用上版修正，不再被顶栏遮挡",
+  "changelog": "v2.18.12\n\n- 弹窗内容统一 20dp 左右留白：正文、开关行、按钮都不再贴边\n- 按钮行保留 16dp 上间距与 14dp 底部间距",
   "versions": [
+    {
+      "versionName": "2.18.12",
+      "versionCode": 179,
+      "publishedAt": "2026-11-05T14:06:00+08:00",
+      "size": 14560295,
+      "notes": [
+        "弹窗内容统一 20dp 左右留白：正文、开关行、按钮都不再贴边",
+        "按钮行保留 16dp 上间距与 14dp 底部间距"
+      ]
+    },
     {
       "versionName": "2.18.11",
       "versionCode": 178,
