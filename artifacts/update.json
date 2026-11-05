@@ -1,12 +1,22 @@
 {
-  "versionCode": 170,
-  "versionName": "2.18.3",
-  "publishedAt": "2026-11-05T10:56:00+08:00",
-  "size": 14560299,
-  "sha256": "6627808bbb6bf06670d366ec57a08460258fe5521227f2bad0c7d2df604cd9d8",
+  "versionCode": 171,
+  "versionName": "2.18.4",
+  "publishedAt": "2026-11-05T10:52:00+08:00",
+  "size": 14560303,
+  "sha256": "3e7e5f14efdc0503ec1f8a03895cfa9e778a756f514e58f7e59e87130a8dc856",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.3\n\n- 顶栏与底栏改为渐变高斯模糊，模糊强度随高度衰减，不再出现硬切边\n- 栏体叠色改为渐变，滚动时过渡更自然",
+  "changelog": "v2.18.4\n\n- 顶栏与底栏的渐变模糊方向修正：模糊强度由屏幕外沿向内衰减\n- 模糊半径收敛到 20，叠色进一步减淡，避免出现整块灰带",
   "versions": [
+    {
+      "versionName": "2.18.4",
+      "versionCode": 171,
+      "publishedAt": "2026-11-05T10:52:00+08:00",
+      "size": 14560303,
+      "notes": [
+        "顶栏与底栏的渐变模糊方向修正：模糊强度由屏幕外沿向内衰减",
+        "模糊半径收敛到 20，叠色进一步减淡，避免出现整块灰带"
+      ]
+    },
     {
       "versionName": "2.18.3",
       "versionCode": 170,

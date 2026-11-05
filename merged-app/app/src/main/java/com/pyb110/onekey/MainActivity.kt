@@ -797,10 +797,10 @@ private fun TopBar(
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp) },
-                effects = { progressiveBlur(26f, 0f, ProgressiveBlur.Bottom) }
+                effects = { progressiveBlur(20f, 0f, ProgressiveBlur.Top) }
             )
             .background(
-                Brush.verticalGradient(listOf(COUITheme.colorScheme.background.copy(alpha = 0.55f), COUITheme.colorScheme.background.copy(alpha = 0f))),
+                Brush.verticalGradient(listOf(COUITheme.colorScheme.background.copy(alpha = 0.35f), COUITheme.colorScheme.background.copy(alpha = 0f))),
                 RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
             )
             .padding(top = 3.dp, bottom = 2.dp)
@@ -900,7 +900,7 @@ private fun AppBottomBar(
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { shape },
-                effects = { progressiveBlur(26f, 0f, ProgressiveBlur.Top) }
+                effects = { progressiveBlur(20f, 0f, ProgressiveBlur.Bottom) }
             )
             .background(
                 Brush.verticalGradient(
