@@ -1,12 +1,22 @@
 {
-  "versionCode": 182,
-  "versionName": "2.18.15",
-  "publishedAt": "2026-11-05T19:15:00+08:00",
-  "size": 14562916,
-  "sha256": "cb3e3fee57bb8c2e23765f51dbdfc004b052b37d98f92455cab945bba47dd3ad",
+  "versionCode": 183,
+  "versionName": "2.18.16",
+  "publishedAt": "2026-11-05T19:30:00+08:00",
+  "size": 14563144,
+  "sha256": "9650197ee0f7c7ce41be5deaf8a6198a78e30b0ef01cc8db4b98fb5082016d99",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.15\n\n- 第三方声明补全：执行引擎与内核模块的 GPL 信息、上游来源\n- 项目仓库转为公开，采用 GPL-3.0 许可",
+  "changelog": "v2.18.16\n\n- 用户协议新增条款：禁止以本项目名义骚扰厂商或官方渠道、禁止冒充官方\n- 开源仓库转为公开并采用 GPL-3.0，关于页署名同步",
   "versions": [
+    {
+      "versionName": "2.18.16",
+      "versionCode": 183,
+      "publishedAt": "2026-11-05T19:30:00+08:00",
+      "size": 14563144,
+      "notes": [
+        "用户协议新增条款：禁止以本项目名义骚扰厂商或官方渠道、禁止冒充官方",
+        "开源仓库转为公开并采用 GPL-3.0，关于页署名同步"
+      ]
+    },
     {
       "versionName": "2.18.15",
       "versionCode": 182,
