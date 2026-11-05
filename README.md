@@ -1,92 +1,108 @@
-# OneKey · OnePlus 越狱工具（私有备份）
+<div align="center">
 
-OnePlus 16（PYB110 / 6.18.21）与 OnePlus Ace 7 Pro（PMS110 / 6.12.69）的一键越狱 App。
-稳定链 CVE-2026-64560，实验链 CVE-2026-98260；内置 KernelSU 系管理器适配、云端模块与在线更新。
+# OneKey
 
-- 当前版本：**2.18.1（versionCode 168）**
-- 产物：`artifacts/OneKeyJB-v2.17.16.apk`
-- 发布源：`https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/`
+**一加 16 / Ace 7 Pro 本地越狱工具 · ColorOS 17 适配**
 
-## 目录
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue?logo=gnu&logoColor=white)](./LICENSE)
+[![Release](https://img.shields.io/badge/release-v2.18.14-ff69b4?logo=android&logoColor=white)](https://github.com/xingranya/onekeyjb-private/releases)
+[![Platform](https://img.shields.io/badge/Android-12%2B-3ddc84?logo=android&logoColor=white)]()
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7f52ff?logo=kotlin&logoColor=white)]()
+[![Compose](https://img.shields.io/badge/Jetpack-Compose-4285f4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![Kernel](https://img.shields.io/badge/Kernel-6.18.21%20%2F%206.12.69-orange)]()
 
-| 路径 | 说明 |
+</div>
+
+---
+
+## 这是什么
+
+OneKey 是一个运行在 Android 上的**本地越狱辅助工具**：通过公开的内核漏洞获取临时 root，再把你自己安装的 root 管理器（KernelSU 系）拉起来。
+
+- 全程本地执行，不联网、不上传数据
+- 不内置管理器本体，运行时读取你已安装的管理器 APK 与其 `libksud`
+- 重启后 root 失效属正常，再点一次即可
+
+## 截图
+
+<div align="center">
+  <img src="docs/images/home.png" width="220" alt="首页" />
+  <img src="docs/images/terms.png" width="220" alt="用户协议" />
+  <img src="docs/images/dialog.png" width="220" alt="弹窗" />
+  <img src="docs/images/about.png" width="220" alt="关于" />
+</div>
+
+## 功能
+
+| 功能 | 说明 |
 | --- | --- |
-| `merged-app/` | Android 工程（Kotlin + Compose，COUI 组件库） |
-| `merged-app/app/src/main/assets/core/` | 越狱载荷、各管理器 6.18/6.12 内核模块与 ksud |
-| `tools/ko_stamp.py` | 内核模块 `.modinfo` 重写工具（vermagic 对齐 + onuce 契约字段） |
-| `artifacts/` | 发布产物：APK、update 清单、云端模块与 catalog |
-| `knowledge/` | **技术知识库**：产品矩阵、链路原理、模块协议、更新协议、排障、UI 规范，含 AI 可导入 JSON |
-| `docs/` | 漏洞链研究记录（历史归档，非构建依赖） |
+| 一键越狱 | 首页点一次，约 3 秒拿到 root（`su` 可用，SELinux 保持 Enforcing） |
+| 失败可重试 | 只有真的写入内核才提示重启；未写入可直接再点 |
+| 五个拓展功能 | 禁用安全弹窗、软重启、卸载内核安全防护、SUSFS、VFS |
+| 日志可追溯 | 每行日志实时落盘，软重启或被杀后重开仍能回看上次记录 |
+| 管理器自适应 | KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU / FinaSU |
+| 用户协议 | 首次启动强制阅读 10 秒并滚动到底部才能同意 |
 
-## 支持的内核
+## 支持机型
 
-| 机型 | 内核 release | 稳定链 | 实验链 |
-| --- | --- | --- | --- |
-| 一加 16 | `6.18.21-android17-5-gf957accaf563-ab15926176-4k` | 支持 | 已标定 |
-| 一加 16 | `6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k`（17.0.1.201） | 支持（新符号表） | 未标定，真机验证中 |
-| 一加 Ace 7 Pro | `6.12.69-android16-6-g242e1a07f878-ab15865446-4k` | — | 支持 |
+| 机型 | 系统 / 内核 | 状态 |
+| --- | --- | --- |
+| 一加 16（PYB110） | ColorOS 17.0.1.201 · `6.18.21-…-g7fcbffcad3e1` | ✅ 真机实测跑通 |
+| 一加 16（PYB110） | ColorOS 17.0.0.x · `6.18.21-…-gf957accaf563` | ✅ 档案保留 |
+| 一加 Ace 7 Pro（PMS110） | `6.12.69-android16` | ⚠️ 档案保留，本版未重新验证 |
 
-内置内核模块在投放前会按 `uname -r` 现场对齐 vermagic，换小版本 OTA 不需要重发模块。
+> 系统 OTA 会更换内核，适配档案需要跟着更新；不匹配时应用会明确提示"当前设备或内核不支持"，不会盲跑。
 
-## 知识库
+## 使用步骤
 
-`knowledge/` 是给用户、二次开发和 AI 助手看的技术资料，入口见 [knowledge/README.md](knowledge/README.md)：
+1. 安装并打开管理器（KernelSU 系任一），先不要求 root
+2. 启动 Stellar 或 Shizuku 服务，回到 OneKey 授予权限
+3. 首次启动阅读并同意《用户协议与免责声明》
+4. 首页点「运行 98260 越狱链」，等待进度到 100%
+5. 用 `su -c id` 验证；重启后需要重新执行
 
-| 文件 | 内容 |
-| --- | --- |
-| `01-产品概览与支持矩阵.md` | 能力边界、机型/内核矩阵、功能清单 |
-| `02-越狱链路原理.md` | 64560 阶段表、98260 一次性许可与后端选择 |
-| `03-管理器适配.md` | 五管理器版本/证书、三档取材顺序、自适应细节 |
-| `04-云端模块与校验协议.md` | catalog 结构、`onuce_*` 契约、校验清单、发模块步骤 |
-| `05-更新协议.md` | `update.json` 字段、弹窗行为、下载与安装 |
-| `06-构建与发布.md` | JDK 21、签名、发版流程、CNB 上传 |
-| `07-故障排查.md` | 报错对照表、日志标记、诊断命令 |
-| `08-UI与交互规范.md` | 页面结构、组件规格、文案基调 |
-| `09-新系统17.0.1.201适配.md` | 新 OTA 的内核变化、符号表重导、哪些必须真机 |
-| `10-98260执行引擎.md` | 引擎调用协议、五个拓展开关、日志落盘、排障 |
-
-AI 导入用：`knowledge/ai-kb/onekey-kb.json`（段落式，44 段）、`knowledge/ai-kb/onekey-kb.docs.json`（整篇式，8 篇）。
-改完 Markdown 跑 `python3 knowledge/ai-kb/build_kb.py` 同步。
-
-## 五个管理器支持状态
-
-| 管理器 | 包名 | 适配版本 | versionCode | 证书 SHA-256（前 16 位） |
-| --- | --- | --- | --- | --- |
-| KernelSU 官方 | `me.weishu.kernelsu` | v3.3.1 | 32680 | `c371061b19d8c7d7` |
-| KernelSU-Next | `com.rifsxd.ksunext` | v3.4.2 | 33355 | `79e590113c4c4c0c` |
-| SukiSU Ultra | `com.sukisu.ultra` | v4.3.0-r1 | 41140 | `947ae944f3de4ed4` |
-| BakaSU | `com.resukisu.resukisu` | v4.2.0-rc3 | 35171 | `d3469712b6214462` |
-| FinaSU | `me.yuki.fina` | v1.4.5 | 33168 | `2d89b50aaf1db013` |
-
-三档取材顺序：**云端模块 → 管理器 APK 运行时自适应 → 内置模块**。
-云端模块按 `manager + versionCode + vermagic` 精确匹配，vermagic 对不上会直接跳过并回落本地组件。
-
-## 构建
+## 从源码构建
 
 ```bash
-export JAVA_HOME=/opt/homebrew/opt/openjdk@21   # Stellar API 的 class 文件是 65.0，JDK 17 编译不过
-cd merged-app && ./gradlew assembleRelease
+# 需要 JDK 21、Android SDK 37、NDK 29
+cd merged-app
+./gradlew assembleRelease
 # 产物：app/build/outputs/apk/release/app-release.apk
 ```
 
-签名配置见 `keystore.properties`（不入库），`keystore.properties.example` 是模板。
+原生执行器（可选，自研链路）单独编译：
 
-## 发布
+```bash
+cd native/executor
+$NDK/toolchains/llvm/prebuilt/*/bin/aarch64-linux-android33-clang -O2 -o onekey-exec main.c leak.c
+```
 
-1. 改 `merged-app/app/build.gradle.kts` 的 `versionCode` / `versionName`。
-2. `./gradlew assembleRelease`，把 APK 复制成 `artifacts/OneKeyJB-v<版本>.apk`。
-3. 生成 `update.json`（`versionCode/versionName/publishedAt/size/sha256/versions[]`），
-   其中 `versions[]` 每项含 `versionName/versionCode/publishedAt/size/notes[]`，供 App 内按版本展开查看。
-4. 需要新云端模块时：
-   ```bash
-   python3 tools/ko_stamp.py IN.ko OUT.ko --release "$(uname -r 对应的设备 release)" \
-     --set onuce_schema=2 --set onuce_key=<manager> --set onuce_version=<versionCode> \
-     --set onuce_uapi=6 --set onuce_certificate=<管理器证书> --set onuce_kernel=<内核 commit> \
-     --set onuce_su=manager-v1 --set onuce_allowlist=cred-v1
-   ```
-   把 `.ko` 与 `cloud-catalog.json` 传到发布源 `update` 标签下。
+## 目录结构
 
-## 说明
+```
+merged-app/        Android 工程（Compose UI + 执行器桥接）
+native/executor/   自研执行器源码（泄漏 / 占位阶段）
+knowledge/         技术文档（内核适配、链路分析、执行引擎协议）
+docs/              研究记录与截图
+artifacts/         发布产物（APK、update.json、云端模块）
+tools/             签名与模块处理脚本
+```
 
-- 仅用于自有设备的越狱与维护；内核态写内存存在把设备跑崩的概率。
-- 仓库只保留当前源码与发布产物，历史研究与一次性脚本不再保留。
+## 第三方与致谢
+
+完整清单（组件、作者、许可证、上游地址）见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
+
+特别致谢：**SUSFS（susfs4ksu）**、**Hybrid Mount（maxsteeel）**、**KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU / FinaSU**、**COUI（suqi8）**、**Stellar（roro2239）**、**Shark**、**onuce**、**InfinityCore**。
+
+其中内核模块为 GPL 许可，源码可从上游获取；本应用未修改模块逻辑，仅按内核版本重编译并对齐 vermagic。
+
+## 免责声明
+
+越狱、刷机、加载内核模块属于高风险操作，可能导致设备无法开机、数据丢失、保修失效或部分应用不可用。
+**风险由使用者自行承担**，作者不对任何直接或间接损失负责。请在完全理解风险后使用，并遵守所在地法律法规。
+
+## 许可证
+
+本项目以 **GNU General Public License v3.0** 发布，见 [LICENSE](./LICENSE)。
+
+<div align="center"><sub>Made with ❤️ for OnePlus · OneKey</sub></div>
