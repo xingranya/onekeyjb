@@ -1,12 +1,23 @@
 {
-  "versionCode": 167,
-  "versionName": "2.18.0",
-  "publishedAt": "2026-11-05T00:48:00+08:00",
+  "versionCode": 168,
+  "versionName": "2.18.1",
+  "publishedAt": "2026-11-05T10:40:00+08:00",
   "size": 14560299,
-  "sha256": "cb764403ea9528ef73945892ee37a4f766a46222e21d723e006f5b91cb099747",
+  "sha256": "32d45cf5fa7b08a3161cdeea1fdb6f4d86352bdac95dbf5ab575243e5f99140a",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.0\n\n- 98260 链路真机跑通：su -c id 返回 uid=0、context=u:r:ksu:s0，kernelsu 模块 Live\n- 新增 98260 执行引擎通道，与自研执行器并存，按内核档案自动选择\n- 首页高级设置默认展开，拓展功能移到运行卡片上方；删除服务状态卡（保留「服务在线」标签）\n- 五个拓展开关全部接入：安全弹窗、软重启、卸载内核安全防护、SUSFS、VFS\n- 日志改为逐行 fsync 落盘，软重启/进程中断后仍可回看上次运行\n- 本 App 不再主动软重启，只记录 boot_id 变化做归因\n- 删除修复 SU / SU 兼容 / 恢复系统组件等冗余入口与死代码",
+  "changelog": "v2.18.1\n\n- 关于页新增「第三方组件说明」：列出 onuce、Shark、InfinityCore 与五个管理器、COUI、Stellar 等致谢项目\n- 顶栏/底栏模糊改用 COUI 的 drawBackdrop + blur + noiseDither，去掉原来的 progressiveTextureBlur 叠色，观感更干净\n- 顶栏渐变遮罩减淡（0x33 → 0x1A），避免状态栏区域发灰",
   "versions": [
+    {
+      "versionName": "2.18.1",
+      "versionCode": 168,
+      "publishedAt": "2026-11-05T10:40:00+08:00",
+      "size": 14560299,
+      "notes": [
+        "关于页新增「第三方组件说明」：列出 onuce、Shark、InfinityCore 与五个管理器、COUI、Stellar 等致谢项目",
+        "顶栏/底栏模糊改用 COUI 的 drawBackdrop + blur + noiseDither，去掉原来的 progressiveTextureBlur 叠色，观感更干净",
+        "顶栏渐变遮罩减淡（0x33 → 0x1A），避免状态栏区域发灰"
+      ]
+    },
     {
       "versionName": "2.18.0",
       "versionCode": 167,

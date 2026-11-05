@@ -60,7 +60,9 @@ import androidx.compose.ui.unit.sp
 import io.github.suqi8.coui.kmp.basic.*
 import io.github.suqi8.coui.kmp.blur.LayerBackdrop
 import io.github.suqi8.coui.kmp.blur.layerBackdrop
-import io.github.suqi8.coui.kmp.blur.progressiveTextureBlur
+import io.github.suqi8.coui.kmp.blur.drawBackdrop
+import io.github.suqi8.coui.kmp.blur.blur
+import io.github.suqi8.coui.kmp.blur.noiseDither
 import io.github.suqi8.coui.kmp.blur.rememberLayerBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Back
@@ -149,6 +151,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
     var showDiagnostics by remember { mutableStateOf(false) }
     var showClearHistoryConfirm by remember { mutableStateOf(false) }
     var showManual by remember { mutableStateOf(false) }
+    var showThirdParty by remember { mutableStateOf(false) }
     var reloadHistoryTick by remember { mutableIntStateOf(0) }
 
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -246,6 +249,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             onOpenLog = { tab = 1 },
                             onNotice = { showNotice = true },
                             onManual = { showManual = true },
+                            onThirdParty = { showThirdParty = true },
                             contentPadding = screenContentPadding
                         )
                     }
@@ -324,6 +328,35 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                 }
             }
 
+            if (showThirdParty) {
+                WindowDialog(title = "第三方组件说明", show = true, onDismissRequest = { showThirdParty = false }) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 480.dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        ManualSection("执行链与协议", listOf(
+                            "onuce：98260 原生执行器，提供 plant / 泄漏 / 收尾的本地实现与调试经验。",
+                            "Shark：98260 执行引擎与层内协议参考，其公开行为帮助我们对齐了 slide、tile/cred 写原语与 late-load 流程。",
+                            "InfinityCore：98260 的公开参考实现，是我们理解 timer UAF 形状的基础。",
+                            "KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU / FinaSU：内核 root 管理器本体，均遵循各自开源许可证。"
+                        ))
+                        ManualSection("界面与通道", listOf(
+                            "COUI（github.com/suqi8/coui）：ColorOS 风格 Compose 组件库。",
+                            "Stellar（github.com/roro2239/Stellar）：以 shell 身份执行特权命令的服务通道。"
+                        ))
+                        ManualSection("说明", listOf(
+                            "上述项目版权归各自作者所有；本项目仅在本地设备上调用其公开接口或参考其公开行为，不修改、不转售。",
+                            "完整许可见项目 THIRD_PARTY_NOTICES.md 与各上游仓库。"
+                        ))
+                        DialogActions(
+                            DialogAction("知道了", COUIIcons.Ok, primary = true) { showThirdParty = false }
+                        )
+                    }
+                }
+            }
             if (showNotice) {
                 AppreciationDialog(
                     onMessage = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
@@ -762,9 +795,16 @@ private fun TopBar(
             .fillMaxWidth()
             .statusBarsPadding()
             .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
-            .progressiveTextureBlur(backdrop, RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp), blurRadius = 42f)
+            .drawBackdrop(
+                backdrop = backdrop,
+                shape = { RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp) },
+                effects = {
+                    blur(28f, 1.2f)
+                    noiseDither(0.03f)
+                }
+            )
             .background(
-                Brush.verticalGradient(listOf(Color(0x33000000), Color(0x00000000))),
+                Brush.verticalGradient(listOf(Color(0x1A000000), Color(0x00000000))),
                 RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
             )
             .padding(top = 3.dp, bottom = 2.dp)
@@ -861,7 +901,14 @@ private fun AppBottomBar(
             .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
             .height(70.dp)
             .clip(shape)
-            .progressiveTextureBlur(backdrop, shape, blurRadius = 42f)
+            .drawBackdrop(
+                backdrop = backdrop,
+                shape = { shape },
+                effects = {
+                    blur(30f, 1.2f)
+                    noiseDither(0.03f)
+                }
+            )
             .background(
                 Brush.verticalGradient(
                     listOf(
@@ -1594,6 +1641,7 @@ private fun AboutScreen(
     onOpenLog: () -> Unit,
     onNotice: () -> Unit,
     onManual: () -> Unit,
+    onThirdParty: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     val context = LocalContext.current
@@ -1658,7 +1706,7 @@ private fun AboutScreen(
                     BasicComponent(title = "免费声明与赞赏码", summary = "群内免费 · 禁止倒卖", startAction = { Icon(COUIIcons.Help, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = onNotice)
                     BasicComponent(title = "COUI 组件库（开源）", summary = "github.com/suqi8/coui", startAction = { Icon(COUIIcons.Link, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = { openUrl(context, "https://github.com/suqi8/coui") })
                     BasicComponent(title = "Stellar（开源）", summary = "github.com/roro2239/Stellar", startAction = { Icon(COUIIcons.Link, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = { openUrl(context, "https://github.com/roro2239/Stellar") })
-                    BasicComponent(title = "第三方组件说明", summary = "内置引导组件遵循各自开源许可证，详见项目 NOTICE", startAction = { Icon(COUIIcons.Info, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = { openUrl(context, "https://github.com/xingranya/OnePlus16-Jailbreak") })
+                    BasicComponent(title = "第三方组件说明", summary = "感谢以下开源项目与实现", startAction = { Icon(COUIIcons.Info, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = onThirdParty)
                     BasicComponent(title = "版本", summary = "v" + BuildConfig.VERSION_NAME + " · 双模式 · 管理器自适应/固定", startAction = { Icon(COUIIcons.Info, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) })
                 }
             }
