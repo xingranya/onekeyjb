@@ -795,15 +795,16 @@ private fun RunFlow(
 private object BarBlurDefaults {
     const val topRadius = 14f
     const val bottomRadius = 16f
-    val topFade = 28.dp
-    val bottomFade = 24.dp
-    const val scrim = 0.90f
+    val topFade = 0.dp          // 顶栏不做淡出，滚动内容彻底被挡住
+    val bottomFade = 16.dp
+    const val topScrim = 1.0f   // 顶栏完全不透明，内容绝不透出
+    const val bottomScrim = 0.98f
 }
 
 /** 只对调用它的那一层做竖向 alpha 淡出。 */
 private fun Modifier.edgeFade(fadeDp: Dp, fromBottom: Boolean): Modifier = this.drawWithCache {
     val h = size.height
-    if (h <= 0f) {
+    if (h <= 0f || fadeDp.value <= 0f) {
         onDrawWithContent { drawContent() }
     } else {
         val fade = fadeDp.toPx().coerceAtMost(h * 0.6f)
@@ -826,6 +827,7 @@ private fun BlurBar(
     backdrop: LayerBackdrop,
     shape: Shape,
     radius: Float,
+    scrim: Float,
     fade: Dp,
     fromBottom: Boolean,
     modifier: Modifier = Modifier,
@@ -847,7 +849,7 @@ private fun BlurBar(
         Box(
             Modifier
                 .matchParentSize()
-                .background(COUITheme.colorScheme.surfaceContainer.copy(alpha = BarBlurDefaults.scrim), shape)
+                .background(COUITheme.colorScheme.surfaceContainer.copy(alpha = scrim), shape)
         )
         // 内容层负责撑开尺寸，绝对不能用 matchParentSize
         content()
@@ -871,6 +873,7 @@ private fun TopBar(
         backdrop = backdrop,
         shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
         radius = BarBlurDefaults.topRadius,
+        scrim = BarBlurDefaults.topScrim,
         fade = BarBlurDefaults.topFade,
         fromBottom = true,
         modifier = modifier.fillMaxWidth().statusBarsPadding(),
@@ -900,6 +903,7 @@ private fun AppBottomBar(
         backdrop = backdrop,
         shape = RoundedCornerShape(30.dp),
         radius = BarBlurDefaults.bottomRadius,
+        scrim = BarBlurDefaults.bottomScrim,
         fade = BarBlurDefaults.bottomFade,
         fromBottom = false,
         modifier = modifier
