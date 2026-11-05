@@ -32,8 +32,8 @@ android {
         buildConfig = true
     }
     signingConfigs {
-        create("release") {
-            if (keystorePropsFile.exists()) {
+        if (keystorePropsFile.exists()) create("release") {
+            run {
                 storeFile = rootProject.file(keystoreProps["storeFile"] as String)
                 storePassword = keystoreProps["storePassword"] as String
                 keyAlias = keystoreProps["keyAlias"] as String
@@ -43,14 +43,14 @@ android {
     }
     buildTypes {
         debug {
-            // 保证 debug 包也是同一把密钥，可覆盖安装现有 dev.onekey.jb
-            signingConfig = signingConfigs.getByName("release")
+            // 本地有 keystore 时用同一把密钥，便于覆盖安装；CI 无密钥时构建未签名包
+            if (keystorePropsFile.exists()) signingConfig = signingConfigs.getByName("release")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            if (keystorePropsFile.exists()) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

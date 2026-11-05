@@ -116,6 +116,11 @@ public final class ShizukuShell {
 
         public boolean isRunning() { return ProcessRunner.isAlive(proc); }
 
+        /** 进程已退出时返回退出码，仍在运行返回 null。 */
+        public Integer exitCode() {
+            try { return proc.exitValue(); } catch (IllegalThreadStateException e) { return null; }
+        }
+
         public String waitFor(String needle, long timeoutSec) throws InterruptedException {
             long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSec);
             while (System.nanoTime() < end) {
