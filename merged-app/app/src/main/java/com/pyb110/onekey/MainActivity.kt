@@ -62,7 +62,6 @@ import io.github.suqi8.coui.kmp.blur.LayerBackdrop
 import io.github.suqi8.coui.kmp.blur.layerBackdrop
 import io.github.suqi8.coui.kmp.blur.drawBackdrop
 import io.github.suqi8.coui.kmp.blur.blur
-import io.github.suqi8.coui.kmp.blur.noiseDither
 import io.github.suqi8.coui.kmp.blur.rememberLayerBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Back
@@ -337,18 +336,16 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 4.dp)
                     ) {
-                        ManualSection("执行链与协议", listOf(
-                            "onuce：98260 原生执行器，提供 plant / 泄漏 / 收尾的本地实现与调试经验。",
-                            "Shark：98260 执行引擎与层内协议参考，其公开行为帮助我们对齐了 slide、tile/cred 写原语与 late-load 流程。",
-                            "InfinityCore：98260 的公开参考实现，是我们理解 timer UAF 形状的基础。",
-                            "KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU / FinaSU：内核 root 管理器本体，均遵循各自开源许可证。"
-                        ))
-                        ManualSection("界面与通道", listOf(
-                            "COUI（github.com/suqi8/coui）：ColorOS 风格 Compose 组件库。",
-                            "Stellar（github.com/roro2239/Stellar）：以 shell 身份执行特权命令的服务通道。"
+                        ManualSection("感谢以下项目", listOf(
+                            "COUI（github.com/suqi8/coui）",
+                            "Stellar（github.com/roro2239/Stellar）",
+                            "onuce",
+                            "Shark",
+                            "InfinityCore",
+                            "KernelSU、KernelSU-Next、SukiSU Ultra、BakaSU、FinaSU"
                         ))
                         ManualSection("说明", listOf(
-                            "上述项目版权归各自作者所有；本项目仅在本地设备上调用其公开接口或参考其公开行为，不修改、不转售。",
+                            "以上项目的版权归各自作者所有，在此一并致谢。",
                             "完整许可见项目 THIRD_PARTY_NOTICES.md 与各上游仓库。"
                         ))
                         DialogActions(
@@ -798,13 +795,10 @@ private fun TopBar(
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp) },
-                effects = {
-                    blur(28f, 1.2f)
-                    noiseDither(0.03f)
-                }
+                effects = { blur(22f) }
             )
             .background(
-                Brush.verticalGradient(listOf(Color(0x1A000000), Color(0x00000000))),
+                Brush.verticalGradient(listOf(COUITheme.colorScheme.background.copy(alpha = 0.72f), COUITheme.colorScheme.background.copy(alpha = 0.38f))),
                 RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
             )
             .padding(top = 3.dp, bottom = 2.dp)
@@ -904,16 +898,13 @@ private fun AppBottomBar(
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { shape },
-                effects = {
-                    blur(30f, 1.2f)
-                    noiseDither(0.03f)
-                }
+                effects = { blur(24f) }
             )
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        COUITheme.colorScheme.surfaceContainer.copy(alpha = 0.90f),
-                        COUITheme.colorScheme.surfaceContainer.copy(alpha = 0.68f)
+                        COUITheme.colorScheme.surfaceContainer.copy(alpha = 0.82f),
+                        COUITheme.colorScheme.surfaceContainer.copy(alpha = 0.72f)
                     )
                 ),
                 shape

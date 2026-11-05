@@ -1,12 +1,23 @@
 {
-  "versionCode": 168,
-  "versionName": "2.18.1",
-  "publishedAt": "2026-11-05T10:40:00+08:00",
-  "size": 14560299,
-  "sha256": "32d45cf5fa7b08a3161cdeea1fdb6f4d86352bdac95dbf5ab575243e5f99140a",
+  "versionCode": 169,
+  "versionName": "2.18.2",
+  "publishedAt": "2026-11-05T10:52:00+08:00",
+  "size": 14560303,
+  "sha256": "fab37be409397368775d10dd3516a16c912bdfbef4125ef900e49e3a0ff6fe8d",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.1\n\n- 关于页新增「第三方组件说明」：列出 onuce、Shark、InfinityCore 与五个管理器、COUI、Stellar 等致谢项目\n- 顶栏/底栏模糊改用 COUI 的 drawBackdrop + blur + noiseDither，去掉原来的 progressiveTextureBlur 叠色，观感更干净\n- 顶栏渐变遮罩减淡（0x33 → 0x1A），避免状态栏区域发灰",
+  "changelog": "v2.18.2\n\n- 关于页新增第三方组件致谢页\n- 顶栏与底栏模糊参数调整，观感更自然\n- 栏体对比度提升，滚动时文字更清晰",
   "versions": [
+    {
+      "versionName": "2.18.2",
+      "versionCode": 169,
+      "publishedAt": "2026-11-05T10:52:00+08:00",
+      "size": 14560303,
+      "notes": [
+        "关于页新增第三方组件致谢页",
+        "顶栏与底栏模糊参数调整，观感更自然",
+        "栏体对比度提升，滚动时文字更清晰"
+      ]
+    },
     {
       "versionName": "2.18.1",
       "versionCode": 168,
