@@ -95,6 +95,8 @@ class JailbreakController private constructor(private val context: Context) {
     var activeKernelManager: String by mutableStateOf(""); private set
     var isSwitchingManager: Boolean by mutableStateOf(false); private set
     var hotSwitchMessage: String by mutableStateOf(""); private set
+    /** 状态探测的诊断摘要，便于定位"显示未越狱"这类问题。 */
+    var probeDetail: String by mutableStateOf(""); private set
     /** 是否在越狱时加载通用多管理器模块（热切换前提，默认关闭以保持既有成功率）。 */
     var universalModuleEnabled: Boolean by mutableStateOf(prefs.getBoolean("universal_module", false)); private set
     /** 本次开机是否已成功越狱（与 boot_id 绑定，重启后自动失效）。 */
@@ -173,6 +175,8 @@ class JailbreakController private constructor(private val context: Context) {
     fun refreshState() {
         if (isSwitchingManager) return
         refreshRootedFlag()
+        // 服务在线但未授权时主动申请，否则所有探测都会是空结果。
+        if (serviceReady && !serviceGranted) runCatching { StellarShell.requestPermission(1001) }
         serviceReady = StellarShell.available()
         serviceGranted = StellarShell.hasPermission()
         if (!RunState.active && lockFile().isFile()) {
@@ -212,6 +216,10 @@ class JailbreakController private constructor(private val context: Context) {
             }
             val overlaySu = if (serviceReady) StellarShell.run("[ -x /system_ext/bin/su ] && grep -q su_compat /proc/mounts && echo READY || echo MISSING", 15).output else "MISSING"
             suCompatReady = suOk || overlaySu.contains("READY")
+            probeDetail = "服务" + (if (serviceReady) "在线" else "离线") +
+                (if (serviceReady) (if (serviceGranted) "/已授权" else "/未授权") else "") +
+                " · su " + (if (suOk) "可用" else "不可用") +
+                " · 本次开机" + (if (rootedThisBoot) "已越狱" else "无成功记录")
 
             // 节点探测与 root 检测解耦：/proc 节点本身对 shell 可读，不需要 su。
             if (serviceReady && serviceGranted && !running && !isSwitchingManager) {

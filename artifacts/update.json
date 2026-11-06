@@ -1,12 +1,23 @@
 {
-  "versionCode": 190,
-  "versionName": "2.18.23",
-  "publishedAt": "2026-11-06T09:44:00+08:00",
-  "size": 23837237,
-  "sha256": "ee8e0a6dbb922aec61b0fe35d6f1463efdb4fc7314c2bfee8e26681dbc65b415",
+  "versionCode": 191,
+  "versionName": "2.18.24",
+  "publishedAt": "2026-11-06T09:52:00+08:00",
+  "size": 23837233,
+  "sha256": "ac568d74f2300921661a08508885b6e8e5ac9f4a1c2250b3a32e924d28fc0561",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.23\n\n- root 检测改为多路尝试（su / /system/bin/su / su 0），不再因单一命令失败误判未越狱\n- 热切换节点探测与 root 检测解耦：直接检查 /proc/kernelsu_manager，不再被 su 结果卡住\n- 热切换面板新增「重新检测状态」按钮，可手动刷新",
+  "changelog": "v2.18.24\n\n- 检测与切换按钮改为并排（左检测、右切换）\n- 热切换面板新增状态诊断行：服务/授权/su/本次开机越狱记录，便于定位误判\n- 服务在线但未授权时自动发起授权申请",
   "versions": [
+    {
+      "versionName": "2.18.24",
+      "versionCode": 191,
+      "publishedAt": "2026-11-06T09:52:00+08:00",
+      "size": 23837233,
+      "notes": [
+        "检测与切换按钮改为并排（左检测、右切换）",
+        "热切换面板新增状态诊断行：服务/授权/su/本次开机越狱记录，便于定位误判",
+        "服务在线但未授权时自动发起授权申请"
+      ]
+    },
     {
       "versionName": "2.18.23",
       "versionCode": 190,

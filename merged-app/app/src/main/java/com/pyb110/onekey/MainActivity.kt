@@ -1580,31 +1580,47 @@ private fun OptionsCard(
                     }
                     Spacer(Modifier.height(10.dp))
                     val canSwitch = controller.hotSwitchAvailable && controller.suCompatReady && !controller.running && !controller.preparing && selectedTarget.isNotBlank() && !controller.isSwitchingManager
-                    Surface(
-                        onClick = {
-                            haptic(CouiHapticEffect.Switch)
-                            controller.executeHotSwitch(selectedTarget) { _, _ -> }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        enabled = canSwitch,
-                        color = if (canSwitch) COUITheme.colorScheme.primary else COUITheme.colorScheme.surfaceContainer
-                    ) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                if (controller.isSwitchingManager) "切换中…" else "切换",
-                                style = COUITheme.textStyles.body1,
-                                color = if (canSwitch) COUITheme.colorScheme.onPrimary else COUITheme.colorScheme.onSurfaceContainerVariant
-                            )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Surface(
+                            onClick = { haptic(CouiHapticEffect.Switch); controller.refreshState() },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = COUITheme.colorScheme.surfaceContainer
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("检测", style = COUITheme.textStyles.body1, color = COUITheme.colorScheme.primary)
+                            }
+                        }
+                        Surface(
+                            onClick = {
+                                haptic(CouiHapticEffect.Switch)
+                                controller.executeHotSwitch(selectedTarget) { _, _ -> }
+                            },
+                            modifier = Modifier.weight(2f).height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = canSwitch,
+                            color = if (canSwitch) COUITheme.colorScheme.primary else COUITheme.colorScheme.surfaceContainer
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    if (controller.isSwitchingManager) "切换中…" else "切换",
+                                    style = COUITheme.textStyles.body1,
+                                    color = if (canSwitch) COUITheme.colorScheme.onPrimary else COUITheme.colorScheme.onSurfaceContainerVariant
+                                )
+                            }
                         }
                     }
                     if (controller.hotSwitchMessage.isNotBlank()) {
                         Text(controller.hotSwitchMessage, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant, modifier = Modifier.padding(top = 8.dp))
                     }
-                    TextButton(
-                        text = "重新检测状态",
-                        onClick = { haptic(CouiHapticEffect.Switch); controller.refreshState() }
-                    )
+                    if (controller.probeDetail.isNotBlank()) {
+                        Text(
+                            controller.probeDetail,
+                            style = COUITheme.textStyles.body2,
+                            color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
                 }
             }
             // 管理器下载：直接指向各家官方最新正式版。
