@@ -1,12 +1,22 @@
 {
-  "versionCode": 188,
-  "versionName": "2.18.21",
-  "publishedAt": "2026-11-06T09:35:00+08:00",
-  "size": 23837233,
-  "sha256": "d3d25791ae8ff102b391a1b32ef24c34a9999a5ade1fb87655241ad63ec6becd",
+  "versionCode": 189,
+  "versionName": "2.18.22",
+  "publishedAt": "2026-11-06T09:36:00+08:00",
+  "size": 23837237,
+  "sha256": "4d757d2237ac575cd80744ba0eae888ac0067f6e9d0c28f20abccd6134d277c1",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.21\n\n- 修复越狱成功后仍显示未提权：状态改为按本次开机的成功记录判定，不再完全依赖 Stellar\n- 服务离线时明确提示「已越狱（服务离线）」，热切换面板区分「服务离线」与「单管理器模块」\n- boot_id 改为本地读取，服务未就绪也能判断是否需要重启",
+  "changelog": "v2.18.22\n\n- 修复「成功后软重启导致状态丢失」：拿到 root 的瞬间即同步写入成功标记，不再依赖运行结束\n- 软重启后重新打开 App 仍显示「已越狱（服务离线）」，不再误报未提权",
   "versions": [
+    {
+      "versionName": "2.18.22",
+      "versionCode": 189,
+      "publishedAt": "2026-11-06T09:36:00+08:00",
+      "size": 23837237,
+      "notes": [
+        "修复「成功后软重启导致状态丢失」：拿到 root 的瞬间即同步写入成功标记，不再依赖运行结束",
+        "软重启后重新打开 App 仍显示「已越狱（服务离线）」，不再误报未提权"
+      ]
+    },
     {
       "versionName": "2.18.21",
       "versionCode": 188,

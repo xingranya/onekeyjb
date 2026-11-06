@@ -10,6 +10,21 @@ import dev.onekey.jb.ShizukuShell
  */
 object OneKeyEngine {
     private const val ROOT = "/data/local/tmp/pyb110-onekey"
+    /**
+     * 成功标志必须即时落盘：引擎在拿到 root 后会立刻软重启，
+     * 进程往往来不及走到 finally，导致"成功了却显示未越狱"。
+     */
+    private fun markRootedNow(context: Context) {
+        val boot = runCatching { java.io.File("/proc/sys/kernel/random/boot_id").readText().trim() }.getOrDefault("")
+        if (boot.isBlank()) return
+        runCatching {
+            context.getSharedPreferences("merged", Context.MODE_PRIVATE).edit()
+                .putString("success_boot_id", boot)
+                .remove("failed_boot_id")
+                .commit()
+        }
+    }
+
     /** 本次运行后内核是否暴露了 /proc/kernelsu_manager。 */
     @Volatile var hotSwitchReady: Boolean = false
         private set
@@ -118,7 +133,8 @@ object OneKeyEngine {
                     line.startsWith("[2/4]") -> { stage("加载内核模块"); progress(65) }
                     line.startsWith("[3/4]") -> { stage("等待 su"); progress(80) }
                     line.startsWith("[4/4]") -> { stage("管理器收尾"); progress(90) }
-                    line == "MODULE_LOADED" -> log("内核模块已加载")
+                    line == "MODULE_LOADED" -> { markRootedNow(context); log("内核模块已加载") }
+                    line.startsWith("SU_ID_RC=0") -> { markRootedNow(context); log("su 校验：" + line) }
                     line.startsWith("SU_ID_RC=") -> log("su 校验：" + line)
                     line.contains("UNIVERSAL_NODE_OK") -> log("通用模块已加载，热切换节点就绪")
                     line.contains("UNIVERSAL_NODE_MISSING") -> log("通用模块未能提供热切换节点")
