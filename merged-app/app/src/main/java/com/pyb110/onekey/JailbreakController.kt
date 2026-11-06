@@ -46,7 +46,7 @@ class JailbreakController private constructor(private val context: Context) {
     }
 
     private val prefs = context.getSharedPreferences("merged", Context.MODE_PRIVATE)
-    private val UNIVERSAL_KSUD_SIZE = 12335680
+    private val UNIVERSAL_KSUD_SIZE = 12652520
     private val legacyPrefs = context.getSharedPreferences("onekey", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(Dispatchers.IO)
     // 必须早于 init 块初始化：init 里的 refreshState() 可能触发 addLog 的 synchronized(logLock)

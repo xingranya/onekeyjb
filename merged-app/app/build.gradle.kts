@@ -24,8 +24,8 @@ android {
         applicationId = "dev.onekey.jb"
         minSdk = 33
         targetSdk = 37
-        versionCode = 199
-        versionName = "2.19.1"
+        versionCode = 200
+        versionName = "2.19.2"
     }
     buildFeatures {
         compose = true

@@ -1,12 +1,25 @@
 {
-  "versionCode": 199,
-  "versionName": "2.19.1",
-  "publishedAt": "2026-11-07T00:05:00+08:00",
-  "size": 23902773,
-  "sha256": "512751c9e1d1b7b647a178ed50639163b5925a94a4ead7edfa8062665177da68",
+  "versionCode": 200,
+  "versionName": "2.19.2",
+  "publishedAt": "2026-11-07T00:40:00+08:00",
+  "size": 24212065,
+  "sha256": "db7f51f651ca6783d92a17d5992500416e24f7d3870bc94b3f800e9f1ca9ac0b",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.19.1\n\n- 移除运行卡内的「环境诊断」按钮，诊断入口统一放在拓展功能分组\n- 移除「高级设置」及其展开的越狱方式说明卡，首页更简洁",
+  "changelog": "v2.19.2\n\n- 合入 KSU-Universal v1.2.0：内置通用多管理器加载器升级到最新版（12,652,520 B）\n- 新版修正各 profile 的 manager ops 行为，补齐 BakaSU / FinaSU 的模块过滤与动态管理器语义\n- 修复模块过滤在 tracepoint 上下文读取 ELF 导致的内核卡死（改为 syscall 表 hook）\n- Baka 多管理器语义修正：只保留 active primary，其余由用户在 Baka 管理器中勾选\n- 加载器就绪检测同步更新为新版大小；第三方声明版本号同步为 v1.2.0",
   "versions": [
+    {
+      "versionName": "2.19.2",
+      "versionCode": 200,
+      "publishedAt": "2026-11-07T00:40:00+08:00",
+      "size": 24212065,
+      "notes": [
+        "合入 KSU-Universal v1.2.0：内置通用多管理器加载器升级到最新版（12,652,520 B）",
+        "新版修正各 profile 的 manager ops 行为，补齐 BakaSU / FinaSU 的模块过滤与动态管理器语义",
+        "修复模块过滤在 tracepoint 上下文读取 ELF 导致的内核卡死（改为 syscall 表 hook）",
+        "Baka 多管理器语义修正：只保留 active primary，其余由用户在 Baka 管理器中勾选",
+        "加载器就绪检测同步更新为新版大小；第三方声明版本号同步为 v1.2.0"
+      ]
+    },
     {
       "versionName": "2.19.1",
       "versionCode": 199,
