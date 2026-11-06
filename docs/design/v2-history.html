@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>历史记录 - OneKey</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+      background-color: #FBF4F2;
+      color: #2D2326;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#FBF4F2] text-[#2D2326] flex justify-center selection:bg-[#9B4A5A]/20">
+  <!-- Mobile Container (Max 412px for standard Android viewport) -->
+  <div class="w-full max-w-[412px] min-h-screen flex flex-col justify-between relative bg-[#FBF4F2]">
+    
+    <!-- Top Area: Status Bar & App Header -->
+    <header class="w-full pt-3 px-5 pb-2">
+      <!-- Android / iOS Status Bar Indicators -->
+      <div class="flex items-center justify-between text-[13px] font-medium text-[#7C6E72] mb-3 select-none">
+        <span class="tracking-tight">09:41</span>
+        <div class="flex items-center space-x-1.5">
+          <!-- Signal Icon -->
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 16 16">
+            <rect x="1" y="11" width="2" height="4" rx="0.5" />
+            <rect x="5" y="8" width="2" height="7" rx="0.5" />
+            <rect x="9" y="5" width="2" height="10" rx="0.5" />
+            <rect x="13" y="2" width="2" height="13" rx="0.5" />
+          </svg>
+          <!-- Wifi Icon -->
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 16 16">
+            <path d="M8 12.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm-4.24-2.83a6 6 0 0 1 8.48 0 .75.75 0 1 1-1.06 1.06 4.5 4.5 0 0 0-6.36 0 .75.75 0 0 1-1.06-1.06zm-2.83-2.83a10 10 0 0 1 14.14 0 .75.75 0 1 1-1.06 1.06 8.5 8.5 0 0 0-12.02 0 .75.75 0 0 1-1.06-1.06z" />
+          </svg>
+          <!-- Battery Icon -->
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 18 18">
+            <rect x="1.5" y="5" width="13" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <rect x="3.5" y="7" width="8" height="4" rx="1" />
+            <path d="M15.5 7.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- TopAppBar: Avatar, Title '历史', Version -->
+      <div class="flex items-center justify-between py-1">
+        <!-- Left: Circular Avatar -->
+        <div class="flex items-center">
+          <div class="w-9 h-9 rounded-full overflow-hidden border border-[#9B4A5A]/20 bg-[#F6EBE9] flex-shrink-0 flex items-center justify-center shadow-none">
+            <img src="https://lh3.googleusercontent.com/aida/ALJJyrA7Wt3x5xKrY7-NkDQYx8ctfjjuaVtjTkCOCqKwzUKjOUlvUhtnqsscu8h0U3FWR58tmgwqrIOIo7cUiofZYKPbzt9rR7492ATzjxPG7Zg6QeTc_ojz0_ebqJ6Z6i18vxQ3U8AVItASPS5XNTQBIcVCZ2pE1R5M1kJ3zZRmjJxcqXHC5OfXTEhyUzs1q9zoGKts07YOrzh0gHaJwq-soyUTLiAbndf9CB7WwZO-sSU99dU-eZMW1YkISg" alt="用户头像" class="w-full h-full object-cover">
+          </div>
+        </div>
+
+        <!-- Center: Title -->
+        <h1 class="text-[19px] font-bold text-[#2D2326] tracking-tight">历史</h1>
+
+        <!-- Right: Version info -->
+        <div class="text-[12px] font-medium text-[#7C6E72] tracking-tight">
+          v2.18.30 · 197
+        </div>
+      </div>
+
+      <!-- Filter Row: Segmented Control (全部 / 成功 / 失败) aligned to right -->
+      <div class="flex justify-end items-center mt-3 pt-1">
+        <div class="inline-flex p-1 bg-[#F0E4E2] rounded-full border border-[#E8D8D5]">
+          <button class="px-3.5 py-1 text-[13px] font-medium rounded-full bg-[#9B4A5A] text-white transition-none shadow-none">
+            全部
+          </button>
+          <button class="px-3.5 py-1 text-[13px] font-medium rounded-full text-[#7C6E72] hover:text-[#2D2326] transition-none">
+            成功
+          </button>
+          <button class="px-3.5 py-1 text-[13px] font-medium rounded-full text-[#7C6E72] hover:text-[#2D2326] transition-none">
+            失败
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content: History List with Groupings -->
+    <main class="flex-1 px-5 pt-1 pb-24 space-y-4">
+      
+      <!-- Group 1: 今日 (2条记录) -->
+      <div>
+        <div class="flex items-center justify-between text-[13px] font-medium text-[#7C6E72] mb-2 px-1">
+          <span>今日</span>
+          <span>2 条记录</span>
+        </div>
+        <!-- Card with 20dp border radius (#F6EBE9) -->
+        <div class="bg-[#F6EBE9] rounded-[20px] p-1 border border-[#EFE1DF]">
+          <!-- Item 1: 成功 -->
+          <div class="flex items-center justify-between px-3.5 py-3 cursor-pointer">
+            <div class="flex items-center space-x-3 min-w-0">
+              <!-- Success State Icon: 主色勾 -->
+              <div class="w-8 h-8 rounded-full bg-[#9B4A5A]/12 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-[#9B4A5A]" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3.5 8.5L6.5 11.5L12.5 5" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-[15px] font-semibold text-[#2D2326] leading-snug truncate">越狱成功 · 用时 5 秒</div>
+                <div class="text-[12px] text-[#7C6E72] leading-snug mt-0.5 truncate">OnePlus 16 · FinaSU · 09:24</div>
+              </div>
+            </div>
+            <!-- Right Chevron Arrow -->
+            <div class="pl-2 flex-shrink-0 text-[#B0A2A5]">
+              <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 3.5L10.5 8L6 12.5" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- 1px Separator Line -->
+          <div class="h-[1px] bg-[#E8D8D5] mx-3.5"></div>
+
+          <!-- Item 2: 失败 -->
+          <div class="flex items-center justify-between px-3.5 py-3 cursor-pointer">
+            <div class="flex items-center space-x-3 min-w-0">
+              <!-- Failure State Icon: 红色叉 -->
+              <div class="w-8 h-8 rounded-full bg-[#D32F2F]/12 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-[#D32F2F]" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-[15px] font-semibold text-[#2D2326] leading-snug truncate">越狱中断 · 内核校验未通过</div>
+                <div class="text-[12px] text-[#7C6E72] leading-snug mt-0.5 truncate">OnePlus 16 · KernelSU Next · 08:15</div>
+              </div>
+            </div>
+            <!-- Right Chevron Arrow -->
+            <div class="pl-2 flex-shrink-0 text-[#B0A2A5]">
+              <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 3.5L10.5 8L6 12.5" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Group 2: 昨日 (2条记录) -->
+      <div>
+        <div class="flex items-center justify-between text-[13px] font-medium text-[#7C6E72] mb-2 px-1">
+          <span>昨日</span>
+          <span>2 条记录</span>
+        </div>
+        <!-- Card with 20dp border radius (#F6EBE9) -->
+        <div class="bg-[#F6EBE9] rounded-[20px] p-1 border border-[#EFE1DF]">
+          <!-- Item 1: 成功 -->
+          <div class="flex items-center justify-between px-3.5 py-3 cursor-pointer">
+            <div class="flex items-center space-x-3 min-w-0">
+              <!-- Success State Icon -->
+              <div class="w-8 h-8 rounded-full bg-[#9B4A5A]/12 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-[#9B4A5A]" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3.5 8.5L6.5 11.5L12.5 5" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-[15px] font-semibold text-[#2D2326] leading-snug truncate">越狱成功 · 用时 4 秒</div>
+                <div class="text-[12px] text-[#7C6E72] leading-snug mt-0.5 truncate">OnePlus 16 · FinaSU · 21:02</div>
+              </div>
+            </div>
+            <div class="pl-2 flex-shrink-0 text-[#B0A2A5]">
+              <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 3.5L10.5 8L6 12.5" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- 1px Separator Line -->
+          <div class="h-[1px] bg-[#E8D8D5] mx-3.5"></div>
+
+          <!-- Item 2: 成功 -->
+          <div class="flex items-center justify-between px-3.5 py-3 cursor-pointer">
+            <div class="flex items-center space-x-3 min-w-0">
+              <!-- Success State Icon -->
+              <div class="w-8 h-8 rounded-full bg-[#9B4A5A]/12 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-[#9B4A5A]" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3.5 8.5L6.5 11.5L12.5 5" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-[15px] font-semibold text-[#2D2326] leading-snug truncate">越狱成功 · 用时 6 秒</div>
+                <div class="text-[12px] text-[#7C6E72] leading-snug mt-0.5 truncate">OnePlus 16 · Magisk Alpha · 14:18</div>
+              </div>
+            </div>
+            <div class="pl-2 flex-shrink-0 text-[#B0A2A5]">
+              <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 3.5L10.5 8L6 12.5" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Group 3: 更早 (1条记录) -->
+      <div>
+        <div class="flex items-center justify-between text-[13px] font-medium text-[#7C6E72] mb-2 px-1">
+          <span>更早</span>
+          <span>1 条记录</span>
+        </div>
+        <!-- Card with 20dp border radius (#F6EBE9) -->
+        <div class="bg-[#F6EBE9] rounded-[20px] p-1 border border-[#EFE1DF]">
+          <!-- Item 1: 成功 -->
+          <div class="flex items-center justify-between px-3.5 py-3 cursor-pointer">
+            <div class="flex items-center space-x-3 min-w-0">
+              <!-- Success State Icon -->
+              <div class="w-8 h-8 rounded-full bg-[#9B4A5A]/12 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-[#9B4A5A]" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3.5 8.5L6.5 11.5L12.5 5" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-[15px] font-semibold text-[#2D2326] leading-snug truncate">越狱成功 · 用时 5 秒</div>
+                <div class="text-[12px] text-[#7C6E72] leading-snug mt-0.5 truncate">OnePlus 16 · APatch · 3天前 16:30</div>
+              </div>
+            </div>
+            <div class="pl-2 flex-shrink-0 text-[#B0A2A5]">
+              <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 3.5L10.5 8L6 12.5" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Bottom Navigation Bar: Full-width docked bar (not floating capsule) -->
+    <!-- Equal 4 columns: 首页 / 日志 / 历史 (Active: #9B4A5A) / 关于 -->
+    <nav class="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-[#FBF4F2] border-t border-[#E8D8D5] flex items-center justify-around py-2 px-1 z-50">
+      
+      <!-- Tab 1: 首页 -->
+      <a href="#" class="flex flex-col items-center justify-center flex-1 py-1 text-[#7C6E72] select-none">
+        <svg class="w-5 h-5 mb-1" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 8.5L10 3L17 8.5V16C17 16.55 16.55 17 16 17H4C3.45 17 3 16.55 3 16V8.5Z" />
+          <path d="M7.5 17V10.5H12.5V17" />
+        </svg>
+        <span class="text-[11px] leading-none">首页</span>
+      </a>
+
+      <!-- Tab 2: 日志 -->
+      <a href="#" class="flex flex-col items-center justify-center flex-1 py-1 text-[#7C6E72] select-none">
+        <svg class="w-5 h-5 mb-1" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
+          <path d="M6 7.5L8.5 10L6 12.5" />
+          <path d="M10.5 12.5H14" />
+        </svg>
+        <span class="text-[11px] leading-none">日志</span>
+      </a>
+
+      <!-- Tab 3: 历史 (Active Tab) -->
+      <a href="#" class="flex flex-col items-center justify-center flex-1 py-1 text-[#9B4A5A] font-semibold select-none">
+        <svg class="w-5 h-5 mb-1" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10" cy="10" r="7.5" />
+          <path d="M10 6V10L13 12" />
+        </svg>
+        <span class="text-[11px] leading-none">历史</span>
+      </a>
+
+      <!-- Tab 4: 关于 -->
+      <a href="#" class="flex flex-col items-center justify-center flex-1 py-1 text-[#7C6E72] select-none">
+        <svg class="w-5 h-5 mb-1" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10" cy="10" r="7.5" />
+          <line x1="10" y1="9" x2="10" y2="14" />
+          <circle cx="10" cy="6.5" r="0.75" fill="currentColor" />
+        </svg>
+        <span class="text-[11px] leading-none">关于</span>
+      </a>
+
+    </nav>
+  </div>
+</body>
+</html>

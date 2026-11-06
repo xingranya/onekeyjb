@@ -64,10 +64,14 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.suqi8.coui.kmp.basic.*
+import com.pyb110.onekey.ui.components.ListCard
+import com.pyb110.onekey.ui.components.ListRow
+import com.pyb110.onekey.ui.components.SectionTitle
 
 import io.github.suqi8.coui.kmp.blur.LayerBackdrop
 import io.github.suqi8.coui.kmp.blur.layerBackdrop
@@ -83,6 +87,12 @@ import io.github.suqi8.coui.kmp.icon.extended.Close
 import io.github.suqi8.coui.kmp.icon.extended.Copy
 import io.github.suqi8.coui.kmp.icon.extended.Delete
 import io.github.suqi8.coui.kmp.icon.extended.Download
+import io.github.suqi8.coui.kmp.icon.extended.ChevronForward
+import io.github.suqi8.coui.kmp.icon.extended.GridView
+import io.github.suqi8.coui.kmp.icon.extended.Hide
+import io.github.suqi8.coui.kmp.icon.extended.Replace
+import io.github.suqi8.coui.kmp.icon.extended.Timer
+import io.github.suqi8.coui.kmp.icon.extended.Tune
 import io.github.suqi8.coui.kmp.icon.extended.Help
 import io.github.suqi8.coui.kmp.icon.extended.Home
 import io.github.suqi8.coui.kmp.icon.extended.Info
@@ -108,6 +118,9 @@ import io.github.suqi8.coui.kmp.theme.ThemeController
 import io.github.suqi8.coui.kmp.utils.CouiHapticEffect
 import io.github.suqi8.coui.kmp.utils.rememberCouiHaptic
 import io.github.suqi8.coui.kmp.window.WindowDialog
+import io.github.suqi8.coui.kmp.window.WindowBottomSheet
+import io.github.suqi8.coui.kmp.utils.COUIPopupUtils.Companion.COUIPopupHost
+import androidx.compose.ui.unit.DpSize
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -167,6 +180,14 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
     val termsPrefs = LocalContext.current.getSharedPreferences("onekey", Context.MODE_PRIVATE)
     var showTerms by remember { mutableStateOf(!termsPrefs.getBoolean("terms_accepted_v2", false)) }
     var reloadHistoryTick by remember { mutableIntStateOf(0) }
+    // 底部抽屉的状态放在根级：overlay 组件必须挂在浮层宿主上，不能留在列表 item 里。
+    var sheet by remember { mutableIntStateOf(0) }
+    var hwTarget by remember { mutableStateOf("") }
+    val certManagers = controller.managers.filter { it.installedVersionCode != null && it.certOk }
+    LaunchedEffect(certManagers.map { it.kind }) {
+        if (certManagers.none { it.kind == hwTarget }) hwTarget = certManagers.firstOrNull()?.kind.orEmpty()
+    }
+    val hwTargetLabel = controller.managers.firstOrNull { it.kind == hwTarget }?.label ?: "未安装"
 
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
@@ -240,6 +261,11 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             onRunJailbreak = {
                                 show98260Warning = true
                             },
+                            onOpenAbout = { tab = 3 },
+                            onOpenManual = { showManual = true },
+                            targetLabel = hwTargetLabel,
+                            targetSelectable = certManagers.isNotEmpty(),
+                            onOpenSheet = { sheet = it },
                             contentPadding = screenContentPadding
                         )
                         1 -> LogScreen(
@@ -304,6 +330,82 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                 onHeight = { navBarPx = it },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
+
+            // 浮层宿主：底部抽屉等 overlay 组件需要它才能挂到窗口层。
+            COUIPopupHost()
+
+            if (sheet == 1) {
+                var v1 by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { v1 = true }
+                WindowBottomSheet(
+                    show = v1,
+                    title = "管理器热切换",
+                    onDismissRequest = { v1 = false },
+                    onDismissFinished = { sheet = 0 }
+                ) {
+                    Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                        HotSwitchPanel(
+                            controller = controller,
+                            haptic = haptic,
+                            selectedTarget = hwTarget,
+                            onPickTarget = { sheet = 4 }
+                        )
+                    }
+                }
+            }
+            if (sheet == 2) {
+                var v2 by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { v2 = true }
+                WindowBottomSheet(
+                    show = v2,
+                    title = "管理器下载",
+                    onDismissRequest = { v2 = false },
+                    onDismissFinished = { sheet = 0 }
+                ) {
+                    Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                        ManagerDownloadPanel()
+                    }
+                }
+            }
+            if (sheet == 3) {
+                var v3 by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { v3 = true }
+                WindowBottomSheet(
+                    show = v3,
+                    title = "拓展开关",
+                    onDismissRequest = { v3 = false },
+                    onDismissFinished = { sheet = 0 }
+                ) {
+                    Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                        FeatureTogglePanel(controller, haptic)
+                    }
+                }
+            }
+            if (sheet == 5) {
+                WindowDialog(title = "越狱管理器", show = true, onDismissRequest = { sheet = 0 }) {
+                    Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
+                        JailManagerPanel(controller, haptic)
+                    }
+                }
+            }
+            if (sheet == 4) {
+                var v4 by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { v4 = true }
+                WindowBottomSheet(
+                    show = v4,
+                    title = "目标管理器",
+                    onDismissRequest = { v4 = false },
+                    onDismissFinished = { sheet = 0 }
+                ) {
+                    Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                        TargetPickerPanel(
+                            controller = controller,
+                            selected = hwTarget,
+                            onPick = { hwTarget = it; sheet = 0 }
+                        )
+                    }
+                }
+            }
 
             if (showDiagnostics) {
                 DiagnosticsDialog(
@@ -696,12 +798,45 @@ private fun VersionNoteRow(
 
 @Composable
 private fun ManualSection(title: String, lines: List<String>) {
-    Column(Modifier.padding(bottom = 12.dp)) {
-        Text(title, style = COUITheme.textStyles.headline2, color = COUITheme.colorScheme.primary)
-        lines.forEach { line ->
-            Row(Modifier.padding(top = 4.dp)) {
-                Text("· ", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
-                Text(line, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant)
+    val index = when {
+        title.startsWith("一") -> 1
+        title.startsWith("二") -> 2
+        title.startsWith("三") -> 3
+        title.startsWith("四") -> 4
+        title.startsWith("五") -> 5
+        else -> null
+    }
+    Card(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+        Row(Modifier.fillMaxWidth().padding(14.dp)) {
+            if (index != null) {
+                Box(
+                    Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(COUITheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("$index", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
+                }
+                Spacer(Modifier.width(12.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style = COUITheme.textStyles.body1,
+                    color = if (index != null) COUITheme.colorScheme.onSurface else COUITheme.colorScheme.primary
+                )
+                lines.forEach { line ->
+                    Row(Modifier.padding(top = 6.dp)) {
+                        Text("·", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            line,
+                            style = COUITheme.textStyles.body2,
+                            color = COUITheme.colorScheme.onSurfaceContainerVariant
+                        )
+                    }
+                }
             }
         }
     }
@@ -1030,6 +1165,8 @@ private fun TopBarContent(
                 }
             }
             1 -> {
+                Avatar(40)
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("运行日志", style = COUITheme.textStyles.headline1)
                     Text(
@@ -1049,6 +1186,8 @@ private fun TopBarContent(
                 }
             }
             2 -> {
+                Avatar(40)
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("越狱历史", style = COUITheme.textStyles.headline1)
                     Text(
@@ -1065,6 +1204,8 @@ private fun TopBarContent(
                 }
             }
             else -> {
+                Avatar(40)
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("关于与设置", style = COUITheme.textStyles.headline1)
                     Text(
@@ -1245,6 +1386,11 @@ private fun HomeScreen(
     onDiagnostics: () -> Unit,
     onOpenLog: () -> Unit,
     onRunJailbreak: () -> Unit,
+    onOpenAbout: () -> Unit,
+    onOpenManual: () -> Unit,
+    targetLabel: String,
+    targetSelectable: Boolean,
+    onOpenSheet: (Int) -> Unit,
     contentPadding: PaddingValues,
 ) {
     val context = LocalContext.current
@@ -1284,11 +1430,41 @@ private fun HomeScreen(
                 )
             }
         }
-        if (showAdvanced) {
-            item { OptionsCard(controller, haptic, onOpenLog) }
-            item { ManagerCard(controller, haptic) }
-        }
         item { ActionCard(controller, haptic, onDiagnostics, onRunJailbreak) }
+        if (showAdvanced) {
+            item { SectionTitle("拓展功能") }
+            item {
+                OptionsCard(
+                    controller = controller,
+                    haptic = haptic,
+                    targetLabel = targetLabel,
+                    targetSelectable = targetSelectable,
+                    onOpenSheet = onOpenSheet
+                )
+            }
+
+        }
+        item { SectionTitle("更多") }
+        item {
+            ListCard(
+                rows = listOf(
+                    ListRow(
+                        title = "用户手册",
+                        summary = "从零开始，5 分钟完成越狱",
+                        icon = COUIIcons.Help,
+                        arrow = true,
+                        onClick = { haptic(CouiHapticEffect.Switch); onOpenManual() }
+                    ),
+                    ListRow(
+                        title = "关于 OneKey",
+                        summary = "v" + BuildConfig.VERSION_NAME + " · " + BuildConfig.VERSION_CODE,
+                        icon = COUIIcons.Info,
+                        arrow = true,
+                        onClick = { haptic(CouiHapticEffect.Switch); onOpenAbout() }
+                    )
+                )
+            )
+        }
         item { ExploitCard(controller, haptic) }
     }
 }
@@ -1309,43 +1485,96 @@ private fun HiddenEnvCard(
     }
 }
 
+
 @Composable
 private fun HeroCard(controller: JailbreakController) {
     Card {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    controller.profile?.displayName ?: "OnePlus",
-                    style = COUITheme.textStyles.headline1
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "98260 越狱链" +
-                            " · " + when {
-                                controller.suCompatReady -> "SU 就绪"
-                                controller.rootedThisBoot -> "已越狱（服务离线）"
-                                else -> "未提权"
-                            },
-                    style = COUITheme.textStyles.body2,
-                    color = COUITheme.colorScheme.onSurfaceContainerVariant
-                )
-            }
-            Surface(
-                shape = CircleShape,
-                color = if (controller.serviceReady) COUITheme.colorScheme.primary.copy(alpha = 0.16f)
-                        else COUITheme.colorScheme.surfaceContainer
-            ) {
-                Text(
-                    if (controller.serviceReady) "服务在线" else "服务离线",
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        controller.profile?.displayName ?: "OnePlus",
+                        style = COUITheme.textStyles.headline1
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "98260 越狱链" + " · " + when {
+                            controller.suCompatReady -> "SU 就绪"
+                            controller.rootedThisBoot -> "已越狱"
+                            else -> "未提权"
+                        },
+                        style = COUITheme.textStyles.body2,
+                        color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Surface(
+                    shape = CircleShape,
                     color = if (controller.serviceReady) COUITheme.colorScheme.primary
-                            else COUITheme.colorScheme.onSurfaceContainerVariant,
-                    style = COUITheme.textStyles.body2,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                            else COUITheme.colorScheme.surfaceContainer
+                ) {
+                    Text(
+                        if (controller.serviceReady) "服务在线" else "服务离线",
+                        color = if (controller.serviceReady) COUITheme.colorScheme.onPrimary
+                                else COUITheme.colorScheme.onSurfaceContainerVariant,
+                        style = COUITheme.textStyles.body2,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HeroCell(
+                    "服务通道",
+                    if (controller.serviceReady && controller.serviceGranted) "已授权"
+                    else if (controller.serviceReady) "待授权" else "未连接",
+                    COUIIcons.Ok,
+                    Modifier.weight(1f)
+                )
+                HeroCell(
+                    "SU 权限",
+                    if (controller.suCompatReady) "已就绪"
+                    else if (controller.rootedThisBoot) "已越狱" else "未就绪",
+                    COUIIcons.Lock,
+                    Modifier.weight(1f)
                 )
             }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HeroCell(
+                    "热切换",
+                    if (controller.hotSwitchAvailable) "可用" else "不可用",
+                    COUIIcons.Refresh,
+                    Modifier.weight(1f)
+                )
+                HeroCell(
+                    "本次开机",
+                    if (controller.rootedThisBoot) "已越狱" else "未越狱",
+                    COUIIcons.Info,
+                    Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroCell(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = COUITheme.colorScheme.primary,
+            modifier = Modifier.width(20.dp).height(20.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text(label, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant)
+            Text(value, style = COUITheme.textStyles.body1)
         }
     }
 }
@@ -1473,308 +1702,448 @@ private fun ManagerCard(controller: JailbreakController, haptic: (CouiHapticEffe
 private fun OptionsCard(
     controller: JailbreakController,
     haptic: (CouiHapticEffect) -> Unit,
-    onOpenLog: () -> Unit,
+    targetLabel: String,
+    targetSelectable: Boolean,
+    onOpenSheet: (Int) -> Unit,
 ) {
-    Card {
-        Column(Modifier.padding(4.dp)) {
-            BasicComponent(
-                title = "拓展功能",
-                summary = "越狱成功后自动生效，可随时关掉",
-                startAction = { Icon(COUIIcons.Settings, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }
+    val hotSummary = when {
+        controller.hotSwitchAvailable -> "当前 " + controller.activeKernelManager.ifBlank { "未知" }
+        controller.hotSwitchLoaderInstalled -> "通用加载器已安装，重启后运行一次越狱即可启用"
+        else -> "未启用，需先安装通用加载器"
+    }
+    ListCard(
+        rows = listOf(
+            ListRow(
+                title = "管理器热切换",
+                summary = hotSummary,
+                icon = COUIIcons.Replace,
+                arrow = true,
+                onClick = { haptic(CouiHapticEffect.Switch); onOpenSheet(1) }
+            ),
+            ListRow(
+                title = "目标管理器",
+                summary = targetLabel,
+                icon = COUIIcons.GridView,
+                arrow = true,
+                enabled = targetSelectable,
+                onClick = { haptic(CouiHapticEffect.Switch); onOpenSheet(4) }
+            ),
+            ListRow(
+                title = "越狱管理器",
+                summary = controller.managers.firstOrNull { it.kind == controller.selectedManager }?.label ?: "未选择",
+                icon = COUIIcons.Tasks,
+                arrow = true,
+                onClick = { haptic(CouiHapticEffect.Switch); onOpenSheet(5) }
+            ),
+            ListRow(
+                title = "管理器下载",
+                summary = "五家官方最新正式版",
+                icon = COUIIcons.Download,
+                arrow = true,
+                onClick = { haptic(CouiHapticEffect.Switch); onOpenSheet(2) }
+            ),
+            ListRow(
+                title = "拓展开关",
+                summary = "SUSFS / VFS / 卸载保护 / 反检测 / 软重启",
+                icon = COUIIcons.Tune,
+                arrow = true,
+                onClick = { haptic(CouiHapticEffect.Switch); onOpenSheet(3) }
             )
-            // 管理器热切换：需要内核模块暴露 /proc/kernelsu_manager 节点。
+        )
+    )
+}
+
+@Composable
+private fun HotSwitchPanel(
+    controller: JailbreakController,
+    haptic: (CouiHapticEffect) -> Unit,
+    selectedTarget: String,
+    onPickTarget: () -> Unit,
+) {
+    val nodeReady = controller.hotSwitchAvailable
+    val loaderInstalled = controller.hotSwitchLoaderInstalled
+    val canSwitch = nodeReady && controller.suCompatReady && !controller.running &&
+        !controller.preparing && selectedTarget.isNotBlank() && !controller.isSwitchingManager
+    val targetLabel = controller.managers.firstOrNull { it.kind == selectedTarget }?.label ?: "未安装"
+
+    Column(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = COUITheme.colorScheme.surface
+                shape = CircleShape,
+                color = if (nodeReady) COUITheme.colorScheme.primary else COUITheme.colorScheme.surfaceContainer
             ) {
-                Column(Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(COUIIcons.Refresh, contentDescription = null, modifier = Modifier.size(20.dp), tint = COUITheme.colorScheme.primary)
-                        Spacer(Modifier.width(8.dp))
-                        Text("管理器热切换", style = COUITheme.textStyles.headline2)
-                    }
-                    Text(
-                        text = if (controller.hotSwitchAvailable)
-                            "当前 " + controller.activeKernelManager.ifBlank { "未知" } + "；切换只改内核 profile，不重启、不重新越狱。"
-                        else if (controller.hotSwitchLoaderInstalled)
-                            "通用加载器已安装；请重启手机，然后重新运行一次越狱以加载通用模块。"
-                        else if (!controller.serviceReady)
-                            "服务离线，启动 Stellar 并授权后可检测热切换节点。"
-                        else if (controller.rootedThisBoot)
-                            "已越狱；当前加载的是单管理器模块。开启下方通用模块并重启后运行，即可启用热切换。"
-                        else
-                            "尚未越狱，热切换不可用。",
-                        style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurfaceContainerVariant,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
-                    )
-                    var selectorOpen by remember { mutableStateOf(false) }
-                    val installed = controller.managers.filter { it.installedVersionCode != null && it.certOk }
-                    var selectedTarget by remember { mutableStateOf(installed.firstOrNull()?.kind.orEmpty()) }
-                    LaunchedEffect(installed.map { it.kind }, controller.activeKernelManager) {
-                        if (installed.none { it.kind == selectedTarget }) selectedTarget = installed.firstOrNull()?.kind.orEmpty()
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(COUITheme.colorScheme.surfaceContainer)
-                            .clickable(enabled = installed.isNotEmpty() && !controller.running) { selectorOpen = true }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("目标管理器", style = COUITheme.textStyles.body2)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                controller.managers.firstOrNull { it.kind == selectedTarget }?.label ?: "未安装",
-                                style = COUITheme.textStyles.body2,
-                                color = COUITheme.colorScheme.primary
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text("选择", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant)
-                        }
-                    }
-                    if (selectorOpen) {
-                        WindowDialog(title = "选择目标管理器", show = true, onDismissRequest = { selectorOpen = false }) {
-                            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)) {
-                                controller.managers.forEach { option ->
-                                    val available = option.installedVersionCode != null && option.certOk
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                            .clickable(enabled = available) { selectedTarget = option.kind; selectorOpen = false }
-                                            .padding(vertical = 12.dp, horizontal = 8.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(option.label, style = COUITheme.textStyles.body1, color = if (available) COUITheme.colorScheme.onSurface else COUITheme.colorScheme.onSurfaceContainerVariant)
-                                        when {
-                                            option.kind == selectedTarget && available -> Icon(COUIIcons.Ok, contentDescription = "已选", tint = COUITheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                            option.installedVersionCode == null -> Text("未安装", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.error)
-                                            !option.certOk -> Text("签名不符", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.error)
-                                        }
-                                    }
-                                }
-                                DialogActions(DialogAction("取消", COUIIcons.Close) { selectorOpen = false })
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Column(Modifier.fillMaxWidth()) {
-                        Text(
-                            if (controller.hotSwitchLoaderInstalled) "通用加载器：已安装" else "通用加载器：未安装",
-                            style = COUITheme.textStyles.body1,
-                            color = if (controller.hotSwitchLoaderInstalled) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurface
-                        )
-                        Text(
-                            "热切换需要通用模块。安装会备份并替换管理器目录下的 libksud.so，可随时还原；" +
-                                "安装后需重启手机并重新运行一次越狱。",
-                            style = COUITheme.textStyles.body2,
-                            color = COUITheme.colorScheme.onSurfaceContainerVariant
-                        )
-                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Surface(
-                                onClick = {
-                                    haptic(CouiHapticEffect.Switch)
-                                    controller.installHotSwitchLoader { ok, msg ->
-                                        controller.addLog(if (ok) "加载器：" + msg else "加载器：" + msg)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f).height(40.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                enabled = !controller.loaderBusy && controller.suCompatReady,
-                                color = COUITheme.colorScheme.surfaceContainer
-                            ) {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("安装加载器", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
-                                }
-                            }
-                            Surface(
-                                onClick = {
-                                    haptic(CouiHapticEffect.Switch)
-                                    controller.rebootDevice()
-                                },
-                                modifier = Modifier.weight(1f).height(40.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                enabled = !controller.loaderBusy && controller.suCompatReady,
-                                color = COUITheme.colorScheme.primary
-                            ) {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("重启手机", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onPrimary)
-                                }
-                            }
-                        }
-                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Surface(
-                                onClick = {
-                                    haptic(CouiHapticEffect.Switch)
-                                    controller.restoreHotSwitchLoader { _, _ -> }
-                                },
-                                modifier = Modifier.weight(1f).height(40.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                enabled = !controller.loaderBusy && controller.suCompatReady,
-                                color = COUITheme.colorScheme.surfaceContainer
-                            ) {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("还原加载器", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant)
-                                }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    val canSwitch = controller.hotSwitchAvailable && controller.suCompatReady && !controller.running && !controller.preparing && selectedTarget.isNotBlank() && !controller.isSwitchingManager
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Surface(
-                            onClick = { haptic(CouiHapticEffect.Switch); controller.refreshState() },
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = COUITheme.colorScheme.surfaceContainer
-                        ) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("检测", style = COUITheme.textStyles.body1, color = COUITheme.colorScheme.primary)
-                            }
-                        }
-                        Surface(
-                            onClick = {
-                                haptic(CouiHapticEffect.Switch)
-                                controller.executeHotSwitch(selectedTarget) { _, _ -> }
-                            },
-                            modifier = Modifier.weight(2f).height(44.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            enabled = canSwitch,
-                            color = if (canSwitch) COUITheme.colorScheme.primary else COUITheme.colorScheme.surfaceContainer
-                        ) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    if (controller.isSwitchingManager) "切换中…" else "切换",
-                                    style = COUITheme.textStyles.body1,
-                                    color = if (canSwitch) COUITheme.colorScheme.onPrimary else COUITheme.colorScheme.onSurfaceContainerVariant
-                                )
-                            }
-                        }
-                    }
-                    if (controller.hotSwitchMessage.isNotBlank()) {
-                        Text(controller.hotSwitchMessage, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant, modifier = Modifier.padding(top = 8.dp))
-                    }
-                    if (controller.activeKernelRaw.isNotBlank()) {
-                        Text(
-                            "primary：" + controller.activeKernelRaw,
-                            style = COUITheme.textStyles.body2,
-                            color = COUITheme.colorScheme.onSurfaceContainerVariant,
-                            modifier = Modifier.padding(top = 6.dp)
-                        )
-                    }
-                    if (controller.probeDetail.isNotBlank()) {
-                        Text(
-                            controller.probeDetail,
-                            style = COUITheme.textStyles.body2,
-                            color = COUITheme.colorScheme.onSurfaceContainerVariant,
-                            modifier = Modifier.padding(top = 6.dp)
-                        )
-                    }
+                Text(
+                    if (nodeReady) "节点就绪" else "未就绪",
+                    style = COUITheme.textStyles.body2,
+                    color = if (nodeReady) COUITheme.colorScheme.onPrimary else COUITheme.colorScheme.onSurfaceContainerVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                "当前 " + controller.activeKernelManager.ifBlank { "未启用" },
+                style = COUITheme.textStyles.body1,
+                color = COUITheme.colorScheme.primary
+            )
+        }
+        Text(
+            text = when {
+                nodeReady -> "切换只改内核 profile，不重启、不重新越狱。"
+                loaderInstalled -> "通用加载器已安装；重启手机后重新运行一次越狱即可启用。"
+                !controller.serviceReady -> "服务离线，启动 Stellar 并授权后可检测热切换节点。"
+                else -> "热切换需要通用模块。安装后重启手机并重新运行一次越狱即可启用。"
+            },
+            style = COUITheme.textStyles.body2,
+            color = COUITheme.colorScheme.onSurfaceContainerVariant,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        // 目标管理器：只在可以切换时才需要，未就绪时不占地方。
+        if (nodeReady) {
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(COUITheme.colorScheme.surfaceContainer)
+                    .clickable(enabled = !controller.running) { onPickTarget() }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("目标管理器", style = COUITheme.textStyles.body1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(targetLabel, style = COUITheme.textStyles.body1, color = COUITheme.colorScheme.primary)
+                    Spacer(Modifier.width(6.dp))
+                    Icon(COUIIcons.ChevronForward, contentDescription = null, modifier = Modifier.size(16.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant)
                 }
             }
-            // 管理器下载：直接指向各家官方最新正式版。
-            Surface(
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = COUITheme.colorScheme.surface
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        // 按钮按当前阶段收敛：未装只给「安装」，已装未生效只给「重启」，就绪后才出现「切换」。
+        when {
+            !loaderInstalled -> {
+                PanelButton(
+                    text = "安装通用加载器",
+                    primary = true,
+                    enabled = !controller.loaderBusy && controller.suCompatReady,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    haptic(CouiHapticEffect.Switch)
+                    controller.installHotSwitchLoader { _, msg -> controller.addLog("加载器：" + msg) }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "安装会备份并替换管理器目录下的 libksud.so，可随时还原。",
+                    style = COUITheme.textStyles.body2,
+                    color = COUITheme.colorScheme.onSurfaceContainerVariant
+                )
+            }
+            !nodeReady -> {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PanelButton(
+                        text = "重启手机",
+                        primary = true,
+                        enabled = !controller.loaderBusy && controller.suCompatReady,
+                        modifier = Modifier.weight(1f)
+                    ) { haptic(CouiHapticEffect.Switch); controller.rebootDevice() }
+                    PanelButton(
+                        text = "检测",
+                        modifier = Modifier.weight(1f)
+                    ) { haptic(CouiHapticEffect.Switch); controller.refreshState() }
+                }
+                Spacer(Modifier.height(8.dp))
+                PanelButton(
+                    text = "还原加载器",
+                    enabled = !controller.loaderBusy && controller.suCompatReady,
+                    modifier = Modifier.fillMaxWidth()
+                ) { haptic(CouiHapticEffect.Switch); controller.restoreHotSwitchLoader { _, _ -> } }
+            }
+            else -> {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PanelButton(
+                        text = if (controller.isSwitchingManager) "切换中…" else "切换",
+                        primary = true,
+                        enabled = canSwitch,
+                        modifier = Modifier.weight(2f)
+                    ) { haptic(CouiHapticEffect.Switch); controller.executeHotSwitch(selectedTarget) { _, _ -> } }
+                    PanelButton(
+                        text = "检测",
+                        modifier = Modifier.weight(1f)
+                    ) { haptic(CouiHapticEffect.Switch); controller.refreshState() }
+                }
+                Spacer(Modifier.height(8.dp))
+                PanelButton(
+                    text = "还原加载器",
+                    enabled = !controller.loaderBusy && controller.suCompatReady,
+                    modifier = Modifier.fillMaxWidth()
+                ) { haptic(CouiHapticEffect.Switch); controller.restoreHotSwitchLoader { _, _ -> } }
+            }
+        }
+
+        if (controller.hotSwitchMessage.isNotBlank()) {
+            Text(
+                controller.hotSwitchMessage,
+                style = COUITheme.textStyles.body2,
+                color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                modifier = Modifier.padding(top = 10.dp)
+            )
+        }
+        if (controller.activeKernelRaw.isNotBlank()) {
+            Text(
+                "primary：" + controller.activeKernelRaw,
+                style = COUITheme.textStyles.body2,
+                color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+        if (controller.probeDetail.isNotBlank()) {
+            Text(
+                controller.probeDetail,
+                style = COUITheme.textStyles.body2,
+                color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+    }
+}
+
+/** 目标管理器选择列表。 */
+@Composable
+private fun TargetPickerPanel(
+    controller: JailbreakController,
+    selected: String,
+    onPick: (String) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        controller.managers.forEach { option ->
+            val available = option.installedVersionCode != null && option.certOk
+            val isSelected = option.kind == selected
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(enabled = available) { onPick(option.kind) }
+                    .padding(vertical = 12.dp, horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val downloadContext = LocalContext.current
-                Column(Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(COUIIcons.Download, contentDescription = null, modifier = Modifier.size(20.dp), tint = COUITheme.colorScheme.primary)
-                        Spacer(Modifier.width(8.dp))
-                        Text("管理器下载", style = COUITheme.textStyles.headline2)
-                    }
+                Column(Modifier.weight(1f)) {
                     Text(
-                        "均为官方最新正式版，下载后直接安装即可；已装管理器无需重复下载。",
-                        style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurfaceContainerVariant,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
+                        option.label,
+                        style = COUITheme.textStyles.body1,
+                        color = if (available) COUITheme.colorScheme.onSurface else COUITheme.colorScheme.onSurfaceContainerVariant
                     )
-                    ManagerDownloads.all.forEach { item ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { openUrl(downloadContext, item.apkUrl) }
-                                .padding(horizontal = 8.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(item.label, style = COUITheme.textStyles.body1)
-                                Text(
-                                    item.version + " · " + item.versionCode,
-                                    style = COUITheme.textStyles.body2,
-                                    color = COUITheme.colorScheme.onSurfaceContainerVariant
-                                )
-                            }
-                            Text("下载", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
-                        }
-                    }
                     Text(
-                        "打不开下载页时可复制发布页链接到浏览器。",
+                        when {
+                            option.installedVersionCode == null -> "未安装"
+                            !option.certOk -> "签名不符"
+                            else -> "已安装 v" + (option.installedVersion ?: "-") + " · 可运行时就绪"
+                        },
                         style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurfaceContainerVariant,
-                        modifier = Modifier.padding(top = 6.dp)
+                        color = if (available) COUITheme.colorScheme.onSurfaceContainerVariant else COUITheme.colorScheme.error
+                    )
+                }
+                if (isSelected && available) {
+                    Icon(COUIIcons.Ok, contentDescription = "已选", tint = COUITheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+    }
+}
+
+/** 越狱管理器选择列表。 */
+@Composable
+private fun JailManagerPanel(
+    controller: JailbreakController,
+    haptic: (CouiHapticEffect) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        if (controller.visibleManagers.isEmpty()) {
+            Text(
+                "未检测到管理器，请先安装列表中的固定版本。",
+                style = COUITheme.textStyles.body2,
+                color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                modifier = Modifier.padding(vertical = 12.dp)
+            )
+        }
+        controller.visibleManagers.forEach { manager ->
+            val selectable = !controller.running && manager.supported && manager.installedVersionCode != null &&
+                manager.certOk && (if (controller.adaptiveManagerEnabled) true
+                else (manager.kind != "finasu" && manager.installedVersionCode == manager.expectedVersionCode))
+            val isSelected = controller.selectedManager == manager.kind
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(enabled = selectable) {
+                        haptic(CouiHapticEffect.Switch); controller.selectManager(manager.kind)
+                    }
+                    .padding(vertical = 12.dp, horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        manager.label,
+                        style = COUITheme.textStyles.body1,
+                        color = if (selectable) COUITheme.colorScheme.onSurface else COUITheme.colorScheme.onSurfaceContainerVariant
+                    )
+                    Text(
+                        manager.statusText,
+                        style = COUITheme.textStyles.body2,
+                        color = COUITheme.colorScheme.onSurfaceContainerVariant
+                    )
+                }
+                RadioButton(
+                    selected = isSelected,
+                    onClick = null,
+                    enabled = selectable
+                )
+            }
+        }
+    }
+}
+
+/** 抽屉内的操作按钮：主色实心或浅底两种。 */
+@Composable
+private fun PanelButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    primary: Boolean = false,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(46.dp),
+        shape = RoundedCornerShape(14.dp),
+        enabled = enabled,
+        color = if (primary && enabled) COUITheme.colorScheme.primary else COUITheme.colorScheme.surfaceContainer
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text,
+                style = COUITheme.textStyles.body1,
+                color = when {
+                    primary && enabled -> COUITheme.colorScheme.onPrimary
+                    enabled -> COUITheme.colorScheme.primary
+                    else -> COUITheme.colorScheme.onSurfaceContainerVariant
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ManagerDownloadPanel(
+) {
+    val downloadContext = LocalContext.current
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            "均为官方最新正式版，下载后直接安装即可；已装管理器无需重复下载。",
+            style = COUITheme.textStyles.body2,
+            color = COUITheme.colorScheme.onSurfaceContainerVariant,
+            modifier = Modifier.padding(bottom = 10.dp)
+        )
+        ManagerDownloads.all.forEach { item ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable { openUrl(downloadContext, item.apkUrl) }
+                    .padding(vertical = 12.dp, horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(item.label, style = COUITheme.textStyles.body1)
+                    Text(
+                        item.version + " · " + item.versionCode,
+                        style = COUITheme.textStyles.body2,
+                        color = COUITheme.colorScheme.onSurfaceContainerVariant
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("下载", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
+                    Spacer(Modifier.width(2.dp))
+                    Icon(
+                        COUIIcons.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = COUITheme.colorScheme.primary
                     )
                 }
             }
-            BasicComponent(
+        }
+        Text(
+            "打不开下载页时，可复制发布页链接到浏览器打开。",
+            style = COUITheme.textStyles.body2,
+            color = COUITheme.colorScheme.onSurfaceContainerVariant,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun FeatureTogglePanel(
+    controller: JailbreakController,
+    haptic: (CouiHapticEffect) -> Unit,
+) {
+    ListCard(
+        rows = listOf(
+            ListRow(
                 title = "越狱后禁用安全弹窗",
                 summary = "停用安全守护与安全中心，不影响截屏",
-                startAction = { Icon(COUIIcons.Lock, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                endActions = {
+                icon = COUIIcons.Lock,
+                end = {
                     Switch(
                         checked = controller.antiRootGuard,
                         onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateAntiRootGuard(it) },
                         enabled = !controller.running
                     )
                 }
-            )
-            BasicComponent(
+            ),
+            ListRow(
                 title = "越狱后软重启",
                 summary = "ColorOS 拦截原生调用时，软重启用户态恢复 root",
-                startAction = { Icon(COUIIcons.Refresh, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                endActions = {
+                icon = COUIIcons.Refresh,
+                end = {
                     Switch(
                         checked = controller.softRebootFix,
                         onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateSoftRebootFix(it) },
                         enabled = !controller.running
                     )
                 }
-            )
-            BasicComponent(
+            ),
+            ListRow(
                 title = "越狱后卸载内核安全防护",
                 summary = "卸载 oplus_secure_guard 等内核防护模块",
-                startAction = { Icon(COUIIcons.Unlock, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                endActions = {
+                icon = COUIIcons.Unlock,
+                end = {
                     Switch(
                         checked = controller.unloadKernelGuard,
                         onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateUnloadKernelGuard(it) },
                         enabled = !controller.running
                     )
                 }
-            )
-            BasicComponent(
+            ),
+            ListRow(
                 title = "SUSFS 支持",
                 summary = "加载 SUSFS 隐藏模块（需要执行器侧配合）",
-                startAction = { Icon(COUIIcons.Lock, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                endActions = {
+                icon = COUIIcons.Hide,
+                end = {
                     Switch(
                         checked = controller.susfsEnabled,
                         onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateSusfs(it) },
                         enabled = !controller.running
                     )
                 }
-            )
-            BasicComponent(
+            ),
+            ListRow(
                 title = "VFS 支持",
                 summary = "加载 hybridmount VFS 重定向（仅 6.18 内核）",
-                startAction = { Icon(COUIIcons.Tasks, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                endActions = {
+                icon = COUIIcons.Tasks,
+                end = {
                     Switch(
                         checked = controller.vfsEnabled,
                         onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateVfs(it) },
@@ -1782,8 +2151,8 @@ private fun OptionsCard(
                     )
                 }
             )
-        }
-    }
+        )
+    )
 }
 
 @Composable
@@ -1955,40 +2324,106 @@ private fun HistoryScreen(
             }
         }
     } else {
+        var filter by remember { mutableIntStateOf(0) }
+        val filtered = records.filter {
+            when (filter) {
+                1 -> it.status == "ok"
+                2 -> it.status != "ok"
+                else -> true
+            }
+        }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            items(records.size) { idx ->
-                val r = records[idx]
-                val isOk = r.status == "ok"
-                Card {
-                    BasicComponent(
-                        title = (if (isOk) "越狱成功 · " else "越狱中断 · ") + (if (r.exploit == "cve98260") "98260" else "64560") + (if (r.adaptive) " (自适应)" else ""),
-                        summary = HistoryStore.formatTime(r.startedAt) + " · 管理器 " + r.manager + " · 耗时 " + r.durationSec + "s · v" + r.versionName,
-                        startAction = {
-                            Icon(
-                                if (isOk) COUIIcons.Ok else COUIIcons.Close,
-                                contentDescription = null,
-                                modifier = Modifier.padding(end = 12.dp),
-                                tint = if (isOk) COUITheme.colorScheme.primary else COUITheme.colorScheme.error
+            item {
+                Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.End) {
+                    listOf("全部", "成功", "失败").forEachIndexed { index, label ->
+                        val on = filter == index
+                        Surface(
+                            onClick = { haptic(CouiHapticEffect.Switch); filter = index },
+                            shape = CircleShape,
+                            color = if (on) COUITheme.colorScheme.primary else Color.Transparent,
+                            modifier = Modifier.padding(start = 6.dp)
+                        ) {
+                            Text(
+                                label,
+                                style = COUITheme.textStyles.body2,
+                                color = if (on) COUITheme.colorScheme.onPrimary else COUITheme.colorScheme.onSurfaceContainerVariant,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                             )
-                        },
-                        onClick = { haptic(CouiHapticEffect.Switch); selected = r }
-                    )
+                        }
+                    }
+                }
+            }
+            listOf(0 to "今日", 1 to "昨日", 2 to "更早").forEach { (bucket, label) ->
+                val groupRows = filtered.filter { historyDayBucket(it.startedAt) == bucket }
+                if (groupRows.isNotEmpty()) {
+                    item { SectionTitle(label + " · " + groupRows.size + " 条") }
+                    item {
+                        ListCard(
+                            rows = groupRows.map { rec ->
+                                val isOk = rec.status == "ok"
+                                ListRow(
+                                    title = (if (isOk) "越狱成功" else "越狱中断") +
+                                        " · 用时 " + rec.durationSec + " 秒",
+                                    summary = HistoryStore.formatTime(rec.startedAt) + " · " + rec.manager +
+                                        " · v" + rec.versionName,
+                                    icon = if (isOk) COUIIcons.Ok else COUIIcons.Close,
+                                    iconTint = if (isOk) COUITheme.colorScheme.primary else COUITheme.colorScheme.error,
+                                    arrow = true,
+                                    onClick = { haptic(CouiHapticEffect.Switch); selected = rec }
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+            if (filtered.isEmpty()) {
+                item {
+                    Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                        Text(
+                            "当前筛选下没有记录",
+                            style = COUITheme.textStyles.body2,
+                            color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
                 }
             }
             item {
-                Spacer(Modifier.height(8.dp))
-                Button(
+                Spacer(Modifier.height(16.dp))
+                Surface(
                     onClick = { haptic(CouiHapticEffect.Switch); onClearRequest() },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(46.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = COUITheme.colorScheme.surfaceContainer
                 ) {
-                    ButtonIconText(COUIIcons.Delete, "清空全部历史记录")
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("清空全部历史记录", style = COUITheme.textStyles.body1, color = COUITheme.colorScheme.error)
+                    }
                 }
+                Spacer(Modifier.height(12.dp))
             }
         }
+    }
+}
+
+/** 历史记录按天分桶：0 今日、1 昨日、2 更早。 */
+private fun historyDayBucket(ts: Long): Int {
+    val cal = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.HOUR_OF_DAY, 0)
+        set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0)
+        set(java.util.Calendar.MILLISECOND, 0)
+    }
+    val today = cal.timeInMillis
+    val yesterday = today - 86_400_000L
+    return when {
+        ts >= today -> 0
+        ts >= yesterday -> 1
+        else -> 2
     }
 }
 
@@ -2006,7 +2441,16 @@ private fun LogScreen(
     val sec = controller.elapsedSeconds
     val elapsedText = (sec / 60).toString().padStart(2, '0') + ":" + (sec % 60).toString().padStart(2, '0')
     val listState = rememberLazyListState()
-    LaunchedEffect(logs.size) { if (logs.isNotEmpty()) listState.animateScrollToItem(logs.size - 1) }
+    var autoScroll by remember { mutableStateOf(true) }
+    var filter by remember { mutableIntStateOf(0) }
+    val filtered = when (filter) {
+        1 -> logs.filter { logLevel(it) == 0 }
+        2 -> logs.filter { logLevel(it) >= 1 }
+        else -> logs
+    }
+    LaunchedEffect(filtered.size, autoScroll, filter) {
+        if (autoScroll && filtered.isNotEmpty()) listState.animateScrollToItem(filtered.size - 1)
+    }
 
     if (logs.isEmpty()) {
         FullPageStatement(
@@ -2016,20 +2460,82 @@ private fun LogScreen(
             onPrimaryButtonClick = onGoHome,
             modifier = Modifier.fillMaxSize().padding(contentPadding)
         )
-    } else {
-        Column(Modifier.fillMaxSize().padding(contentPadding)) {
-            Text("已用时间 " + elapsedText, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
-            RunFlow(controller.progress, controller.running, controller.lastResultOk)
-            LinearProgressIndicator(progress = controller.progress, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp))
-            Card(Modifier.fillMaxSize().padding(top = 8.dp)) {
-                LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(10.dp)) {
-                    items(logs.size) { idx ->
+        return
+    }
+
+    Column(Modifier.fillMaxSize().padding(contentPadding)) {
+        Card {
+            Column(Modifier.fillMaxWidth().padding(14.dp)) {
+                RunFlow(controller.progress, controller.running, controller.lastResultOk)
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        COUIIcons.Timer,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = COUITheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("已用时间 " + elapsedText, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        controller.stage.ifBlank { if (controller.running) "运行中" else "就绪" },
+                        style = COUITheme.textStyles.body2,
+                        color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Card(Modifier.fillMaxWidth().weight(1f)) {
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf("全部", "警告", "错误").forEachIndexed { index, label ->
+                        val selected = filter == index
+                        Surface(
+                            onClick = { haptic(CouiHapticEffect.Switch); filter = index },
+                            shape = CircleShape,
+                            color = if (selected) COUITheme.colorScheme.primary else Color.Transparent,
+                            modifier = Modifier.padding(end = 6.dp)
+                        ) {
+                            Text(
+                                label,
+                                style = COUITheme.textStyles.body2,
+                                color = if (selected) COUITheme.colorScheme.onPrimary
+                                        else COUITheme.colorScheme.onSurfaceContainerVariant,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text("自动滚动", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant)
+                    Spacer(Modifier.width(6.dp))
+                    Switch(checked = autoScroll, onCheckedChange = { autoScroll = it })
+                }
+                HorizontalDivider()
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    items(filtered.size) { idx ->
+                        val line = filtered[idx]
+                        val color = when (logLevel(line)) {
+                            2 -> COUITheme.colorScheme.error
+                            1 -> Color(0xFFC77700)
+                            else -> if (logLevel(line) == 0 && isSuccessLog(line)) COUITheme.colorScheme.primary
+                                    else COUITheme.colorScheme.onSurface
+                        }
                         Text(
-                            logs[idx],
+                            line,
                             style = COUITheme.textStyles.body2,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
+                            color = color,
                             modifier = Modifier.padding(vertical = 1.dp)
                         )
                     }
@@ -2038,6 +2544,19 @@ private fun LogScreen(
         }
     }
 }
+
+/** 0 = 普通/成功，1 = 警告，2 = 错误。 */
+private fun logLevel(line: String): Int = when {
+    line.contains("失败") || line.contains("中止") || line.contains("错误") ||
+        line.contains("rc=-1") || line.contains("FAIL") || line.contains("MISSING") -> 2
+    line.contains("未命中") || line.contains("跳过") || line.contains("SKIP") ||
+        line.contains("警告") || line.contains("离线") -> 1
+    else -> 0
+}
+
+private fun isSuccessLog(line: String): Boolean =
+    line.contains("SU_ID_RC=0") || line.contains("已加载") || line.contains("成功") ||
+        line.contains("就绪") || line.contains("完成")
 
 @Composable
 private fun SmallTitle(text: String) {
@@ -2065,68 +2584,133 @@ private fun AboutScreen(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         item {
-            Card {
-                Column(Modifier.padding(16.dp)) {
-                    Text("OneKey v" + BuildConfig.VERSION_NAME, style = COUITheme.textStyles.subtitle)
-                    Text("作者 星苒鸭 · github.com/xingranya · xran.uk", style = COUITheme.textStyles.body2)
-                }
+            Column(
+                Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Avatar(72)
+                Spacer(Modifier.height(10.dp))
+                Text("OneKey", style = COUITheme.textStyles.headline1)
+                Text(
+                    "v" + BuildConfig.VERSION_NAME + " · " + BuildConfig.VERSION_CODE,
+                    style = COUITheme.textStyles.body2,
+                    color = COUITheme.colorScheme.onSurfaceContainerVariant
+                )
             }
         }
-        item { SmallTitle("个性化与组件") }
+        item { SectionTitle("设备") }
         item {
-            Card {
-                Column {
-                    BasicComponent(
-                        title = "主题色 · 星苒粉 #FFC0CB",
-                        summary = if (themeMode == "pink") "当前：星苒粉（切换为动态取色）" else "当前：动态取色（跟随壁纸）",
-                        startAction = { Icon(COUIIcons.Theme, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                        onClick = { haptic(CouiHapticEffect.Switch); onToggleTheme() },
-                        endActions = {
+            ListCard(
+                rows = listOf(
+                    ListRow(
+                        title = "设备",
+                        summary = (controller.profile?.displayName ?: "OnePlus") + " · " +
+                            (controller.profile?.model ?: "UNKNOWN"),
+                        icon = COUIIcons.Info
+                    ),
+                    ListRow(
+                        title = "内核",
+                        summary = System.getProperty("os.version") ?: "未知",
+                        icon = COUIIcons.Tasks
+                    ),
+                    ListRow(
+                        title = "模块",
+                        summary = if (controller.hotSwitchLoaderInstalled) "通用多管理器（已安装加载器）" else "管理器自带模块",
+                        icon = COUIIcons.Replace
+                    )
+                )
+            )
+        }
+        item { SectionTitle("个性化") }
+        item {
+            ListCard(
+                rows = listOf(
+                    ListRow(
+                        title = "主题色",
+                        summary = if (themeMode == "pink") "星苒粉 #FFC0CB" else "动态取色（跟随壁纸）",
+                        icon = COUIIcons.Theme,
+                        end = {
                             Switch(
                                 checked = themeMode == "pink",
                                 onCheckedChange = { haptic(CouiHapticEffect.Switch); onToggleTheme() }
                             )
                         }
-                    )
-                    BasicComponent(
+                    ),
+                    ListRow(
                         title = "自动匹配云端组件",
-                        summary = if (controller.cloudAuto) "按当前设备和管理器自动获取模块" else "仅使用本机固定组件",
-                        startAction = { Icon(COUIIcons.Update, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                        endActions = {
+                        summary = if (controller.cloudAuto) "按设备与管理器自动获取模块" else "仅使用本机固定组件",
+                        icon = COUIIcons.Update,
+                        end = {
                             Switch(
                                 checked = controller.cloudAuto,
-                                onCheckedChange = {
-                                    haptic(CouiHapticEffect.Switch)
-                                    controller.updateCloudAuto(it)
-                                },
+                                onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateCloudAuto(it) },
                                 enabled = !controller.running
                             )
                         }
                     )
-                    BasicComponent(
+                )
+            )
+        }
+        item { SectionTitle("支持与说明") }
+        item {
+            ListCard(
+                rows = listOf(
+                    ListRow(
                         title = "检查更新",
                         summary = if (controller.checkingUpdate) "正在检查…" else controller.updateStatus,
-                        startAction = { Icon(COUIIcons.Refresh, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
+                        icon = COUIIcons.Refresh,
+                        arrow = true,
                         onClick = { haptic(CouiHapticEffect.Switch); controller.checkUpdates() }
+                    ),
+                    ListRow(
+                        title = "用户手册",
+                        summary = "首次使用、拓展功能说明与异常处理",
+                        icon = COUIIcons.Notes,
+                        arrow = true,
+                        onClick = onManual
+                    ),
+                    ListRow(
+                        title = "免费声明与赞赏码",
+                        summary = "群内免费 · 禁止倒卖",
+                        icon = COUIIcons.Help,
+                        arrow = true,
+                        onClick = onNotice
+                    ),
+                    ListRow(
+                        title = "COUI 组件库",
+                        summary = "github.com/suqi8/coui",
+                        icon = COUIIcons.Link,
+                        arrow = true,
+                        onClick = { openUrl(context, "https://github.com/suqi8/coui") }
+                    ),
+                    ListRow(
+                        title = "Stellar",
+                        summary = "github.com/roro2239/Stellar",
+                        icon = COUIIcons.Link,
+                        arrow = true,
+                        onClick = { openUrl(context, "https://github.com/roro2239/Stellar") }
+                    ),
+                    ListRow(
+                        title = "第三方组件说明",
+                        summary = "感谢以下开源项目与实现",
+                        icon = COUIIcons.Report,
+                        arrow = true,
+                        onClick = onThirdParty
                     )
-                }
-            }
+                )
+            )
         }
-        item { SmallTitle("开源说明与致谢") }
         item {
-            Card {
-                Column {
-                    BasicComponent(title = "使用手册", summary = "首次使用、拓展功能说明与异常处理", startAction = { Icon(COUIIcons.Notes, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = onManual)
-                    BasicComponent(title = "免费声明与赞赏码", summary = "群内免费 · 禁止倒卖", startAction = { Icon(COUIIcons.Help, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = onNotice)
-                    BasicComponent(title = "COUI 组件库（开源）", summary = "github.com/suqi8/coui", startAction = { Icon(COUIIcons.Link, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = { openUrl(context, "https://github.com/suqi8/coui") })
-                    BasicComponent(title = "Stellar（开源）", summary = "github.com/roro2239/Stellar", startAction = { Icon(COUIIcons.Link, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = { openUrl(context, "https://github.com/roro2239/Stellar") })
-                    BasicComponent(title = "第三方组件说明", summary = "感谢以下开源项目与实现", startAction = { Icon(COUIIcons.Info, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) }, onClick = onThirdParty)
-                    BasicComponent(title = "版本", summary = "v" + BuildConfig.VERSION_NAME + " · 双模式 · 管理器自适应/固定", startAction = { Icon(COUIIcons.Info, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) })
-                }
-            }
+            Text(
+                "GPL-3.0 · 作者 星苒鸭 · github.com/xingranya",
+                style = COUITheme.textStyles.body2,
+                color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 16.dp),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

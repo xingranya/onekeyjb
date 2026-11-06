@@ -8,3 +8,7 @@ keystore/
 *.jks
 *.keystore
 .DS_Store
+
+# 本地备份
+*.bak
+*.p*bak

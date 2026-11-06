@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-surface" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>OneKey</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-tertiary-fixed": "#00210c",
+            "surface-container-low": "#f9f2f0",
+            "surface-container-lowest": "#ffffff",
+            "surface-bright": "#fff8f6",
+            "error": "#ba1a1a",
+            "tertiary-fixed-dim": "#8dd79d",
+            "tertiary-fixed": "#a8f4b7",
+            "on-secondary-fixed-variant": "#524346",
+            "on-background": "#1d1b1a",
+            "surface-dim": "#dfd9d7",
+            "secondary-fixed": "#f3dde1",
+            "on-primary-container": "#ffd7dc",
+            "background": "#fff8f6",
+            "outline-variant": "#d9c1c3",
+            "surface-variant": "#e8e1df",
+            "on-tertiary-fixed-variant": "#005227",
+            "secondary": "#6a5a5e",
+            "on-secondary-container": "#6f5e62",
+            "on-secondary-fixed": "#24181b",
+            "inverse-primary": "#ffb2bd",
+            "on-tertiary-container": "#a7f2b6",
+            "on-primary-fixed-variant": "#772e3e",
+            "tertiary": "#04582b",
+            "on-surface": "#1d1b1a",
+            "tertiary-container": "#287141",
+            "primary-fixed": "#ffd9de",
+            "on-primary": "#ffffff",
+            "on-tertiary": "#ffffff",
+            "inverse-on-surface": "#f6efed",
+            "primary-container": "#9b4a5a",
+            "primary": "#7e3343",
+            "on-secondary": "#ffffff",
+            "secondary-container": "#f0dade",
+            "on-primary-fixed": "#3e0214",
+            "surface-container-high": "#ede7e5",
+            "surface-tint": "#954555",
+            "on-error": "#ffffff",
+            "surface-container": "#f3ecea",
+            "surface-container-highest": "#e8e1df",
+            "secondary-fixed-dim": "#d6c1c5",
+            "on-error-container": "#93000a",
+            "surface": "#fff8f6",
+            "inverse-surface": "#33302f",
+            "outline": "#867274",
+            "on-surface-variant": "#534245",
+            "error-container": "#ffdad6",
+            "primary-fixed-dim": "#ffb2bd"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "gutter": "0.75rem",
+            "space-sm": "0.5rem",
+            "space-md": "0.75rem",
+            "margin": "1.25rem",
+            "space-xl": "1.25rem",
+            "space-xs": "0.25rem",
+            "space-lg": "1rem"
+          },
+          "fontFamily": {
+            "label-sm": ["Plus Jakarta Sans"],
+            "headline-md": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "display-lg": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"]
+          },
+          "fontSize": {
+            "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+            "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "label-lg": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "headline-sm": ["17px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+            "display-lg": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+            "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    body {
+      background-color: #FBF4F2;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 12px);
+    }
+    .pt-safe {
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col antialiased text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-5 h-[64px] backdrop-blur-md bg-[#FBF4F2]/85 border-b border-outline-variant/30">
+<div class="flex items-center gap-3">
+<!-- Round Profile Avatar -->
+<img alt="User Profile" class="w-10 h-10 rounded-full object-cover border border-primary-container/20 shadow-sm shrink-0" src="https://lh3.googleusercontent.com/aida/ALJJyrA7Wt3x5xKrY7-NkDQYx8ctfjjuaVtjTkCOCqKwzUKjOUlvUhtnqsscu8h0U3FWR58tmgwqrIOIo7cUiofZYKPbzt9rR7492ATzjxPG7Zg6QeTc_ojz0_ebqJ6Z6i18vxQ3U8AVItASPS5XNTQBIcVCZ2pE1R5M1kJ3zZRmjJxcqXHC5OfXTEhyUzs1q9zoGKts07YOrzh0gHaJwq-soyUTLiAbndf9CB7WwZO-sSU99dU-eZMW1YkISg"/>
+<!-- App Name & Version -->
+<div class="flex items-baseline gap-2">
+<h1 class="text-[22px] leading-none font-semibold text-on-surface tracking-tight font-headline-sm">OneKey</h1>
+<span class="text-[12px] font-medium text-secondary/80 font-label-sm">v2.18.30 · 197</span>
+</div>
+</div>
+<!-- Right Action Status Badge -->
+<div class="flex items-center">
+<div class="px-3.5 py-1.5 rounded-full bg-primary-container text-white text-[13px] font-medium flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform">
+<span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+<span>服务在线</span>
+</div>
+</div>
+</header>
+<!-- Main Scrollable Canvas Base -->
+<main class="flex-1 w-full max-w-md mx-auto pt-[80px] pb-[96px] px-5 flex flex-col gap-3">
+<!-- Device Status Card -->
+<section class="rounded-[20px] bg-[#F6EBE9] p-5 border border-primary-container/10">
+<div class="flex items-start justify-between">
+<div>
+<div class="text-[18px] font-semibold text-on-surface leading-snug font-headline-sm tracking-tight">OnePlus 16</div>
+<div class="text-[13px] text-on-surface-variant/80 font-body-sm mt-0.5">98260 越狱链 · SU 就绪</div>
+</div>
+<div class="w-9 h-9 rounded-xl bg-secondary-container/60 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-[20px]">phone_android</span>
+</div>
+</div>
+<!-- 2x2 Information Metric Grid -->
+<div class="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-primary-container/10">
+<!-- Item 1 -->
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary-container shrink-0">
+<span class="material-symbols-outlined text-[18px]">memory</span>
+</div>
+<div class="min-w-0">
+<div class="text-[11px] text-secondary font-label-sm leading-tight">核心架构</div>
+<div class="text-[13px] font-semibold text-on-surface font-body-md truncate">SD 8 Gen 5</div>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary-container shrink-0">
+<span class="material-symbols-outlined text-[18px]">shield</span>
+</div>
+<div class="min-w-0">
+<div class="text-[11px] text-secondary font-label-sm leading-tight">安全状态</div>
+<div class="text-[13px] font-semibold text-on-surface font-body-md truncate">SELinux 宽容</div>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary-container shrink-0">
+<span class="material-symbols-outlined text-[18px]">terminal</span>
+</div>
+<div class="min-w-0">
+<div class="text-[11px] text-secondary font-label-sm leading-tight">内核版本</div>
+<div class="text-[13px] font-semibold text-on-surface font-body-md truncate">6.18.21</div>
+</div>
+</div>
+<!-- Item 4 -->
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary-container shrink-0">
+<span class="material-symbols-outlined text-[18px]">widgets</span>
+</div>
+<div class="min-w-0">
+<div class="text-[11px] text-secondary font-label-sm leading-tight">模块版本</div>
+<div class="text-[13px] font-semibold text-on-surface font-body-md truncate">v1.4.5</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Primary Action Button -->
+<button class="w-full h-[52px] rounded-[16px] bg-primary-container text-white flex items-center justify-center gap-2 text-[16px] font-bold shadow-[0_4px_16px_-2px_rgba(155,74,90,0.25)] active:scale-[0.98] active:bg-[#883F4E] transition-all my-0.5">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="font-headline-sm">开始越狱</span>
+</button>
+<!-- Section: 拓展功能 -->
+<section class="mt-1.5">
+<h2 class="text-[15px] font-semibold text-on-surface font-headline-sm mb-2.5 px-0.5">拓展功能</h2>
+<div class="rounded-[20px] bg-[#F6EBE9] border border-primary-container/10 overflow-hidden divide-y divide-outline-variant/20">
+<!-- Row 1 -->
+<div class="h-[56px] flex items-center justify-between px-4 hover:bg-black/[0.015] active:bg-black/[0.03] transition-colors cursor-pointer">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-[10px] bg-[#F2DCE0] flex items-center justify-center text-primary-container shrink-0">
+<span class="material-symbols-outlined text-[19px]">swap_horiz</span>
+</div>
+<span class="text-[14px] font-medium text-on-surface font-body-md">管理器热切换</span>
+</div>
+<div class="flex items-center gap-1.5 text-secondary">
+<span class="text-[13px] font-medium text-on-surface-variant font-label-lg">FinaSU</span>
+<span class="material-symbols-outlined text-[18px] text-outline">chevron_right</span>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="h-[56px] flex items-center justify-between px-4 hover:bg-black/[0.015] active:bg-black/[0.03] transition-colors cursor-pointer">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-[10px] bg-[#F2DCE0] flex items-center justify-center text-primary-container shrink-0">
+<span class="material-symbols-outlined text-[19px]">adjust</span>
+</div>
+<span class="text-[14px] font-medium text-on-surface font-body-md">目标管理器</span>
+</div>
+<div class="flex items-center gap-1.5 text-secondary">
+<span class="text-[13px] font-medium text-on-surface-variant font-label-lg">KernelSU Next</span>
+<span class="material-symbols-outlined text-[18px] text-outline">chevron_right</span>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="h-[56px] flex items-center justify-between px-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-[10px] bg-[#F2DCE0] flex items-center justify-center text-primary-container shrink-0">
+<span class="material-symbols-outlined text-[19px]">extension</span>
+</div>
+<span class="text-[14px] font-medium text-on-surface font-body-md">运行前加载通用模块</span>
+</div>
+<!-- Switch Toggle Active -->
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-12 h-7 bg-[#E5D5D3] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:rounded-full after:h-6 after:w-6 after:transition-all after:shadow-[0_2px_6px_rgba(45,35,38,0.15)] peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<!-- Row 4 -->
+<div class="h-[56px] flex items-center justify-between px-4 hover:bg-black/[0.015] active:bg-black/[0.03] transition-colors cursor-pointer">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-[10px] bg-[#F2DCE0] flex items-center justify-center text-primary-container shrink-0">
+<span class="material-symbols-outlined text-[19px]">download</span>
+</div>
+<span class="text-[14px] font-medium text-on-surface font-body-md">管理器下载</span>
+</div>
+<div class="flex items-center text-outline">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: 更多 -->
+<section class="mt-1.5">
+<h2 class="text-[15px] font-semibold text-on-surface font-headline-sm mb-2.5 px-0.5">更多</h2>
+<div class="rounded-[20px] bg-[#F6EBE9] border border-primary-container/10 overflow-hidden divide-y divide-outline-variant/20">
+<!-- Row 1 -->
+<div class="h-[56px] flex items-center justify-between px-4 hover:bg-black/[0.015] active:bg-black/[0.03] transition-colors cursor-pointer">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-[10px] bg-[#F2DCE0] flex items-center justify-center text-primary-container shrink-0">
+<span class="material-symbols-outlined text-[19px]">auto_stories</span>
+</div>
+<span class="text-[14px] font-medium text-on-surface font-body-md">用户手册</span>
+</div>
+<div class="flex items-center text-outline">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="h-[56px] flex items-center justify-between px-4 hover:bg-black/[0.015] active:bg-black/[0.03] transition-colors cursor-pointer">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-[10px] bg-[#F2DCE0] flex items-center justify-center text-primary-container shrink-0">
+<span class="material-symbols-outlined text-[19px]">info</span>
+</div>
+<span class="text-[14px] font-medium text-on-surface font-body-md">关于 OneKey</span>
+</div>
+<div class="flex items-center text-outline">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Docked Full Width Classic System Bar) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center bg-[#FBF4F2]/95 backdrop-blur-md border-t border-primary-container/15 py-2 pb-safe select-none">
+<!-- Tab 1: 首页 (Active) -->
+<a class="flex flex-col items-center justify-center gap-0.5 text-primary-container flex-1 py-1 active:scale-95 transition-transform" href="javascript:void(0)">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="text-[11px] font-semibold tracking-tight font-label-sm">首页</span>
+</a>
+<!-- Tab 2: 日志 (Inactive) -->
+<a class="flex flex-col items-center justify-center gap-0.5 text-secondary flex-1 py-1 hover:text-primary-container transition-colors active:scale-95" href="javascript:void(0)">
+<span class="material-symbols-outlined text-[22px]">terminal</span>
+<span class="text-[11px] font-medium tracking-tight font-label-sm">日志</span>
+</a>
+<!-- Tab 3: 历史 (Inactive) -->
+<a class="flex flex-col items-center justify-center gap-0.5 text-secondary flex-1 py-1 hover:text-primary-container transition-colors active:scale-95" href="javascript:void(0)">
+<span class="material-symbols-outlined text-[22px]">history</span>
+<span class="text-[11px] font-medium tracking-tight font-label-sm">历史</span>
+</a>
+<!-- Tab 4: 关于 (Inactive) -->
+<a class="flex flex-col items-center justify-center gap-0.5 text-secondary flex-1 py-1 hover:text-primary-container transition-colors active:scale-95" href="javascript:void(0)">
+<span class="material-symbols-outlined text-[22px]">info</span>
+<span class="text-[11px] font-medium tracking-tight font-label-sm">关于</span>
+</a>
+</nav>
+</body></html>

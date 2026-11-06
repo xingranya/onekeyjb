@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理器热切换</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans SC', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background-color: #FBF4F2;
+      color: #2D2124;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+<body class="bg-[#FBF4F2] text-[#2D2124] min-h-screen flex flex-col justify-between selection:bg-[#9B4A5A]/20">
+  <!-- Top Main Content Container (Mobile Standard 390px-412px layout) -->
+  <div class="w-full max-w-md mx-auto flex-1 flex flex-col pb-6 px-4">
+    
+    <!-- 顶部状态栏占位 -->
+    <div class="h-6 flex justify-between items-center text-[12px] font-medium text-[#7D6B70] px-1 pt-1 mb-2">
+      <span>09:41</span>
+      <div class="flex items-center gap-1.5">
+        <!-- 信号 SVG -->
+        <svg class="w-3.5 h-3.5 fill-[#7D6B70]" viewBox="0 0 16 16">
+          <rect x="1" y="11" width="2.5" height="4" rx="0.5" />
+          <rect x="5" y="8" width="2.5" height="7" rx="0.5" />
+          <rect x="9" y="5" width="2.5" height="10" rx="0.5" />
+          <rect x="13" y="2" width="2.5" height="13" rx="0.5" />
+        </svg>
+        <!-- Wifi SVG -->
+        <svg class="w-3.5 h-3.5 stroke-[#7D6B70] fill-none stroke-[1.8]" viewBox="0 0 16 16">
+          <path d="M2 5.5C5.8 2.2 10.2 2.2 14 5.5" stroke-linecap="round" />
+          <path d="M4.5 8.5C7.2 6.2 8.8 6.2 11.5 8.5" stroke-linecap="round" />
+          <circle cx="8" cy="12" r="1.2" fill="#7D6B70" />
+        </svg>
+        <!-- 电池 SVG -->
+        <svg class="w-4 h-3.5 fill-[#7D6B70]" viewBox="0 0 20 16">
+          <rect x="1" y="3" width="15" height="10" rx="2" fill="none" stroke="#7D6B70" stroke-width="1.8" />
+          <rect x="3" y="5" width="10" height="6" rx="1" />
+          <path d="M17 6.5C17.5 6.8 18 7.3 18 8C18 8.7 17.5 9.2 17 9.5" stroke="#7D6B70" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+      </div>
+    </div>
+
+    <!-- 顶栏：左侧圆形头像，中间标题「管理器热切换」，右侧小字「v2.18.30 · 197」 -->
+    <header class="flex items-center justify-between py-2">
+      <div class="flex items-center gap-3">
+        <!-- 圆形头像 -->
+        <div class="w-10 h-10 rounded-full bg-[#ECDCDA] border border-[#DFC8C5] overflow-hidden flex-shrink-0 flex items-center justify-center shadow-none">
+          <img src="https://lh3.googleusercontent.com/aida/ALJJyrA7Wt3x5xKrY7-NkDQYx8ctfjjuaVtjTkCOCqKwzUKjOUlvUhtnqsscu8h0U3FWR58tmgwqrIOIo7cUiofZYKPbzt9rR7492ATzjxPG7Zg6QeTc_ojz0_ebqJ6Z6i18vxQ3U8AVItASPS5XNTQBIcVCZ2pE1R5M1kJ3zZRmjJxcqXHC5OfXTEhyUzs1q9zoGKts07YOrzh0gHaJwq-soyUTLiAbndf9CB7WwZO-sSU99dU-eZMW1YkISg" alt="User Avatar" class="w-full h-full object-cover">
+        </div>
+        <h1 class="text-[19px] font-bold tracking-tight text-[#2D2124]">管理器热切换</h1>
+      </div>
+      <div class="text-[12px] font-medium text-[#8F797E] tracking-tight bg-[#F2E4E1]/80 px-2 py-0.5 rounded-full border border-[#E8D4D0]">
+        v2.18.30 · 197
+      </div>
+    </header>
+
+    <!-- 说明行：标题下方一行小字「切换只改内核 profile，不重启、不重新越狱」 -->
+    <div class="mt-1 mb-3.5 px-0.5">
+      <p class="text-[12px] text-[#7D6B70] flex items-center gap-1.5">
+        <span class="inline-block w-1.5 h-1.5 rounded-full bg-[#9B4A5A]/60"></span>
+        切换只改内核 profile，不重启、不重新越狱
+      </p>
+    </div>
+
+    <!-- 主体卡片区 -->
+    <div class="space-y-3 flex-1">
+
+      <!-- 第一张卡片：左侧大号「FinaSU」+ 小字「v1.4.5」，右上角绿色圆点 + 「节点就绪」；卡片底部一行诊断小字「服务在线 / 已授权 · su 可用 · 本次开机已越狱」 -->
+      <section class="bg-[#F6EBE9] border border-[#EBDBD8] rounded-[18px] p-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-baseline gap-2">
+            <span class="text-[22px] font-bold text-[#2D2124] tracking-tight">FinaSU</span>
+            <span class="text-[12px] font-semibold text-[#9B4A5A] bg-[#9B4A5A]/10 px-2 py-0.5 rounded-md">v1.4.5</span>
+          </div>
+          <div class="flex items-center gap-1.5 bg-[#E8F3EB] border border-[#CDE5D3] px-2.5 py-1 rounded-full">
+            <span class="w-2 h-2 rounded-full bg-[#2E7D32]"></span>
+            <span class="text-[11px] font-semibold text-[#1B5E20]">节点就绪</span>
+          </div>
+        </div>
+
+        <div class="mt-3 pt-3 border-t border-[#EBDBD8]/80 flex items-center gap-1.5">
+          <!-- 诊断盾牌/圆点几何图标 -->
+          <svg class="w-3.5 h-3.5 stroke-[#9B4A5A] fill-none stroke-[1.8] flex-shrink-0" viewBox="0 0 16 16">
+            <path d="M8 2L13 4V8C13 11 8 13.5 8 13.5C8 13.5 3 11 3 8V4L8 2Z" />
+            <path d="M6 7.5L7.5 9L10 6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <p class="text-[12px] text-[#745E64] font-medium leading-none truncate">
+            服务在线 / 已授权 · su 可用 · 本次开机已越狱
+          </p>
+        </div>
+      </section>
+
+      <!-- 第二张卡片：首行「目标管理器」，右侧「KernelSU Next」+ 右箭头；其下列出五个可选项，每项一行，行高 56dp，含小图标、名称、版本号、右侧圆形单选按钮 -->
+      <section class="bg-[#F6EBE9] border border-[#EBDBD8] rounded-[18px] overflow-hidden">
+        <!-- 头部栏 -->
+        <div class="flex items-center justify-between px-4 py-3 border-b border-[#EBDBD8]/90">
+          <span class="text-[13px] font-bold text-[#4F3E43] tracking-wide">目标管理器</span>
+          <div class="flex items-center gap-1 text-[13px] font-semibold text-[#9B4A5A]">
+            <span>KernelSU Next</span>
+            <!-- 右箭头矢量 SVG -->
+            <svg class="w-4 h-4 stroke-[#9B4A5A] stroke-[2] fill-none" viewBox="0 0 16 16">
+              <path d="M6 3.5L10.5 8L6 12.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- 5 个选项列表，每项 56px (56dp) -->
+        <div class="divide-y divide-[#EBDBD8]/60">
+          <!-- 1. KernelSU -->
+          <div class="h-[56px] px-4 flex items-center justify-between hover:bg-[#F0E2DF]/50 transition-colors">
+            <div class="flex items-center gap-3">
+              <!-- 纯几何矢量小图标：芯片方形 -->
+              <div class="w-8 h-8 rounded-lg bg-[#ECDCDA] flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 stroke-[#7D6B70] fill-none stroke-[1.8]" viewBox="0 0 16 16">
+                  <rect x="3.5" y="3.5" width="9" height="9" rx="1.5" />
+                  <path d="M6 1V3.5M10 1V3.5M6 12.5V15M10 12.5V15M1 6H3.5M1 10H3.5M12.5 6H15M12.5 10H15" stroke-linecap="round" />
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-[14px] font-semibold text-[#2D2124] leading-tight">KernelSU</span>
+                <span class="text-[11px] text-[#8A757B]">v0.9.5 · 官方主线内核驱动</span>
+              </div>
+            </div>
+            <!-- 未选中单选钮 -->
+            <div class="w-5 h-5 rounded-full border-2 border-[#C0ACB1] flex items-center justify-center flex-shrink-0"></div>
+          </div>
+
+          <!-- 2. KernelSU Next -->
+          <div class="h-[56px] px-4 flex items-center justify-between hover:bg-[#F0E2DF]/50 transition-colors">
+            <div class="flex items-center gap-3">
+              <!-- 纯几何矢量小图标：分层叠加方块 -->
+              <div class="w-8 h-8 rounded-lg bg-[#ECDCDA] flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 stroke-[#7D6B70] fill-none stroke-[1.8]" viewBox="0 0 16 16">
+                  <path d="M8 2L13.5 5L8 8L2.5 5L8 2Z" stroke-linejoin="round" />
+                  <path d="M2.5 8L8 11L13.5 8" stroke-linejoin="round" stroke-linecap="round" />
+                  <path d="M2.5 11L8 14L13.5 11" stroke-linejoin="round" stroke-linecap="round" />
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[14px] font-semibold text-[#2D2124] leading-tight">KernelSU Next</span>
+                  <span class="text-[9px] font-bold text-[#9B4A5A] bg-[#9B4A5A]/10 px-1 py-0.2 rounded">推荐</span>
+                </div>
+                <span class="text-[11px] text-[#8A757B]">v1.0.5 · 内核级挂载适配</span>
+              </div>
+            </div>
+            <!-- 未选中单选钮 -->
+            <div class="w-5 h-5 rounded-full border-2 border-[#C0ACB1] flex items-center justify-center flex-shrink-0"></div>
+          </div>
+
+          <!-- 3. SukiSU Ultra -->
+          <div class="h-[56px] px-4 flex items-center justify-between hover:bg-[#F0E2DF]/50 transition-colors">
+            <div class="flex items-center gap-3">
+              <!-- 纯几何矢量小图标：闪电折线 -->
+              <div class="w-8 h-8 rounded-lg bg-[#ECDCDA] flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 stroke-[#7D6B70] fill-none stroke-[1.8]" viewBox="0 0 16 16">
+                  <polygon points="9 1.5 3.5 9 8 9 7 14.5 12.5 7 8 7 9 1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-[14px] font-semibold text-[#2D2124] leading-tight">SukiSU Ultra</span>
+                <span class="text-[11px] text-[#8A757B]">v2.3.1 · 高度定制兼容分支</span>
+              </div>
+            </div>
+            <!-- 未选中单选钮 -->
+            <div class="w-5 h-5 rounded-full border-2 border-[#C0ACB1] flex items-center justify-center flex-shrink-0"></div>
+          </div>
+
+          <!-- 4. BakaSU -->
+          <div class="h-[56px] px-4 flex items-center justify-between hover:bg-[#F0E2DF]/50 transition-colors">
+            <div class="flex items-center gap-3">
+              <!-- 纯几何矢量小图标：六边形/盾牌 -->
+              <div class="w-8 h-8 rounded-lg bg-[#ECDCDA] flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 stroke-[#7D6B70] fill-none stroke-[1.8]" viewBox="0 0 16 16">
+                  <path d="M8 1.5L13.5 4.5V9.5C13.5 12.5 8 14.5 8 14.5C8 14.5 2.5 12.5 2.5 9.5V4.5L8 1.5Z" stroke-linejoin="round" />
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="text-[14px] font-semibold text-[#2D2124] leading-tight">BakaSU</span>
+                <span class="text-[11px] text-[#8A757B]">v1.2.0 · 轻量低占用运行时</span>
+              </div>
+            </div>
+            <!-- 未选中单选钮 -->
+            <div class="w-5 h-5 rounded-full border-2 border-[#C0ACB1] flex items-center justify-center flex-shrink-0"></div>
+          </div>
+
+          <!-- 5. FinaSU（已选中状态） -->
+          <div class="h-[56px] px-4 flex items-center justify-between bg-[#F1E0DD]/70">
+            <div class="flex items-center gap-3">
+              <!-- 纯几何矢量小图标：拼图/模块几何块 -->
+              <div class="w-8 h-8 rounded-lg bg-[#9B4A5A]/15 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 stroke-[#9B4A5A] fill-none stroke-[1.8]" viewBox="0 0 16 16">
+                  <circle cx="8" cy="8" r="5" />
+                  <circle cx="8" cy="8" r="2" fill="#9B4A5A" />
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[14px] font-bold text-[#9B4A5A] leading-tight">FinaSU</span>
+                  <span class="text-[9px] font-bold text-[#9B4A5A] bg-[#9B4A5A]/15 px-1 py-0.2 rounded">当前生效</span>
+                </div>
+                <span class="text-[11px] text-[#7E656B]">v1.4.5 · 稳定集成协议</span>
+              </div>
+            </div>
+            <!-- 已选中单选钮：主色圆形带对勾或实心圆心 -->
+            <div class="w-5 h-5 rounded-full border-2 border-[#9B4A5A] bg-[#9B4A5A] flex items-center justify-center flex-shrink-0">
+              <svg class="w-3 h-3 stroke-white stroke-[2.2] fill-none" viewBox="0 0 12 12">
+                <path d="M2.5 6.2L4.8 8.5L9.5 3.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 第三区：六个按钮排成 2 列 3 行，圆角 14dp、高 44dp，文字居中：
+           第一行「切换」（主色实心）与「检测」（浅底描边）；
+           第二行「选择」与「安装」；
+           第三行「重启」与「还原」。 -->
+      <section class="grid grid-cols-2 gap-2.5 pt-1">
+        <!-- 第 1 行 -->
+        <!-- 切换 (主色实心 #9B4A5A) -->
+        <button class="h-[44px] rounded-[14px] bg-[#9B4A5A] active:bg-[#863e4c] text-white font-medium text-[14px] flex items-center justify-center gap-2 shadow-none transition-transform active:scale-[0.98]">
+          <!-- 左右双向切换箭头矢量 -->
+          <svg class="w-4 h-4 stroke-white stroke-[2] fill-none" viewBox="0 0 16 16">
+            <path d="M2.5 5.5H13.5M13.5 5.5L10.5 2.5M13.5 5.5L10.5 8.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M13.5 10.5H2.5M2.5 10.5L5.5 7.5M2.5 10.5L5.5 13.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>切换</span>
+        </button>
+        <!-- 检测 (浅底描边) -->
+        <button class="h-[44px] rounded-[14px] bg-[#F6EBE9] hover:bg-[#F2E3E0] active:bg-[#EBD8D4] border border-[#DFC8C5] text-[#2D2124] font-medium text-[14px] flex items-center justify-center gap-2 shadow-none transition-transform active:scale-[0.98]">
+          <!-- 瞄准/扫描几何矢量 -->
+          <svg class="w-4 h-4 stroke-[#9B4A5A] stroke-[1.8] fill-none" viewBox="0 0 16 16">
+            <circle cx="8" cy="8" r="5" />
+            <path d="M8 1V3M8 13V15M1 8H3M13 8H15" stroke-linecap="round"/>
+          </svg>
+          <span>检测</span>
+        </button>
+
+        <!-- 第 2 行 -->
+        <!-- 选择 -->
+        <button class="h-[44px] rounded-[14px] bg-[#F6EBE9] hover:bg-[#F2E3E0] active:bg-[#EBD8D4] border border-[#DFC8C5] text-[#2D2124] font-medium text-[14px] flex items-center justify-center gap-2 shadow-none transition-transform active:scale-[0.98]">
+          <!-- 列表勾选几何矢量 -->
+          <svg class="w-4 h-4 stroke-[#7D6B70] stroke-[1.8] fill-none" viewBox="0 0 16 16">
+            <path d="M2.5 4H4M6.5 4H13.5M2.5 8H4M6.5 8H13.5M2.5 12H4M6.5 12H13.5" stroke-linecap="round"/>
+          </svg>
+          <span>选择</span>
+        </button>
+        <!-- 安装 -->
+        <button class="h-[44px] rounded-[14px] bg-[#F6EBE9] hover:bg-[#F2E3E0] active:bg-[#EBD8D4] border border-[#DFC8C5] text-[#2D2124] font-medium text-[14px] flex items-center justify-center gap-2 shadow-none transition-transform active:scale-[0.98]">
+          <!-- 下下载箭头几何矢量 -->
+          <svg class="w-4 h-4 stroke-[#7D6B70] stroke-[1.8] fill-none" viewBox="0 0 16 16">
+            <path d="M8 2.5V10.5M8 10.5L5 7.5M8 10.5L11 7.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3 13.5H13" stroke-linecap="round"/>
+          </svg>
+          <span>安装</span>
+        </button>
+
+        <!-- 第 3 行 -->
+        <!-- 重启 -->
+        <button class="h-[44px] rounded-[14px] bg-[#F6EBE9] hover:bg-[#F2E3E0] active:bg-[#EBD8D4] border border-[#DFC8C5] text-[#2D2124] font-medium text-[14px] flex items-center justify-center gap-2 shadow-none transition-transform active:scale-[0.98]">
+          <!-- 环形刷新箭头矢量 -->
+          <svg class="w-4 h-4 stroke-[#7D6B70] stroke-[1.8] fill-none" viewBox="0 0 16 16">
+            <path d="M13.5 8C13.5 11 11 13.5 8 13.5C5 13.5 2.5 11 2.5 8C2.5 5.5 4.5 3.3 7 2.7" stroke-linecap="round"/>
+            <polyline points="7 1 7.5 3.5 5 4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>重启</span>
+        </button>
+        <!-- 还原 -->
+        <button class="h-[44px] rounded-[14px] bg-[#F6EBE9] hover:bg-[#F2E3E0] active:bg-[#EBD8D4] border border-[#DFC8C5] text-[#2D2124] font-medium text-[14px] flex items-center justify-center gap-2 shadow-none transition-transform active:scale-[0.98]">
+          <!-- 历史回退箭头矢量 -->
+          <svg class="w-4 h-4 stroke-[#7D6B70] stroke-[1.8] fill-none" viewBox="0 0 16 16">
+            <circle cx="8" cy="8" r="5.5" />
+            <polyline points="8 5 8 8 10.5 8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>还原</span>
+        </button>
+      </section>
+
+      <!-- 第四张卡片：一段提示文字「热切换需要通用模块；安装会备份并替换管理器目录下的 libksud.so，可随时还原」 -->
+      <section class="bg-[#F6EBE9] border border-[#EBDBD8] rounded-[18px] p-3.5 flex items-start gap-2.5">
+        <!-- 纯矢量几何信息圆圈 i -->
+        <div class="mt-0.5 flex-shrink-0">
+          <svg class="w-4 h-4 stroke-[#9B4A5A] fill-none stroke-[1.8]" viewBox="0 0 16 16">
+            <circle cx="8" cy="8" r="6" />
+            <line x1="8" y1="7.5" x2="8" y2="11.5" stroke-linecap="round"/>
+            <circle cx="8" cy="4.5" r="0.75" fill="#9B4A5A" />
+          </svg>
+        </div>
+        <p class="text-[12px] text-[#6E595F] leading-relaxed">
+          热切换需要通用模块；安装会备份并替换管理器目录下的 <code class="bg-[#ECDCDA] text-[#9B4A5A] px-1.5 py-0.5 rounded text-[11px] font-mono border border-[#DFC8C5]">libksud.so</code>，可随时还原。
+        </p>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- 底部：保持现有样式——与页面同宽的浅色底栏，四项等分（首页 / 日志 / 历史 / 关于），每项为图标 + 11sp 文字，选中项「首页」为主色，其余为次级灰。不要悬浮胶囊。 -->
+  <nav class="w-full bg-[#F6EBE9] border-t border-[#EBDBD8] py-2 px-1 select-none flex-shrink-0">
+    <div class="max-w-md mx-auto grid grid-cols-4 items-center">
+      
+      <!-- 1. 首页 (选中状态：主色 #9B4A5A) -->
+      <button class="flex flex-col items-center justify-center py-1 gap-1 text-[#9B4A5A]">
+        <!-- 房屋几何矢量 -->
+        <svg class="w-5 h-5 stroke-[#9B4A5A] fill-none stroke-[2]" viewBox="0 0 20 20">
+          <path d="M3 8.5L10 3L17 8.5V16C17 16.5 16.5 17 16 17H12.5V12.5H7.5V17H4C3.5 17 3 16.5 3 16V8.5Z" stroke-linejoin="round" />
+        </svg>
+        <span class="text-[11px] font-bold leading-none">首页</span>
+      </button>
+
+      <!-- 2. 日志 (次级灰) -->
+      <button class="flex flex-col items-center justify-center py-1 gap-1 text-[#8F797E] hover:text-[#2D2124] transition-colors">
+        <!-- 命令行/日志终端框几何矢量 -->
+        <svg class="w-5 h-5 stroke-[#8F797E] fill-none stroke-[1.8]" viewBox="0 0 20 20">
+          <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
+          <path d="M6 7.5L8.5 10L6 12.5M10.5 12.5H13.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span class="text-[11px] font-medium leading-none">日志</span>
+      </button>
+
+      <!-- 3. 历史 (次级灰) -->
+      <button class="flex flex-col items-center justify-center py-1 gap-1 text-[#8F797E] hover:text-[#2D2124] transition-colors">
+        <!-- 历史时钟逆时针几何矢量 -->
+        <svg class="w-5 h-5 stroke-[#8F797E] fill-none stroke-[1.8]" viewBox="0 0 20 20">
+          <circle cx="10" cy="10" r="6.5" />
+          <polyline points="10 6.5 10 10 13 11.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="text-[11px] font-medium leading-none">历史</span>
+      </button>
+
+      <!-- 4. 关于 (次级灰) -->
+      <button class="flex flex-col items-center justify-center py-1 gap-1 text-[#8F797E] hover:text-[#2D2124] transition-colors">
+        <!-- 感叹号信息圆圈几何矢量 -->
+        <svg class="w-5 h-5 stroke-[#8F797E] fill-none stroke-[1.8]" viewBox="0 0 20 20">
+          <circle cx="10" cy="10" r="6.5" />
+          <line x1="10" y1="9.5" x2="10" y2="13.5" stroke-linecap="round" stroke-width="2"/>
+          <circle cx="10" cy="6.5" r="1" fill="#8F797E" />
+        </svg>
+        <span class="text-[11px] font-medium leading-none">关于</span>
+      </button>
+
+    </div>
+    <!-- 底部手势指示条安全区 -->
+    <div class="h-3 flex items-center justify-center pt-1">
+      <div class="w-28 h-1 bg-[#D8C4C1] rounded-full"></div>
+    </div>
+  </nav>
+
+</body>
+</html>

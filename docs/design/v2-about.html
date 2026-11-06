@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>关于 - OneKey</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background-color: #FBF4F2;
+      color: #1F1A1C;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+  </style>
+</head>
+<body class="bg-[#FBF4F2] min-h-screen flex flex-col justify-between text-[#1F1A1C] antialiased">
+  <!-- Top App Bar & Status Bar Area -->
+  <header class="w-full pt-3 px-4 pb-2">
+    <!-- System Status Bar -->
+    <div class="flex items-center justify-between text-xs text-[#524346] font-medium mb-3 px-1">
+      <span>09:41</span>
+      <div class="flex items-center space-x-1.5">
+        <!-- Signal icon -->
+        <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+          <path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L12 22l7.03-4.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9zm0 2c3.87 0 7 3.13 7 7 0 1.5-.47 2.89-1.28 4.03L12 19.38l-5.72-3.35C5.47 14.89 5 13.5 5 12c0-3.87 3.13-7 7-7z"/>
+        </svg>
+        <!-- Wifi icon -->
+        <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+          <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.22c3.55 0 6.77 1.4 9.14 3.68L12 19.1 2.86 10.9C5.23 8.62 8.45 7.22 12 7.22z"/>
+        </svg>
+        <!-- Battery icon -->
+        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+          <path d="M17 5v14c0 .55-.45 1-1 1H8c-.55 0-1-.45-1-1V5c0-.55.45-1 1-1h2V2h4v2h2c.55 0 1 .45 1 1zm-2 1H9v12h6V6z"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- App Header -->
+    <div class="flex items-center justify-between h-10">
+      <!-- Left: Round Avatar -->
+      <div class="w-9 h-9 rounded-full overflow-hidden border border-[#E7D6D4] bg-[#F6EBE9] flex items-center justify-center shrink-0 shadow-sm">
+        <img src="https://lh3.googleusercontent.com/aida/ALJJyrA7Wt3x5xKrY7-NkDQYx8ctfjjuaVtjTkCOCqKwzUKjOUlvUhtnqsscu8h0U3FWR58tmgwqrIOIo7cUiofZYKPbzt9rR7492ATzjxPG7Zg6QeTc_ojz0_ebqJ6Z6i18vxQ3U8AVItASPS5XNTQBIcVCZ2pE1R5M1kJ3zZRmjJxcqXHC5OfXTEhyUzs1q9zoGKts07YOrzh0gHaJwq-soyUTLiAbndf9CB7WwZO-sSU99dU-eZMW1YkISg" alt="User Avatar" class="w-full h-full object-cover">
+      </div>
+
+      <!-- Center: Title -->
+      <h1 class="text-base font-semibold text-[#1F1A1C] tracking-wide">关于</h1>
+
+      <!-- Right: Subtext -->
+      <span class="text-xs text-[#827274] font-medium tracking-tight">v2.18.30 · 197</span>
+    </div>
+  </header>
+
+  <!-- Main Content Scroll Area -->
+  <main class="flex-1 px-4 py-2 flex flex-col space-y-4">
+    <!-- Brand / Hero Section -->
+    <div class="flex flex-col items-center justify-center pt-2 pb-1">
+      <div class="w-[84px] h-[84px] rounded-[20px] bg-[#F6EBE9] border border-[#ECD9D6] flex items-center justify-center p-2 mb-3 shadow-[0_2px_8px_rgba(155,74,90,0.06)]">
+        <img src="https://lh3.googleusercontent.com/aida/ALJJyrA7Wt3x5xKrY7-NkDQYx8ctfjjuaVtjTkCOCqKwzUKjOUlvUhtnqsscu8h0U3FWR58tmgwqrIOIo7cUiofZYKPbzt9rR7492ATzjxPG7Zg6QeTc_ojz0_ebqJ6Z6i18vxQ3U8AVItASPS5XNTQBIcVCZ2pE1R5M1kJ3zZRmjJxcqXHC5OfXTEhyUzs1q9zoGKts07YOrzh0gHaJwq-soyUTLiAbndf9CB7WwZO-sSU99dU-eZMW1YkISg" alt="OneKey Icon" class="w-full h-full object-contain rounded-[14px]">
+      </div>
+      <div class="text-[20px] font-semibold text-[#1F1A1C] tracking-tight leading-snug">OneKey</div>
+      <div class="text-[12px] text-[#827274] font-medium mt-0.5 tracking-tight">v2.18.30 · 197</div>
+    </div>
+
+    <!-- Information Card (3 rows, rounded 20px) -->
+    <section class="bg-[#F6EBE9] rounded-[20px] p-3.5 border border-[#EFE1DF]">
+      <!-- Row 1: Device -->
+      <div class="flex items-center justify-between py-2.5 px-1.5 border-b border-[#EBDAD8]/60">
+        <div class="flex items-center space-x-3 text-[#1F1A1C]">
+          <div class="w-7 h-7 rounded-lg bg-[#EEDDDB] flex items-center justify-center text-[#9B4A5A] shrink-0">
+            <!-- Mobile device icon -->
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <rect x="6" y="2" width="12" height="20" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/>
+              <circle cx="12" cy="18" r="1" fill="currentColor"/>
+            </svg>
+          </div>
+          <span class="text-[14px] font-medium text-[#46383B]">设备</span>
+        </div>
+        <span class="text-[13px] font-medium text-[#1F1A1C]">OnePlus 16 · PYB110</span>
+      </div>
+
+      <!-- Row 2: Kernel -->
+      <div class="flex items-center justify-between py-2.5 px-1.5 border-b border-[#EBDAD8]/60">
+        <div class="flex items-center space-x-3 text-[#1F1A1C]">
+          <div class="w-7 h-7 rounded-lg bg-[#EEDDDB] flex items-center justify-center text-[#9B4A5A] shrink-0">
+            <!-- Kernel / Chip icon -->
+            <svg class="w-4 h-4 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="5" y="5" width="14" height="14" rx="2"/>
+              <path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/>
+            </svg>
+          </div>
+          <span class="text-[14px] font-medium text-[#46383B]">内核</span>
+        </div>
+        <span class="text-[13px] font-medium text-[#1F1A1C] font-mono">6.18.21-android17</span>
+      </div>
+
+      <!-- Row 3: Module -->
+      <div class="flex items-center justify-between py-2.5 px-1.5">
+        <div class="flex items-center space-x-3 text-[#1F1A1C]">
+          <div class="w-7 h-7 rounded-lg bg-[#EEDDDB] flex items-center justify-center text-[#9B4A5A] shrink-0">
+            <!-- Puzzle module icon -->
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <path d="M19.5 10.5V6a2 2 0 0 0-2-2h-4.5a2.5 2.5 0 0 0-5 0H3.5a2 2 0 0 0-2 2v4.5a2.5 2.5 0 0 1 0 5V20a2 2 0 0 0 2 2h4.5a2.5 2.5 0 0 0 5 0H17.5a2 2 0 0 0 2-2v-4.5a2.5 2.5 0 0 1 0-5z" fill="none" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </div>
+          <span class="text-[14px] font-medium text-[#46383B]">模块</span>
+        </div>
+        <span class="text-[13px] font-medium text-[#1F1A1C]">通用多管理器 v1.1.0</span>
+      </div>
+    </section>
+
+    <!-- Action Card (4 rows, rounded 20px) -->
+    <section class="bg-[#F6EBE9] rounded-[20px] p-2 border border-[#EFE1DF]">
+      <!-- Item 1: 检查更新 -->
+      <div class="flex items-center justify-between py-3 px-3 border-b border-[#EBDAD8]/60 cursor-pointer active:bg-[#EEDDDB]/50 rounded-xl transition-colors">
+        <div class="flex items-center space-x-3">
+          <div class="w-7 h-7 rounded-lg bg-[#EEDDDB] flex items-center justify-center text-[#9B4A5A] shrink-0">
+            <!-- Refresh sync icon -->
+            <svg class="w-4 h-4 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-5v5h5"/>
+              <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 5v-5h-5"/>
+            </svg>
+          </div>
+          <span class="text-[14px] font-medium text-[#1F1A1C]">检查更新</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#E8D4D2] text-[#9B4A5A]">已是最新</span>
+          <!-- Chevron Right -->
+          <svg class="w-4 h-4 text-[#827274] stroke-current fill-none" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Item 2: 用户手册 -->
+      <div class="flex items-center justify-between py-3 px-3 border-b border-[#EBDAD8]/60 cursor-pointer active:bg-[#EEDDDB]/50 rounded-xl transition-colors">
+        <div class="flex items-center space-x-3">
+          <div class="w-7 h-7 rounded-lg bg-[#EEDDDB] flex items-center justify-center text-[#9B4A5A] shrink-0">
+            <!-- Book / Manual icon -->
+            <svg class="w-4 h-4 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+          </div>
+          <span class="text-[14px] font-medium text-[#1F1A1C]">用户手册</span>
+        </div>
+        <div class="flex items-center">
+          <svg class="w-4 h-4 text-[#827274] stroke-current fill-none" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Item 3: 开源许可 -->
+      <div class="flex items-center justify-between py-3 px-3 border-b border-[#EBDAD8]/60 cursor-pointer active:bg-[#EEDDDB]/50 rounded-xl transition-colors">
+        <div class="flex items-center space-x-3">
+          <div class="w-7 h-7 rounded-lg bg-[#EEDDDB] flex items-center justify-center text-[#9B4A5A] shrink-0">
+            <!-- License / Scales of justice icon -->
+            <svg class="w-4 h-4 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M12 3v18"/>
+              <path d="M4 7h16"/>
+              <path d="M6 7l-3 6h6l-3-6z"/>
+              <path d="M18 7l-3 6h6l-3-6z"/>
+            </svg>
+          </div>
+          <span class="text-[14px] font-medium text-[#1F1A1C]">开源许可</span>
+        </div>
+        <div class="flex items-center">
+          <svg class="w-4 h-4 text-[#827274] stroke-current fill-none" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Item 4: 第三方声明 -->
+      <div class="flex items-center justify-between py-3 px-3 cursor-pointer active:bg-[#EEDDDB]/50 rounded-xl transition-colors">
+        <div class="flex items-center space-x-3">
+          <div class="w-7 h-7 rounded-lg bg-[#EEDDDB] flex items-center justify-center text-[#9B4A5A] shrink-0">
+            <!-- Shield statement icon -->
+            <svg class="w-4 h-4 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <span class="text-[14px] font-medium text-[#1F1A1C]">第三方声明</span>
+        </div>
+        <div class="flex items-center">
+          <svg class="w-4 h-4 text-[#827274] stroke-current fill-none" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer Note -->
+    <div class="pt-2 pb-4 text-center">
+      <p class="text-[12px] text-[#827274] font-normal tracking-wide">GPL-3.0 · 基于开源社区构建</p>
+    </div>
+  </main>
+
+  <!-- Full-Width Bottom Nav Bar (No floating capsule, matching standard layout) -->
+  <footer class="w-full bg-[#F6EBE9] border-t border-[#EBDAD8] px-2 py-2 shrink-0">
+    <nav class="grid grid-cols-4 items-center">
+      <!-- Item 1: 首页 -->
+      <div class="flex flex-col items-center justify-center py-1 cursor-pointer text-[#827274] active:opacity-75 transition-opacity">
+        <svg class="w-5 h-5 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        <span class="text-[11px] font-medium mt-1">首页</span>
+      </div>
+
+      <!-- Item 2: 日志 -->
+      <div class="flex flex-col items-center justify-center py-1 cursor-pointer text-[#827274] active:opacity-75 transition-opacity">
+        <svg class="w-5 h-5 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+          <path d="M7 8l3 3-3 3"/>
+        </svg>
+        <span class="text-[11px] font-medium mt-1">日志</span>
+      </div>
+
+      <!-- Item 3: 历史 -->
+      <div class="flex flex-col items-center justify-center py-1 cursor-pointer text-[#827274] active:opacity-75 transition-opacity">
+        <svg class="w-5 h-5 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span class="text-[11px] font-medium mt-1">历史</span>
+      </div>
+
+      <!-- Item 4: 关于 (Active) -->
+      <div class="flex flex-col items-center justify-center py-1 cursor-pointer text-[#9B4A5A] active:opacity-75 transition-opacity">
+        <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+        </svg>
+        <span class="text-[11px] font-semibold mt-1">关于</span>
+      </div>
+    </nav>
+    <!-- Safe Area Spacer -->
+    <div class="h-1.5 w-full"></div>
+  </footer>
+</body>
+</html>
