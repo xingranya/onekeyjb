@@ -10,6 +10,9 @@ import dev.onekey.jb.ShizukuShell
  */
 object OneKeyEngine {
     private const val ROOT = "/data/local/tmp/pyb110-onekey"
+    /** 本次运行后内核是否暴露了 /proc/kernelsu_manager。 */
+    @Volatile var hotSwitchReady: Boolean = false
+        private set
 
     fun available(context: Context): Boolean = try {
         context.assets.open("core/exec/onekey-98260").close(); true
@@ -36,6 +39,8 @@ object OneKeyEngine {
         }
         if (susfs) ShizukuShell.stageAsset(context, "core/exec/susfs_guard_lkm.ko", ws + "/susfs_guard_lkm.ko", 644)
         if (vfs) ShizukuShell.stageAsset(context, "core/exec/hybridmount-6.18.21.ko", ws + "/hybridmount-6.18.21.ko", 644)
+        // 通用多管理器模块：只有它能提供 /proc/kernelsu_manager（管理器自带的 LKM 是单管理器构建）。
+        val universal = ShizukuShell.stageAsset(context, "core/exec/ksud-universal", ws + "/ksud-universal", 755).code == 0
         val k = when (managerKind) {
             "kernelsu" -> "kernelsu"
             "next" -> "next"
@@ -49,9 +54,10 @@ object OneKeyEngine {
             " PYB110_UNLOAD_GUARD=" + (if (unloadGuard) "1" else "0") +
             " PYB110_DISABLE_ANTIROOT=" + (if (disableAntiRoot) "1" else "0") +
             " PYB110_SOFT_REBOOT=" + (if (softReboot) "1" else "0") +
-            " PYB110_REBOOT=" + (if (softReboot) "1" else "0")
+            " PYB110_REBOOT=" + (if (softReboot) "1" else "0") +
+            (if (universal) " PYB110_KSUD=" + ws + "/ksud-universal" else "")
         val cmd = "cd " + ws + " && " + env + " ./onekey-98260 run 2>&1"
-        log("执行引擎启动（manager=" + k + "）")
+        log("执行引擎启动（manager=" + k + "，" + (if (universal) "通用多管理器模块" else "管理器自带模块") + "）")
         var ok = false
         try {
             val proc = ShizukuShell.start(cmd) { raw ->
@@ -83,6 +89,13 @@ object OneKeyEngine {
             val check = ShizukuShell.run("timeout 5 /system/bin/su -c id 2>&1", 10).output
             ok = check.contains("uid=0")
             if (ok) RunReport.markWrote("加载内核模块")
+        }
+        // 明确区分“拿到了 root”和“内核暴露了热切换节点”，避免两者混淆。
+        val node = ShizukuShell.run("timeout 5 su -c 'test -f /proc/kernelsu_manager && echo YES || echo NO'", 12).output.trim()
+        hotSwitchReady = node == "YES"
+        if (ok) {
+            log(if (hotSwitchReady) "热切换节点已就绪：/proc/kernelsu_manager"
+                else "本次未启用热切换节点（加载的是单管理器模块），管理器切换需重新加载通用模块")
         }
         return ok
     }

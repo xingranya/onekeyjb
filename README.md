@@ -5,7 +5,7 @@
 **一加 16 / Ace 7 Pro 本地越狱工具 · ColorOS 17 适配**
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue?logo=gnu&logoColor=white)](./LICENSE)
-[![Release](https://img.shields.io/badge/release-v2.18.17-ff69b4?logo=android&logoColor=white)](https://github.com/xingranya/onekeyjb/releases)
+[![Release](https://img.shields.io/badge/release-v2.18.18-ff69b4?logo=android&logoColor=white)](https://github.com/xingranya/onekeyjb/releases)
 [![Platform](https://img.shields.io/badge/Android-12%2B-3ddc84?logo=android&logoColor=white)]()
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7f52ff?logo=kotlin&logoColor=white)]()
 [![Compose](https://img.shields.io/badge/Jetpack-Compose-4285f4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)

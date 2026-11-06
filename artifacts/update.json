@@ -1,12 +1,24 @@
 {
-  "versionCode": 184,
-  "versionName": "2.18.17",
-  "publishedAt": "2026-11-06T01:15:00+08:00",
-  "size": 14579628,
-  "sha256": "2c4550aa0b71ffb708dc65bef1958ed2ce7dad62d52a3b0400b8d8fce4d41c9b",
+  "versionCode": 185,
+  "versionName": "2.18.18",
+  "publishedAt": "2026-11-06T09:02:00+08:00",
+  "size": 23837233,
+  "sha256": "03611c8ba0fb94c55d03daee6c43e54834f0286640f7bcf0f842b2d61c7718d7",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.17\n\n- 拓展功能新增管理器热切换：五家管理器之间直接切换，不重启、不重新越狱\n- 热切换仅在加载了通用多管理器内核模块（提供 /proc/kernelsu_manager）时可用，其余情况明确禁用\n- 第三方组件说明补充 KSU-Universal 署名与许可证",
+  "changelog": "v2.18.18\n\n- 修复热切换节点缺失：越狱链改为加载通用多管理器模块（内置 ksud-universal），不再使用管理器自带的单管理器模块\n- 拓展功能新增「管理器下载」：KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU / FinaSU 官方最新正式版一键下载\n- 热切换不可用时提示区分原因：未越狱 / 已加载单管理器模块（重启后重跑即可）\n- 第三方声明补充内置 ksud-universal 的署名与许可",
   "versions": [
+    {
+      "versionName": "2.18.18",
+      "versionCode": 185,
+      "publishedAt": "2026-11-06T09:02:00+08:00",
+      "size": 23837233,
+      "notes": [
+        "修复热切换节点缺失：越狱链改为加载通用多管理器模块（内置 ksud-universal），不再使用管理器自带的单管理器模块",
+        "拓展功能新增「管理器下载」：KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU / FinaSU 官方最新正式版一键下载",
+        "热切换不可用时提示区分原因：未越狱 / 已加载单管理器模块（重启后重跑即可）",
+        "第三方声明补充内置 ksud-universal 的署名与许可"
+      ]
+    },
     {
       "versionName": "2.18.17",
       "versionCode": 184,

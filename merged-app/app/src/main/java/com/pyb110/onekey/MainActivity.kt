@@ -1492,8 +1492,10 @@ private fun OptionsCard(
                     Text(
                         text = if (controller.hotSwitchAvailable)
                             "当前 " + controller.activeKernelManager.ifBlank { "未知" } + "；切换只改内核 profile，不重启、不重新越狱。"
+                        else if (controller.suCompatReady)
+                            "当前加载的是单管理器模块（无热切换节点）。重启手机后重新运行一次越狱，即可启用热切换。"
                         else
-                            "当前内核模块未启用热切换节点，切换不可用。",
+                            "尚未越狱，热切换不可用。",
                         style = COUITheme.textStyles.body2,
                         color = COUITheme.colorScheme.onSurfaceContainerVariant,
                         modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
@@ -1572,6 +1574,53 @@ private fun OptionsCard(
                     if (controller.hotSwitchMessage.isNotBlank()) {
                         Text(controller.hotSwitchMessage, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant, modifier = Modifier.padding(top = 8.dp))
                     }
+                }
+            }
+            // 管理器下载：直接指向各家官方最新正式版。
+            Surface(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = COUITheme.colorScheme.surface
+            ) {
+                val downloadContext = LocalContext.current
+                Column(Modifier.padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(COUIIcons.Download, contentDescription = null, modifier = Modifier.size(20.dp), tint = COUITheme.colorScheme.primary)
+                        Spacer(Modifier.width(8.dp))
+                        Text("管理器下载", style = COUITheme.textStyles.headline2)
+                    }
+                    Text(
+                        "均为官方最新正式版，下载后直接安装即可；已装管理器无需重复下载。",
+                        style = COUITheme.textStyles.body2,
+                        color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
+                    )
+                    ManagerDownloads.all.forEach { item ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { openUrl(downloadContext, item.apkUrl) }
+                                .padding(horizontal = 8.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(item.label, style = COUITheme.textStyles.body1)
+                                Text(
+                                    item.version + " · " + item.versionCode,
+                                    style = COUITheme.textStyles.body2,
+                                    color = COUITheme.colorScheme.onSurfaceContainerVariant
+                                )
+                            }
+                            Text("下载", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
+                        }
+                    }
+                    Text(
+                        "打不开下载页时可复制发布页链接到浏览器。",
+                        style = COUITheme.textStyles.body2,
+                        color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
                 }
             }
             BasicComponent(
