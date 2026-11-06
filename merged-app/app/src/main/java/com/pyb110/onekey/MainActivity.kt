@@ -1397,7 +1397,6 @@ private fun HomeScreen(
     contentPadding: PaddingValues,
 ) {
     val context = LocalContext.current
-    var showAdvanced by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = contentPadding,
@@ -1429,9 +1428,7 @@ private fun HomeScreen(
                 controller = controller,
                 haptic = haptic,
                 onOpenSheet = onOpenSheet,
-                onDiagnostics = onDiagnostics,
-                showAdvanced = showAdvanced,
-                onToggleAdvanced = { showAdvanced = !showAdvanced }
+                onDiagnostics = onDiagnostics
             )
         }
         item { SectionTitle("更多") }
@@ -1454,9 +1451,6 @@ private fun HomeScreen(
                     )
                 )
             )
-        }
-        if (showAdvanced) {
-            item { ExploitCard(controller, haptic) }
         }
     }
 }
@@ -1806,8 +1800,6 @@ private fun OptionsCard(
     haptic: (CouiHapticEffect) -> Unit,
     onOpenSheet: (Int) -> Unit,
     onDiagnostics: () -> Unit,
-    showAdvanced: Boolean,
-    onToggleAdvanced: () -> Unit,
 ) {
     val hotSummary = when {
         controller.hotSwitchAvailable -> "当前 " + controller.activeKernelManager.ifBlank { "未知" }
@@ -1851,13 +1843,6 @@ private fun OptionsCard(
                 arrow = true,
                 onClick = { haptic(CouiHapticEffect.Switch); onDiagnostics() }
             ),
-            ListRow(
-                title = "高级设置",
-                summary = if (showAdvanced) "已展开：越狱方式与适配说明" else "越狱方式与适配说明",
-                icon = COUIIcons.Settings,
-                arrow = true,
-                onClick = { haptic(CouiHapticEffect.Switch); onToggleAdvanced() }
-            )
         )
     )
 }
@@ -2395,10 +2380,11 @@ private fun ActionCard(
         Spacer(Modifier.height(6.dp))
         LinearProgressIndicator(progress = controller.progress, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(4.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("失败可直接重试，内核异常时才需重启", style = COUITheme.textStyles.body2, color = c.muted, modifier = Modifier.weight(1f))
-            TextButton(text = "环境诊断", onClick = onDiagnostics)
-        }
+        Text(
+            "失败可直接重试，内核异常时才需重启",
+            style = COUITheme.textStyles.body2,
+            color = c.muted
+        )
     }
 }
 
