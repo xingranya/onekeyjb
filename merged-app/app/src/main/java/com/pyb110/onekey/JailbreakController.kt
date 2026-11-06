@@ -197,16 +197,34 @@ class JailbreakController private constructor(private val context: Context) {
             val selinux = if (serviceReady) StellarShell.run("getenforce", 10).output else "未知"
             val mod = if (serviceReady) StellarShell.run("grep -i kernelsu /proc/modules | tr '\n' ' '", 10).output else ""
             val overlay = if (serviceReady) StellarShell.run("grep -i onekey /proc/mounts 2>/dev/null | wc -l", 10).output else "0"
-            val nativeSu = if (serviceReady) StellarShell.run("timeout 6 su -c 'id -u' 2>/dev/null; true", 15).output.trim() else ""
+            // root 检测多路尝试：不同管理器/软重启后的 su 行为不完全一致。
+            var suOk = false
+            if (serviceReady) {
+                for (probe in listOf(
+                    "su -c 'id -u'",
+                    "/system/bin/su -c 'id -u'",
+                    "su 0 id -u",
+                    "su -c id"
+                )) {
+                    val out = StellarShell.run("timeout 8 " + probe + " 2>&1", 15).output
+                    if (out.contains("uid=0") || out.lineSequence().any { it.trim() == "0" }) { suOk = true; break }
+                }
+            }
             val overlaySu = if (serviceReady) StellarShell.run("[ -x /system_ext/bin/su ] && grep -q su_compat /proc/mounts && echo READY || echo MISSING", 15).output else "MISSING"
-            suCompatReady = nativeSu == "0" || overlaySu.contains("READY")
+            suCompatReady = suOk || overlaySu.contains("READY")
 
-            if (serviceReady && serviceGranted && suCompatReady && !running && !isSwitchingManager) {
-                val node = StellarShell.run("timeout 5 su -c 'test -f /proc/kernelsu_manager && echo EXISTS || echo NO'", 15).output.trim()
-                hotSwitchAvailable = node == "EXISTS"
-                activeKernelManager = if (hotSwitchAvailable) managerLabelFromProfile(
-                    StellarShell.run("timeout 5 su -c 'cat /proc/kernelsu_manager'", 15).output.trim()
-                ) else ""
+            // 节点探测与 root 检测解耦：/proc 节点本身对 shell 可读，不需要 su。
+            if (serviceReady && serviceGranted && !running && !isSwitchingManager) {
+                val plain = StellarShell.run("test -e /proc/kernelsu_manager && echo EXISTS || echo NO", 10).output.trim()
+                val viaSu = if (!plain.contains("EXISTS") && suCompatReady)
+                    StellarShell.run("timeout 5 su -c 'test -e /proc/kernelsu_manager && echo EXISTS || echo NO'", 12).output.trim()
+                else ""
+                hotSwitchAvailable = plain.contains("EXISTS") || viaSu.contains("EXISTS")
+                activeKernelManager = if (hotSwitchAvailable) {
+                    val raw = StellarShell.run("cat /proc/kernelsu_manager 2>/dev/null", 10).output.trim()
+                        .ifBlank { StellarShell.run("timeout 5 su -c 'cat /proc/kernelsu_manager' 2>/dev/null", 12).output.trim() }
+                    managerLabelFromProfile(raw)
+                } else ""
             } else {
                 hotSwitchAvailable = false
                 activeKernelManager = ""

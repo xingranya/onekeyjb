@@ -1601,6 +1601,10 @@ private fun OptionsCard(
                     if (controller.hotSwitchMessage.isNotBlank()) {
                         Text(controller.hotSwitchMessage, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant, modifier = Modifier.padding(top = 8.dp))
                     }
+                    TextButton(
+                        text = "重新检测状态",
+                        onClick = { haptic(CouiHapticEffect.Switch); controller.refreshState() }
+                    )
                 }
             }
             // 管理器下载：直接指向各家官方最新正式版。

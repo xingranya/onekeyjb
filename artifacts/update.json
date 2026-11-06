@@ -1,12 +1,23 @@
 {
-  "versionCode": 189,
-  "versionName": "2.18.22",
-  "publishedAt": "2026-11-06T09:36:00+08:00",
+  "versionCode": 190,
+  "versionName": "2.18.23",
+  "publishedAt": "2026-11-06T09:44:00+08:00",
   "size": 23837237,
-  "sha256": "4d757d2237ac575cd80744ba0eae888ac0067f6e9d0c28f20abccd6134d277c1",
+  "sha256": "ee8e0a6dbb922aec61b0fe35d6f1463efdb4fc7314c2bfee8e26681dbc65b415",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.22\n\n- 修复「成功后软重启导致状态丢失」：拿到 root 的瞬间即同步写入成功标记，不再依赖运行结束\n- 软重启后重新打开 App 仍显示「已越狱（服务离线）」，不再误报未提权",
+  "changelog": "v2.18.23\n\n- root 检测改为多路尝试（su / /system/bin/su / su 0），不再因单一命令失败误判未越狱\n- 热切换节点探测与 root 检测解耦：直接检查 /proc/kernelsu_manager，不再被 su 结果卡住\n- 热切换面板新增「重新检测状态」按钮，可手动刷新",
   "versions": [
+    {
+      "versionName": "2.18.23",
+      "versionCode": 190,
+      "publishedAt": "2026-11-06T09:44:00+08:00",
+      "size": 23837237,
+      "notes": [
+        "root 检测改为多路尝试（su / /system/bin/su / su 0），不再因单一命令失败误判未越狱",
+        "热切换节点探测与 root 检测解耦：直接检查 /proc/kernelsu_manager，不再被 su 结果卡住",
+        "热切换面板新增「重新检测状态」按钮，可手动刷新"
+      ]
+    },
     {
       "versionName": "2.18.22",
       "versionCode": 189,
