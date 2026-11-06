@@ -1,12 +1,23 @@
 {
-  "versionCode": 195,
-  "versionName": "2.18.28",
-  "publishedAt": "2026-11-06T11:05:00+08:00",
-  "size": 23853617,
-  "sha256": "e71ac618c8021de20d9dea64a3b552f54cfdb49e553a9895ece04978b66c739d",
+  "versionCode": 196,
+  "versionName": "2.18.29",
+  "publishedAt": "2026-11-06T11:20:00+08:00",
+  "size": 23853621,
+  "sha256": "6788fb4e4c2936bb9ad78ce39aa07dc739dcd6f4dfb844f5669b40dbc71d5707",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.28\n\n- 热切换：目标管理器改为随时可选，不再依赖节点是否已就绪\n- 新增「安装加载器 / 重启手机 / 还原加载器」三个操作，安装后按提示重启再运行一次即可启用\n- 安装前自动备份原加载器，可一键还原",
+  "changelog": "v2.18.29\n\n- 面板显示 primary profile 原文（包名 版本 feature），可直接确认切换是否生效\n- 切换后强制停止全部管理器，重开时按新 primary 刷新状态\n- 说明：通用模块在 BakaSU profile 下会注册所有已装管理器，多个管理器同时显示\"工作中\"属模块设计",
   "versions": [
+    {
+      "versionName": "2.18.29",
+      "versionCode": 196,
+      "publishedAt": "2026-11-06T11:20:00+08:00",
+      "size": 23853621,
+      "notes": [
+        "面板显示 primary profile 原文（包名 版本 feature），可直接确认切换是否生效",
+        "切换后强制停止全部管理器，重开时按新 primary 刷新状态",
+        "说明：通用模块在 BakaSU profile 下会注册所有已装管理器，多个管理器同时显示\"工作中\"属模块设计"
+      ]
+    },
     {
       "versionName": "2.18.28",
       "versionCode": 195,

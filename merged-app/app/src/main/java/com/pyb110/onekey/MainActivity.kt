@@ -1657,6 +1657,14 @@ private fun OptionsCard(
                     if (controller.hotSwitchMessage.isNotBlank()) {
                         Text(controller.hotSwitchMessage, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant, modifier = Modifier.padding(top = 8.dp))
                     }
+                    if (controller.activeKernelRaw.isNotBlank()) {
+                        Text(
+                            "primary：" + controller.activeKernelRaw,
+                            style = COUITheme.textStyles.body2,
+                            color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
                     if (controller.probeDetail.isNotBlank()) {
                         Text(
                             controller.probeDetail,

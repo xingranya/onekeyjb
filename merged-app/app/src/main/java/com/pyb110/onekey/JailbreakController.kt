@@ -103,6 +103,8 @@ class JailbreakController private constructor(private val context: Context) {
     val universalModuleEnabled: Boolean = false
     /** 管理器加载器是否已被替换为通用加载器（决定热切换能否真正启用）。 */
     var hotSwitchLoaderInstalled: Boolean by mutableStateOf(false); private set
+    /** /proc/kernelsu_manager 的原始内容：包名 版本号 feature_max。 */
+    var activeKernelRaw: String by mutableStateOf(""); private set
     var loaderBusy: Boolean by mutableStateOf(false); private set
     /** 本次开机是否已成功越狱（与 boot_id 绑定，重启后自动失效）。 */
     var rootedThisBoot: Boolean by mutableStateOf(false); private set
@@ -236,8 +238,9 @@ class JailbreakController private constructor(private val context: Context) {
                 activeKernelManager = if (hotSwitchAvailable) {
                     val raw = StellarShell.run("cat /proc/kernelsu_manager 2>/dev/null", 10).output.trim()
                         .ifBlank { StellarShell.run("timeout 5 su -c 'cat /proc/kernelsu_manager' 2>/dev/null", 12).output.trim() }
+                    activeKernelRaw = raw.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
                     managerLabelFromProfile(raw)
-                } else ""
+                } else { activeKernelRaw = ""; "" }
             } else {
                 hotSwitchAvailable = false
                 activeKernelManager = ""
@@ -532,6 +535,10 @@ class JailbreakController private constructor(private val context: Context) {
                     activeKernelManager = active
                     hotSwitchMessage = "已切换到 " + active
                     addLog("热切换成功，内核 profile 已指向 " + active)
+                    // 通用模块在 BakaSU profile 下会把所有已装管理器都注册为 manager，
+                    // 各管理器界面会同时显示"工作中"；切换只改 primary profile。
+                    // 这里把全部管理器停掉，重开时才会按新的 primary 刷新状态。
+                    managers.forEach { m -> StellarShell.run("am force-stop " + m.pkg, 10) }
                     val stopped = StellarShell.run("am force-stop " + target.pkg, 10)
                     if (stopped.code != 0) addLog("目标管理器状态刷新失败，请手动关闭后重开：" + stopped.output.take(100))
                     withContext(Dispatchers.Main) {
