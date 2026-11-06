@@ -106,6 +106,8 @@ class JailbreakController private constructor(private val context: Context) {
     /** /proc/kernelsu_manager 的原始内容：包名 版本号 feature_max。 */
     var activeKernelRaw: String by mutableStateOf(""); private set
     var loaderBusy: Boolean by mutableStateOf(false); private set
+    /** 用户是否希望长期启用热切换；管理器升级导致加载器被还原时会自动重装。 */
+    var hotSwitchWanted: Boolean by mutableStateOf(prefs.getBoolean("hot_switch_wanted", false)); private set
     /** 本次开机是否已成功越狱（与 boot_id 绑定，重启后自动失效）。 */
     var rootedThisBoot: Boolean by mutableStateOf(false); private set
 
@@ -473,6 +475,8 @@ class JailbreakController private constructor(private val context: Context) {
                 val ok = r.output.contains("OK") && !r.output.contains("FAIL")
                 if (ok) {
                     hotSwitchLoaderInstalled = true
+                    hotSwitchWanted = true
+                    prefs.edit().putBoolean("hot_switch_wanted", true).apply()
                     addLog("通用加载器已安装：重启手机后重新运行越狱即可启用热切换")
                 } else {
                     addLog("安装失败：" + r.output.trim().take(120))
@@ -493,7 +497,12 @@ class JailbreakController private constructor(private val context: Context) {
             try {
                 val r = StellarShell.run("su -c '" + loaderScript("restore", "") + "'", 60)
                 val ok = r.output.contains("OK")
-                if (ok) { hotSwitchLoaderInstalled = false; addLog("已还原管理器原加载器") }
+                if (ok) {
+                    hotSwitchLoaderInstalled = false
+                    hotSwitchWanted = false
+                    prefs.edit().putBoolean("hot_switch_wanted", false).apply()
+                    addLog("已还原管理器原加载器")
+                }
                 else addLog("还原失败：" + r.output.trim().take(120))
                 finishLoader(ok, if (ok) "已还原" else "还原失败", onDone)
             } catch (e: Throwable) {
@@ -863,6 +872,11 @@ class JailbreakController private constructor(private val context: Context) {
                 if (ok) {
                     prefs.edit().remove("failed_boot_id").putString("success_boot_id", startBootId).apply()
                     rootedThisBoot = startBootId.isNotBlank() && startBootId == localBootId()
+                    // 管理器升级会重建 lib 目录，加载器被还原；此时自动补装，避免下次开机又变回单管理器。
+                    if (hotSwitchWanted && !hotSwitchLoaderInstalled) {
+                        addLog("检测到通用加载器缺失（可能管理器已升级），正在自动重装")
+                        installHotSwitchLoader { _, _ -> }
+                    }
                 } else if (RunReport.wroteKernel) {
                     prefs.edit().putString("failed_boot_id", startBootId).apply()
                     addLog("已记录：下次运行前需要重启手机")

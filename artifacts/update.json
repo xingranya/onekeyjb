@@ -1,12 +1,23 @@
 {
-  "versionCode": 196,
-  "versionName": "2.18.29",
-  "publishedAt": "2026-11-06T11:20:00+08:00",
+  "versionCode": 197,
+  "versionName": "2.18.30",
+  "publishedAt": "2026-11-06T11:28:00+08:00",
   "size": 23853621,
-  "sha256": "6788fb4e4c2936bb9ad78ce39aa07dc739dcd6f4dfb844f5669b40dbc71d5707",
+  "sha256": "e276db859272fc6d3a8129b679d279336f4d56e6ba594118cff8e3e3076ada55",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.29\n\n- 面板显示 primary profile 原文（包名 版本 feature），可直接确认切换是否生效\n- 切换后强制停止全部管理器，重开时按新 primary 刷新状态\n- 说明：通用模块在 BakaSU profile 下会注册所有已装管理器，多个管理器同时显示\"工作中\"属模块设计",
+  "changelog": "v2.18.30\n\n- 热切换加载器支持自动补装：管理器升级导致 lib 目录重建后，下次越狱成功时自动重装并提示重启\n- 还原加载器会同时清除长期启用标记，不再自动重装\n- 管理器下载清单已核对上游，五家均为当前最新正式版",
   "versions": [
+    {
+      "versionName": "2.18.30",
+      "versionCode": 197,
+      "publishedAt": "2026-11-06T11:28:00+08:00",
+      "size": 23853621,
+      "notes": [
+        "热切换加载器支持自动补装：管理器升级导致 lib 目录重建后，下次越狱成功时自动重装并提示重启",
+        "还原加载器会同时清除长期启用标记，不再自动重装",
+        "管理器下载清单已核对上游，五家均为当前最新正式版"
+      ]
+    },
     {
       "versionName": "2.18.29",
       "versionCode": 196,
