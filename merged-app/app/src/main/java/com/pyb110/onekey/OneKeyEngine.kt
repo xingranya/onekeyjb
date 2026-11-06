@@ -102,20 +102,15 @@ object OneKeyEngine {
                 line = line.replace("PYB110_", "").replace("t98260", "98260-engine")
                 if (line.contains("SELINUX=permissive")) sawPermissive = true
                 // 竞态没落地时引擎会继续盲写并反复重试，这是内核被拖挂的直接原因：立即中止。
-                // 引擎每次失败都会重打一轮；允许重试一次，第二次失败即中止，避免持续冲击内核。
-                if (abortReason == null && (line.contains("rc=-1") || line.contains("HIT=0") || line.contains("RECLAIM_FREED=0"))) {
+                // 一次尝试会同时打出 HIT=0 与 rc=-1，只按 rc 行计一次失败，避免把单次失败当成两次。
+                if (abortReason == null && line.contains("rc=-1")) {
                     failedStageSignals += 1
-                    val reason = when {
-                        line.contains("RECLAIM_FREED=0") -> "对象回收失败（RECLAIM_FREED=0）"
-                        line.contains("HIT=0") -> "写入未命中（HIT=0）"
-                        else -> "该阶段未成功（rc=-1）"
-                    }
-                    if (failedStageSignals >= 2) {
-                        abortReason = reason
-                        RunReport.stop("布置提权原语", reason)
-                        log("连续两次未命中（" + reason + "），立即中止以避免内核进入不稳定状态")
+                    if (failedStageSignals >= 4) {
+                        abortReason = "连续 " + failedStageSignals + " 次尝试未成功"
+                        RunReport.stop("布置提权原语", abortReason!!)
+                        log("已连续失败 " + failedStageSignals + " 次，中止以避免内核进入不稳定状态")
                     } else {
-                        log("本次未命中（" + reason + "），允许再试一次")
+                        log("第 " + failedStageSignals + " 次尝试未命中，继续重试")
                     }
                 }
                 when {

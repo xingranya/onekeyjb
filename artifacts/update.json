@@ -1,12 +1,22 @@
 {
-  "versionCode": 186,
-  "versionName": "2.18.19",
-  "publishedAt": "2026-11-06T09:20:00+08:00",
-  "size": 23837233,
-  "sha256": "6f6bfd14c0c7754b52e9d741f39c56ad9abff67bb83e43a67191650749b8d75f",
+  "versionCode": 187,
+  "versionName": "2.18.20",
+  "publishedAt": "2026-11-06T09:26:00+08:00",
+  "size": 23837237,
+  "sha256": "fc9013639977d3a25d85c5a5d2e3c5107c3382a80b27af4964b526125e895a58",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.19\n\n- 恢复默认加载管理器自带模块，越狱恢复原来的成功率与速度\n- 通用多管理器模块改为「运行前加载通用模块」开关，默认关闭；开启后由包装脚本加载，--kmi 不被接受时自动降级，并回报热切换节点是否就绪\n- 失败保护：同一阶段连续两次未命中立即中止，不再让引擎持续重试拖垮内核\n- 失败且已写入内核时强制要求重启后再运行，避免在已污染的内核上重跑\n- 中止后自动尝试恢复 SELinux 为 Enforcing",
+  "changelog": "v2.18.20\n\n- 修复未启动 Stellar 时点击开始导致的闪退\n- 修正中止判定：同一次失败不再被误计为两次，重试次数放宽到 4 次",
   "versions": [
+    {
+      "versionName": "2.18.20",
+      "versionCode": 187,
+      "publishedAt": "2026-11-06T09:26:00+08:00",
+      "size": 23837237,
+      "notes": [
+        "修复未启动 Stellar 时点击开始导致的闪退",
+        "修正中止判定：同一次失败不再被误计为两次，重试次数放宽到 4 次"
+      ]
+    },
     {
       "versionName": "2.18.19",
       "versionCode": 186,

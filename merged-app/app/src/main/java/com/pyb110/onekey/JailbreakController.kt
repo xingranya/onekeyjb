@@ -557,7 +557,10 @@ class JailbreakController private constructor(private val context: Context) {
         }
         if (!acquireRunLock()) return
         // 引擎自带约束：失败后必须冷启动再重跑，否则会反复冲击已污染的内核。
-        val bootNow = ShizukuShell.run("cat /proc/sys/kernel/random/boot_id 2>/dev/null", 8).output.trim()
+        // 读取失败（例如 Stellar 未就绪）不阻断运行，交给后续服务检查处理。
+        val bootNow = runCatching {
+            ShizukuShell.run("cat /proc/sys/kernel/random/boot_id 2>/dev/null", 8).output.trim()
+        }.getOrDefault("")
         val dirtyBoot = prefs.getString("failed_boot_id", "").orEmpty()
         if (bootNow.isNotBlank() && dirtyBoot.isNotBlank() && bootNow == dirtyBoot) {
             addLog("上次越狱未完成，内核可能已被污染；请重启手机后再试（本次已阻止运行）")
@@ -569,7 +572,7 @@ class JailbreakController private constructor(private val context: Context) {
         val runAdaptive = adaptiveManagerEnabled
         val runKind = selectedManager
         runCatching { JailbreakRunService.start(context) }
-        val startBootId = ShizukuShell.run("cat /proc/sys/kernel/random/boot_id 2>/dev/null", 8).output.trim()
+        val startBootId = bootNow
         progress = 0.01f
         stage = "检查 Stellar 服务"
         elapsedSeconds = 0L
