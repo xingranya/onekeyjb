@@ -30,7 +30,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -112,6 +114,19 @@ import io.github.suqi8.coui.kmp.icon.extended.Theme
 import io.github.suqi8.coui.kmp.icon.extended.Unlock
 import io.github.suqi8.coui.kmp.icon.extended.Update
 import io.github.suqi8.coui.kmp.theme.COUITheme
+import android.os.Build
+import com.pyb110.onekey.ui.AppearanceMode
+import com.pyb110.onekey.ui.DarkOneKeyColors
+import com.pyb110.onekey.ui.LightOneKeyColors
+import com.pyb110.onekey.ui.OneKeyColors
+import com.pyb110.onekey.ui.ProvideOneKeyColors
+import com.pyb110.onekey.ui.oneKeyCardColor
+import com.pyb110.onekey.ui.oneKeyCardOutline
+import com.pyb110.onekey.ui.oneKeyColors
+import com.pyb110.onekey.ui.oneKeyDeviceColor
+import com.pyb110.onekey.ui.readAppearance
+import com.pyb110.onekey.ui.resolveDark
+import com.pyb110.onekey.ui.writeAppearance
 import io.github.suqi8.coui.kmp.theme.ColorSchemeMode
 import io.github.suqi8.coui.kmp.theme.LocalDismissState
 import io.github.suqi8.coui.kmp.theme.ThemeController
@@ -127,38 +142,44 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
-    private fun loadThemeMode(): String =
-        getSharedPreferences("onekey", MODE_PRIVATE).getString("theme_mode", "pink") ?: "pink"
-
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
             val controller = remember { JailbreakController.get(applicationContext) }
-            var themeMode by remember { mutableStateOf(loadThemeMode()) }
-            val themeController = remember(themeMode) {
+            var appearance by remember { mutableStateOf(readAppearance(applicationContext)) }
+            val dark = resolveDark(appearance)
+            val themeController = remember(dark) {
                 ThemeController(
                     ColorSchemeMode.MonetSystem,
-                    keyColor = if (themeMode == "pink") Color(0xFFFFC0CB) else null
+                    keyColor = if (dark) Color(0xFFE4ADBD) else Color(0xFF9B4A5A),
+                    isDark = dark
                 )
             }
             COUITheme(controller = themeController) {
-                AppRoot(
-                    controller = controller,
-                    themeMode = themeMode,
-                    onToggleTheme = {
-                        themeMode = if (themeMode == "pink") "dynamic" else "pink"
-                        getSharedPreferences("onekey", MODE_PRIVATE)
-                            .edit().putString("theme_mode", themeMode).apply()
-                    }
-                )
+                ProvideOneKeyColors(dark) {
+                    AppRoot(
+                        controller = controller,
+                        appearance = appearance,
+                        isDark = dark,
+                        onChangeAppearance = { mode ->
+                            appearance = mode
+                            writeAppearance(applicationContext, mode)
+                        }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun AppRoot(controller: JailbreakController, themeMode: String, onToggleTheme: () -> Unit) {
+private fun AppRoot(
+    controller: JailbreakController,
+    appearance: AppearanceMode,
+    isDark: Boolean,
+    onChangeAppearance: (AppearanceMode) -> Unit,
+) {
     val haptic = rememberCouiHaptic()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -182,6 +203,8 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
     var reloadHistoryTick by remember { mutableIntStateOf(0) }
     // 底部抽屉的状态放在根级：overlay 组件必须挂在浮层宿主上，不能留在列表 item 里。
     var sheet by remember { mutableIntStateOf(0) }
+    var sheetVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(sheet) { if (sheet != 0) sheetVisible = true }
     var hwTarget by remember { mutableStateOf("") }
     val certManagers = controller.managers.filter { it.installedVersionCode != null && it.certOk }
     LaunchedEffect(certManagers.map { it.kind }) {
@@ -222,7 +245,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
 
     Scaffold(
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
-        containerColor = COUITheme.colorScheme.background,
+        containerColor = oneKeyColors().background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { _ ->
         val backdrop = rememberLayerBackdrop()
@@ -232,8 +255,8 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
         val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val screenContentPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
+            start = 12.dp,
+            end = 12.dp,
             // topBarPx 是栏体内容高度（不含状态栏内边距），所以这里要再加一次 statusBarTop
             top = if (topBarPx > 0) statusBarTop + with(density) { topBarPx.toDp() } + 10.dp
                   else statusBarTop + 92.dp,
@@ -263,8 +286,6 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             },
                             onOpenAbout = { tab = 3 },
                             onOpenManual = { showManual = true },
-                            targetLabel = hwTargetLabel,
-                            targetSelectable = certManagers.isNotEmpty(),
                             onOpenSheet = { sheet = it },
                             contentPadding = screenContentPadding
                         )
@@ -275,7 +296,12 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             scope = scope,
                             contentPadding = screenContentPadding,
                             onGoHome = { tab = 0 },
-                            onExport = { exportLauncher.launch("onekey-log-" + System.currentTimeMillis() + ".txt") }
+                            onExport = { exportLauncher.launch("onekey-log-" + System.currentTimeMillis() + ".txt") },
+                            onCopy = { onCopy(context, controller, scope, snackbarHostState) },
+                            onClear = {
+                                controller.clearLogs()
+                                scope.launch { snackbarHostState.showSnackbar("日志已清空") }
+                            }
                         )
                         2 -> HistoryScreen(
                             controller = controller,
@@ -289,8 +315,8 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                         )
                         3 -> AboutScreen(
                             controller = controller,
-                            themeMode = themeMode,
-                            onToggleTheme = onToggleTheme,
+                            appearance = appearance,
+                            onChangeAppearance = onChangeAppearance,
                             haptic = haptic,
                             onOpenLog = { tab = 1 },
                             onNotice = { showNotice = true },
@@ -319,6 +345,11 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                 onLogClear = { controller.clearLogs(); scope.launch { snackbarHostState.showSnackbar("日志已清空") } },
                 onHistoryRefresh = { reloadHistoryTick++; scope.launch { snackbarHostState.showSnackbar("已刷新历史记录") } },
                 onHistoryClear = { showClearHistoryConfirm = true },
+                isDark = isDark,
+                onToggleAppearance = {
+                    haptic(CouiHapticEffect.Switch)
+                    onChangeAppearance(if (isDark) AppearanceMode.LIGHT else AppearanceMode.DARK)
+                },
                 onHeight = { topBarPx = it },
                 modifier = Modifier.align(Alignment.TopCenter)
             )
@@ -334,75 +365,40 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
             // 浮层宿主：底部抽屉等 overlay 组件需要它才能挂到窗口层。
             COUIPopupHost()
 
-            if (sheet == 1) {
-                var v1 by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { v1 = true }
+            // 抽屉的可见状态提到根级：内容里的开关/筛选变化不会重建它，避免整块弹一下。
+            if (sheet != 0) {
                 WindowBottomSheet(
-                    show = v1,
-                    title = "管理器热切换",
-                    onDismissRequest = { v1 = false },
-                    onDismissFinished = { sheet = 0 }
+                    show = sheetVisible,
+                    title = sheetTitle(sheet),
+                    onDismissRequest = { sheetVisible = false },
+                    onDismissFinished = { sheet = 0; sheetVisible = false }
                 ) {
-                    Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
-                        HotSwitchPanel(
-                            controller = controller,
-                            haptic = haptic,
-                            selectedTarget = hwTarget,
-                            onPickTarget = { sheet = 4 }
-                        )
-                    }
-                }
-            }
-            if (sheet == 2) {
-                var v2 by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { v2 = true }
-                WindowBottomSheet(
-                    show = v2,
-                    title = "管理器下载",
-                    onDismissRequest = { v2 = false },
-                    onDismissFinished = { sheet = 0 }
-                ) {
-                    Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
-                        ManagerDownloadPanel()
-                    }
-                }
-            }
-            if (sheet == 3) {
-                var v3 by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { v3 = true }
-                WindowBottomSheet(
-                    show = v3,
-                    title = "拓展开关",
-                    onDismissRequest = { v3 = false },
-                    onDismissFinished = { sheet = 0 }
-                ) {
-                    Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
-                        FeatureTogglePanel(controller, haptic)
-                    }
-                }
-            }
-            if (sheet == 5) {
-                WindowDialog(title = "越狱管理器", show = true, onDismissRequest = { sheet = 0 }) {
-                    Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
-                        JailManagerPanel(controller, haptic)
-                    }
-                }
-            }
-            if (sheet == 4) {
-                var v4 by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { v4 = true }
-                WindowBottomSheet(
-                    show = v4,
-                    title = "目标管理器",
-                    onDismissRequest = { v4 = false },
-                    onDismissFinished = { sheet = 0 }
-                ) {
-                    Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
-                        TargetPickerPanel(
-                            controller = controller,
-                            selected = hwTarget,
-                            onPick = { hwTarget = it; sheet = 0 }
-                        )
+                    when (sheet) {
+                        1 -> Column(Modifier.fillMaxWidth().height(520.dp).verticalScroll(rememberScrollState())) {
+                            HotSwitchPanel(
+                                controller = controller,
+                                haptic = haptic,
+                                selectedTarget = hwTarget,
+                                onPickTarget = { sheet = 4 }
+                            )
+                        }
+                        2 -> Column(Modifier.fillMaxWidth().height(460.dp).verticalScroll(rememberScrollState())) {
+                            ManagerDownloadPanel()
+                        }
+                        3 -> Column(Modifier.fillMaxWidth().height(420.dp).verticalScroll(rememberScrollState())) {
+                            FeatureTogglePanel(controller, haptic)
+                        }
+                        4 -> Column(Modifier.fillMaxWidth().height(400.dp).verticalScroll(rememberScrollState())) {
+                            TargetPickerPanel(
+                                controller = controller,
+                                selected = hwTarget,
+                                // 选完回到热切换面板本身，不用再重新进一次。
+                                onPick = { hwTarget = it; sheet = 1 }
+                            )
+                        }
+                        5 -> Column(Modifier.fillMaxWidth().height(400.dp).verticalScroll(rememberScrollState())) {
+                            JailManagerPanel(controller, haptic)
+                        }
                     }
                 }
             }
@@ -471,7 +467,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                         Text(
                             noticeText,
                             style = COUITheme.textStyles.body2,
-                            color = COUITheme.colorScheme.onSurfaceContainerVariant
+                            color = oneKeyColors().muted
                         )
                         DialogActions(
                             DialogAction("复制全文", COUIIcons.Copy) {
@@ -518,7 +514,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             Text(
                                 termsText,
                                 style = COUITheme.textStyles.body2,
-                                color = COUITheme.colorScheme.onSurfaceContainerVariant
+                                color = oneKeyColors().muted
                             )
                         }
                         Text(
@@ -567,7 +563,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                         Text(
                             "执行过程中将短暂提权并向内核装载特权模块。",
                             style = COUITheme.textStyles.body2,
-                            color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                            color = oneKeyColors().muted,
                             modifier = Modifier.padding(top = 6.dp)
                         )
                         DialogActions(
@@ -641,7 +637,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             "更新时间 " + UpdateChecker.formatTime(info.publishedAt) +
                                 (if (info.size > 0) " · 安装包 " + UpdateChecker.formatSize(info.size) else ""),
                             style = COUITheme.textStyles.body2,
-                            color = COUITheme.colorScheme.onSurfaceContainerVariant
+                            color = oneKeyColors().muted
                         )
                         Spacer(Modifier.height(10.dp))
                         if (info.versions.isEmpty()) {
@@ -671,7 +667,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                             }
                         }
                         updateError?.let { err ->
-                            Text(err, color = COUITheme.colorScheme.error, style = COUITheme.textStyles.body2, modifier = Modifier.padding(top = 8.dp))
+                            Text(err, color = oneKeyColors().error, style = COUITheme.textStyles.body2, modifier = Modifier.padding(top = 8.dp))
                         }
                         if (updateDownloading) {
                             LinearProgressIndicator(
@@ -691,7 +687,7 @@ private fun AppRoot(controller: JailbreakController, themeMode: String, onToggle
                                     UpdateChecker.formatSpeed(updateProgress.bytesPerSec) +
                                         " · 剩余 " + UpdateChecker.formatSize(updateProgress.remaining),
                                     style = COUITheme.textStyles.body2,
-                                    color = COUITheme.colorScheme.onSurfaceContainerVariant
+                                    color = oneKeyColors().muted
                                 )
                             }
                         }
@@ -761,14 +757,14 @@ private fun VersionNoteRow(
                 if (note.size > 0) UpdateChecker.formatSize(note.size) else "大小未标注",
                 style = COUITheme.textStyles.body2,
                 fontSize = 10.sp,
-                color = COUITheme.colorScheme.onSurfaceContainerVariant
+                color = oneKeyColors().muted
             )
         }
         Text(
             "更新时间 " + UpdateChecker.formatTime(note.publishedAt),
             style = COUITheme.textStyles.body2,
             fontSize = 10.sp,
-            color = COUITheme.colorScheme.onSurfaceContainerVariant,
+            color = oneKeyColors().muted,
             modifier = Modifier.padding(top = 2.dp)
         )
         AnimatedVisibility(
@@ -787,7 +783,7 @@ private fun VersionNoteRow(
                         Text(
                             line,
                             style = COUITheme.textStyles.body2,
-                            color = COUITheme.colorScheme.onSurfaceContainerVariant
+                            color = oneKeyColors().muted
                         )
                     }
                 }
@@ -833,7 +829,7 @@ private fun ManualSection(title: String, lines: List<String>) {
                         Text(
                             line,
                             style = COUITheme.textStyles.body2,
-                            color = COUITheme.colorScheme.onSurfaceContainerVariant
+                            color = oneKeyColors().muted
                         )
                     }
                 }
@@ -920,27 +916,12 @@ private fun RunFlow(
                 else -> StepState.PENDING
             }
 
-            val (bg, fg, icon) = when (state) {
-                StepState.SUCCESS -> Triple(
-                    COUITheme.colorScheme.primary,
-                    COUITheme.colorScheme.onPrimary,
-                    COUIIcons.Ok
-                )
-                StepState.RUNNING -> Triple(
-                    COUITheme.colorScheme.primary.copy(alpha = 0.22f),
-                    COUITheme.colorScheme.primary,
-                    COUIIcons.Play
-                )
-                StepState.ERROR -> Triple(
-                    COUITheme.colorScheme.error,
-                    COUITheme.colorScheme.onError,
-                    COUIIcons.Close
-                )
-                StepState.PENDING -> Triple(
-                    COUITheme.colorScheme.surfaceContainer,
-                    COUITheme.colorScheme.onSurfaceContainerVariant,
-                    COUIIcons.Info
-                )
+            val c = oneKeyColors()
+            val (bg, fg, glyph) = when (state) {
+                StepState.SUCCESS -> Triple(c.primary, c.onPrimary, null)
+                StepState.RUNNING -> Triple(c.primarySoft, c.primaryInk, (index + 1).toString())
+                StepState.ERROR -> Triple(c.error, c.onPrimary, null)
+                StepState.PENDING -> Triple(c.background, c.muted, (index + 1).toString())
             }
 
             Column(
@@ -955,12 +936,16 @@ private fun RunFlow(
                         .background(bg),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = fg,
-                        modifier = Modifier.size(13.dp)
-                    )
+                    if (glyph != null) {
+                        Text(glyph, style = COUITheme.textStyles.body2, fontSize = 11.sp, color = fg)
+                    } else {
+                        Icon(
+                            imageVector = if (state == StepState.ERROR) COUIIcons.Close else COUIIcons.Ok,
+                            contentDescription = null,
+                            tint = fg,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -968,9 +953,9 @@ private fun RunFlow(
                     style = COUITheme.textStyles.body2,
                     fontSize = 11.sp,
                     color = when (state) {
-                        StepState.ERROR -> COUITheme.colorScheme.error
-                        StepState.PENDING -> COUITheme.colorScheme.onSurfaceContainerVariant
-                        else -> COUITheme.colorScheme.primary
+                        StepState.ERROR -> c.error
+                        StepState.PENDING -> c.muted
+                        else -> c.primaryInk
                     }
                 )
             }
@@ -1072,6 +1057,8 @@ private fun TopBar(
     onLogClear: () -> Unit,
     onHistoryRefresh: () -> Unit,
     onHistoryClear: () -> Unit,
+    isDark: Boolean,
+    onToggleAppearance: () -> Unit,
     onHeight: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1093,6 +1080,8 @@ private fun TopBar(
             onLogClear = onLogClear,
             onHistoryRefresh = onHistoryRefresh,
             onHistoryClear = onHistoryClear,
+            isDark = isDark,
+            onToggleAppearance = onToggleAppearance,
         )
     }
 }
@@ -1133,8 +1122,11 @@ private fun TopBarContent(
     onLogClear: () -> Unit,
     onHistoryRefresh: () -> Unit,
     onHistoryClear: () -> Unit,
+    isDark: Boolean,
+    onToggleAppearance: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val c = oneKeyColors()
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -1160,7 +1152,7 @@ private fun TopBarContent(
                     Text(
                         "v" + BuildConfig.VERSION_NAME + " · " + (controller.profile?.displayName ?: "OnePlus"),
                         style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurfaceContainerVariant
+                        color = oneKeyColors().muted
                     )
                 }
             }
@@ -1172,7 +1164,7 @@ private fun TopBarContent(
                     Text(
                         "${controller.logs.size} 条记录",
                         style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurfaceContainerVariant
+                        color = oneKeyColors().muted
                     )
                 }
                 IconButton(onClick = onLogCopy) {
@@ -1193,7 +1185,7 @@ private fun TopBarContent(
                     Text(
                         "提权与诊断归档",
                         style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurfaceContainerVariant
+                        color = oneKeyColors().muted
                     )
                 }
                 IconButton(onClick = onHistoryRefresh) {
@@ -1207,18 +1199,34 @@ private fun TopBarContent(
                 Avatar(40)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("关于与设置", style = COUITheme.textStyles.headline1)
+                    Text("关于", style = COUITheme.textStyles.headline1)
                     Text(
                         "OneKey v" + BuildConfig.VERSION_NAME,
                         style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurfaceContainerVariant
+                        color = c.muted
+                    )
+                }
+            }
+        }
+            Spacer(Modifier.width(6.dp))
+            Surface(
+                onClick = onToggleAppearance,
+                shape = CircleShape,
+                color = c.primarySoft,
+                border = androidx.compose.foundation.BorderStroke(1.dp, c.cardOutline),
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        COUIIcons.Theme,
+                        contentDescription = if (isDark) "切换为浅色外观" else "切换为深色外观",
+                        tint = c.primaryInk,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
         }
     }
-}
-
 }
 
 @Composable
@@ -1313,12 +1321,9 @@ private fun ResultBanner(
     val isOk = controller.lastResultOk ?: return
     val is98260 = controller.lastResultExploitKind == "cve98260"
 
-    val containerColor = if (isOk) {
-        COUITheme.colorScheme.primary.copy(alpha = 0.12f)
-    } else {
-        COUITheme.colorScheme.error.copy(alpha = 0.12f)
-    }
-    val contentColor = if (isOk) COUITheme.colorScheme.primary else COUITheme.colorScheme.error
+    val c = oneKeyColors()
+    val containerColor = if (isOk) c.successSoft else c.errorSoft
+    val contentColor = if (isOk) c.success else c.error
 
     Card(Modifier.fillMaxWidth()) {
         Column(
@@ -1351,7 +1356,7 @@ private fun ResultBanner(
                             "在「${controller.stage}」阶段遇到错误，请查看日志排查问题。"
                         },
                         style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurface
+                        color = c.ink
                     )
                 }
             }
@@ -1388,13 +1393,11 @@ private fun HomeScreen(
     onRunJailbreak: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenManual: () -> Unit,
-    targetLabel: String,
-    targetSelectable: Boolean,
     onOpenSheet: (Int) -> Unit,
     contentPadding: PaddingValues,
 ) {
     val context = LocalContext.current
-    var showAdvanced by remember { mutableStateOf(true) }
+    var showAdvanced by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = contentPadding,
@@ -1419,30 +1422,17 @@ private fun HomeScreen(
                 )
             }
         }
-        // 高级设置（含拓展功能）放在运行卡片上方
-        item {
-            Card {
-                BasicComponent(
-                    title = if (showAdvanced) "收起高级设置" else "高级设置",
-                    summary = if (showAdvanced) "已展开：安全组件、软重启与拓展功能" else "安全组件、软重启与拓展功能",
-                    startAction = { Icon(COUIIcons.Settings, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
-                    onClick = { haptic(CouiHapticEffect.Switch); showAdvanced = !showAdvanced }
-                )
-            }
-        }
         item { ActionCard(controller, haptic, onDiagnostics, onRunJailbreak) }
-        if (showAdvanced) {
-            item { SectionTitle("拓展功能") }
-            item {
-                OptionsCard(
-                    controller = controller,
-                    haptic = haptic,
-                    targetLabel = targetLabel,
-                    targetSelectable = targetSelectable,
-                    onOpenSheet = onOpenSheet
-                )
-            }
-
+        item { SectionTitle("拓展功能") }
+        item {
+            OptionsCard(
+                controller = controller,
+                haptic = haptic,
+                onOpenSheet = onOpenSheet,
+                onDiagnostics = onDiagnostics,
+                showAdvanced = showAdvanced,
+                onToggleAdvanced = { showAdvanced = !showAdvanced }
+            )
         }
         item { SectionTitle("更多") }
         item {
@@ -1450,7 +1440,7 @@ private fun HomeScreen(
                 rows = listOf(
                     ListRow(
                         title = "用户手册",
-                        summary = "从零开始，5 分钟完成越狱",
+                        summary = "从零开始，5 秒钟完成越狱",
                         icon = COUIIcons.Help,
                         arrow = true,
                         onClick = { haptic(CouiHapticEffect.Switch); onOpenManual() }
@@ -1465,7 +1455,9 @@ private fun HomeScreen(
                 )
             )
         }
-        item { ExploitCard(controller, haptic) }
+        if (showAdvanced) {
+            item { ExploitCard(controller, haptic) }
+        }
     }
 }
 
@@ -1488,94 +1480,143 @@ private fun HiddenEnvCard(
 
 @Composable
 private fun HeroCard(controller: JailbreakController) {
-    Card {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        controller.profile?.displayName ?: "OnePlus",
-                        style = COUITheme.textStyles.headline1
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "98260 越狱链" + " · " + when {
-                            controller.suCompatReady -> "SU 就绪"
-                            controller.rootedThisBoot -> "已越狱"
-                            else -> "未提权"
-                        },
-                        style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurfaceContainerVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Spacer(Modifier.width(10.dp))
-                Surface(
-                    shape = CircleShape,
-                    color = if (controller.serviceReady) COUITheme.colorScheme.primary
-                            else COUITheme.colorScheme.surfaceContainer
-                ) {
-                    Text(
-                        if (controller.serviceReady) "服务在线" else "服务离线",
-                        color = if (controller.serviceReady) COUITheme.colorScheme.onPrimary
-                                else COUITheme.colorScheme.onSurfaceContainerVariant,
-                        style = COUITheme.textStyles.body2,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                HeroCell(
-                    "服务通道",
-                    if (controller.serviceReady && controller.serviceGranted) "已授权"
-                    else if (controller.serviceReady) "待授权" else "未连接",
-                    COUIIcons.Ok,
-                    Modifier.weight(1f)
+    val c = oneKeyColors()
+    val suReady = controller.suCompatReady
+    val adapterValue = when {
+        controller.hotSwitchAvailable -> "可用"
+        controller.hotSwitchLoaderInstalled -> "待重启"
+        else -> "待启用"
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(oneKeyDeviceColor())
+            .border(1.dp, oneKeyCardOutline(), RoundedCornerShape(20.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    controller.profile?.displayName ?: "OnePlus",
+                    style = COUITheme.textStyles.headline1,
+                    color = c.deviceInk
                 )
-                HeroCell(
-                    "SU 权限",
-                    if (controller.suCompatReady) "已就绪"
-                    else if (controller.rootedThisBoot) "已越狱" else "未就绪",
-                    COUIIcons.Lock,
-                    Modifier.weight(1f)
+                Text(
+                    (controller.profile?.model ?: "PYB110") + " · Android " + Build.VERSION.RELEASE,
+                    style = COUITheme.textStyles.body2,
+                    color = c.deviceMuted
                 )
             }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                HeroCell(
-                    "热切换",
-                    if (controller.hotSwitchAvailable) "可用" else "不可用",
-                    COUIIcons.Refresh,
-                    Modifier.weight(1f)
+            Spacer(Modifier.width(12.dp))
+            Row(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(if (controller.serviceReady) c.deviceStatusBg else c.warningSoft)
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    if (controller.serviceReady) COUIIcons.Ok else COUIIcons.Info,
+                    contentDescription = null,
+                    tint = if (controller.serviceReady) c.deviceStatusInk else c.warning,
+                    modifier = Modifier.size(14.dp)
                 )
-                HeroCell(
-                    "本次开机",
-                    if (controller.rootedThisBoot) "已越狱" else "未越狱",
-                    COUIIcons.Info,
-                    Modifier.weight(1f)
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    if (controller.serviceReady) "服务在线" else "服务离线",
+                    style = COUITheme.textStyles.body2,
+                    color = if (controller.serviceReady) c.deviceStatusInk else c.warning,
+                    maxLines = 1
                 )
             }
+        }
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = c.deviceOutline)
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth()) {
+            DeviceCell(
+                label = "服务通道",
+                value = if (controller.serviceReady && controller.serviceGranted) "已授权"
+                        else if (controller.serviceReady) "待授权" else "未连接",
+                icon = COUIIcons.Link,
+                positive = controller.serviceReady && controller.serviceGranted,
+                modifier = Modifier.weight(1f)
+            )
+            DeviceCell(
+                label = "SU 权限",
+                value = if (suReady) "已就绪" else "未就绪",
+                icon = COUIIcons.Lock,
+                positive = suReady,
+                modifier = Modifier.weight(1f)
+            )
+            DeviceCell(
+                label = "热切换",
+                value = adapterValue,
+                icon = COUIIcons.Replace,
+                positive = controller.hotSwitchAvailable,
+                modifier = Modifier.weight(1f)
+            )
+            DeviceCell(
+                label = "本次开机",
+                value = if (controller.rootedThisBoot) "已运行" else "未运行",
+                icon = COUIIcons.Refresh,
+                positive = controller.rootedThisBoot,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("内核版本", style = COUITheme.textStyles.body2, fontSize = 11.sp, color = c.deviceMuted)
+            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.weight(1f))
+            Text(
+                shortKernelVersion(),
+                style = COUITheme.textStyles.body2,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                color = c.deviceMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
 
+/** 设备卡里的单列状态：图标 + 标签一行，值在下方。 */
 @Composable
-private fun HeroCell(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = COUITheme.colorScheme.primary,
-            modifier = Modifier.width(20.dp).height(20.dp)
-        )
-        Spacer(Modifier.width(8.dp))
-        Column {
-            Text(label, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant)
-            Text(value, style = COUITheme.textStyles.body1)
+private fun DeviceCell(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    positive: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val c = oneKeyColors()
+    Column(modifier.padding(end = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = c.deviceMuted, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(
+                label,
+                style = COUITheme.textStyles.body2,
+                fontSize = 11.sp,
+                color = c.deviceMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
+        Spacer(Modifier.height(2.dp))
+        Text(
+            value,
+            style = COUITheme.textStyles.body2,
+            color = if (positive) c.devicePositive else c.deviceInk,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -1597,7 +1638,7 @@ private fun StatusCard(controller: JailbreakController) {
                 }
             )
             if (controller.deviceInfo.isNotBlank()) {
-                Text(controller.deviceInfo, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
+                Text(controller.deviceInfo, style = COUITheme.textStyles.body2, color = oneKeyColors().muted, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
             }
             Text(
                 when {
@@ -1611,6 +1652,67 @@ private fun StatusCard(controller: JailbreakController) {
             )
         }
     }
+}
+
+/** 读取已安装管理器的真实图标；读不到时退回字母标记。 */
+@Composable
+private fun ManagerMark(pkg: String, label: String, size: Int = 36) {
+    val context = LocalContext.current
+    val c = oneKeyColors()
+    val bitmap = remember(pkg) {
+        runCatching {
+            val drawable = context.packageManager.getApplicationIcon(pkg)
+            val bmp = android.graphics.Bitmap.createBitmap(96, 96, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bmp)
+            drawable.setBounds(0, 0, 96, 96)
+            drawable.draw(canvas)
+            bmp.asImageBitmap()
+        }.getOrNull()
+    }
+    Box(
+        modifier = Modifier
+            .padding(end = 12.dp)
+            .size(size.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(c.primarySoft),
+        contentAlignment = Alignment.Center
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = null,
+                modifier = Modifier.size((size - 8).dp).clip(RoundedCornerShape(8.dp))
+            )
+        } else {
+            Text(
+                label.take(1).uppercase(),
+                style = COUITheme.textStyles.body2,
+                color = c.primaryInk
+            )
+        }
+    }
+}
+
+private fun sheetTitle(sheet: Int): String = when (sheet) {
+    1 -> "管理器热切换"
+    2 -> "管理器下载"
+    3 -> "拓展开关"
+    4 -> "选择目标管理器"
+    5 -> "选择越狱管理器"
+    else -> ""
+}
+
+/** 内核版本取到 android 代次为止，避免长串 SMP 信息把一行挤爆。 */
+private fun shortKernelVersion(): String {
+    val raw = System.getProperty("os.version") ?: return "未知"
+    val cut = raw.substringBefore("-SMP").substringBefore(" SMP")
+    return if (cut.length > 34) cut.take(34) + "…" else cut
+}
+
+internal fun appearanceLabel(mode: AppearanceMode): String = when (mode) {
+    AppearanceMode.LIGHT -> "浅色 · 灰白配深玫瑰"
+    AppearanceMode.DARK -> "深色 · 炭黑配雾玫瑰"
+    AppearanceMode.SYSTEM -> "跟随系统"
 }
 
 private fun managerHint(kind: String): String = when (kind) {
@@ -1644,7 +1746,7 @@ private fun ExploitCard(controller: JailbreakController, haptic: (CouiHapticEffe
             Text(
                 "64560 已被官方修复（157 → 201 反汇编确认），App 只保留 98260。失败可直接重试，只有内核异常才需要硬重启。",
                 style = COUITheme.textStyles.body2,
-                color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                color = oneKeyColors().muted,
                 modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp, top = 4.dp)
             )
         }
@@ -1702,14 +1804,15 @@ private fun ManagerCard(controller: JailbreakController, haptic: (CouiHapticEffe
 private fun OptionsCard(
     controller: JailbreakController,
     haptic: (CouiHapticEffect) -> Unit,
-    targetLabel: String,
-    targetSelectable: Boolean,
     onOpenSheet: (Int) -> Unit,
+    onDiagnostics: () -> Unit,
+    showAdvanced: Boolean,
+    onToggleAdvanced: () -> Unit,
 ) {
     val hotSummary = when {
         controller.hotSwitchAvailable -> "当前 " + controller.activeKernelManager.ifBlank { "未知" }
-        controller.hotSwitchLoaderInstalled -> "通用加载器已安装，重启后运行一次越狱即可启用"
-        else -> "未启用，需先安装通用加载器"
+        controller.hotSwitchLoaderInstalled -> "通用加载器已安装，重启后运行一次即可启用"
+        else -> "安装通用加载器后启用"
     }
     ListCard(
         rows = listOf(
@@ -1719,14 +1822,6 @@ private fun OptionsCard(
                 icon = COUIIcons.Replace,
                 arrow = true,
                 onClick = { haptic(CouiHapticEffect.Switch); onOpenSheet(1) }
-            ),
-            ListRow(
-                title = "目标管理器",
-                summary = targetLabel,
-                icon = COUIIcons.GridView,
-                arrow = true,
-                enabled = targetSelectable,
-                onClick = { haptic(CouiHapticEffect.Switch); onOpenSheet(4) }
             ),
             ListRow(
                 title = "越狱管理器",
@@ -1748,6 +1843,20 @@ private fun OptionsCard(
                 icon = COUIIcons.Tune,
                 arrow = true,
                 onClick = { haptic(CouiHapticEffect.Switch); onOpenSheet(3) }
+            ),
+            ListRow(
+                title = "环境诊断",
+                summary = "检查服务通道、SU 权限与内核状态",
+                icon = COUIIcons.Report,
+                arrow = true,
+                onClick = { haptic(CouiHapticEffect.Switch); onDiagnostics() }
+            ),
+            ListRow(
+                title = "高级设置",
+                summary = if (showAdvanced) "已展开：越狱方式与适配说明" else "越狱方式与适配说明",
+                icon = COUIIcons.Settings,
+                arrow = true,
+                onClick = { haptic(CouiHapticEffect.Switch); onToggleAdvanced() }
             )
         )
     )
@@ -1760,6 +1869,7 @@ private fun HotSwitchPanel(
     selectedTarget: String,
     onPickTarget: () -> Unit,
 ) {
+    val c = oneKeyColors()
     val nodeReady = controller.hotSwitchAvailable
     val loaderInstalled = controller.hotSwitchLoaderInstalled
     val canSwitch = nodeReady && controller.suCompatReady && !controller.running &&
@@ -1770,12 +1880,12 @@ private fun HotSwitchPanel(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
                 shape = CircleShape,
-                color = if (nodeReady) COUITheme.colorScheme.primary else COUITheme.colorScheme.surfaceContainer
+                color = if (nodeReady) c.primary else c.surfaceLow
             ) {
                 Text(
                     if (nodeReady) "节点就绪" else "未就绪",
                     style = COUITheme.textStyles.body2,
-                    color = if (nodeReady) COUITheme.colorScheme.onPrimary else COUITheme.colorScheme.onSurfaceContainerVariant,
+                    color = if (nodeReady) c.onPrimary else c.muted,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                 )
             }
@@ -1783,7 +1893,7 @@ private fun HotSwitchPanel(
             Text(
                 "当前 " + controller.activeKernelManager.ifBlank { "未启用" },
                 style = COUITheme.textStyles.body1,
-                color = COUITheme.colorScheme.primary
+                color = c.primary
             )
         }
         Text(
@@ -1794,7 +1904,7 @@ private fun HotSwitchPanel(
                 else -> "热切换需要通用模块。安装后重启手机并重新运行一次越狱即可启用。"
             },
             style = COUITheme.textStyles.body2,
-            color = COUITheme.colorScheme.onSurfaceContainerVariant,
+            color = c.muted,
             modifier = Modifier.padding(top = 8.dp)
         )
 
@@ -1805,7 +1915,7 @@ private fun HotSwitchPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(COUITheme.colorScheme.surfaceContainer)
+                    .background(c.surfaceLow)
                     .clickable(enabled = !controller.running) { onPickTarget() }
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1813,9 +1923,9 @@ private fun HotSwitchPanel(
             ) {
                 Text("目标管理器", style = COUITheme.textStyles.body1)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(targetLabel, style = COUITheme.textStyles.body1, color = COUITheme.colorScheme.primary)
+                    Text(targetLabel, style = COUITheme.textStyles.body1, color = c.primary)
                     Spacer(Modifier.width(6.dp))
-                    Icon(COUIIcons.ChevronForward, contentDescription = null, modifier = Modifier.size(16.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant)
+                    Icon(COUIIcons.ChevronForward, contentDescription = null, modifier = Modifier.size(16.dp), tint = c.muted)
                 }
             }
         }
@@ -1838,7 +1948,7 @@ private fun HotSwitchPanel(
                 Text(
                     "安装会备份并替换管理器目录下的 libksud.so，可随时还原。",
                     style = COUITheme.textStyles.body2,
-                    color = COUITheme.colorScheme.onSurfaceContainerVariant
+                    color = c.muted
                 )
             }
             !nodeReady -> {
@@ -1887,7 +1997,7 @@ private fun HotSwitchPanel(
             Text(
                 controller.hotSwitchMessage,
                 style = COUITheme.textStyles.body2,
-                color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                color = c.muted,
                 modifier = Modifier.padding(top = 10.dp)
             )
         }
@@ -1895,7 +2005,7 @@ private fun HotSwitchPanel(
             Text(
                 "primary：" + controller.activeKernelRaw,
                 style = COUITheme.textStyles.body2,
-                color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                color = c.muted,
                 modifier = Modifier.padding(top = 6.dp)
             )
         }
@@ -1903,7 +2013,7 @@ private fun HotSwitchPanel(
             Text(
                 controller.probeDetail,
                 style = COUITheme.textStyles.body2,
-                color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                color = c.muted,
                 modifier = Modifier.padding(top = 6.dp)
             )
         }
@@ -1917,6 +2027,7 @@ private fun TargetPickerPanel(
     selected: String,
     onPick: (String) -> Unit,
 ) {
+    val c = oneKeyColors()
     Column(Modifier.fillMaxWidth()) {
         controller.managers.forEach { option ->
             val available = option.installedVersionCode != null && option.certOk
@@ -1926,51 +2037,70 @@ private fun TargetPickerPanel(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .clickable(enabled = available) { onPick(option.kind) }
-                    .padding(vertical = 12.dp, horizontal = 10.dp),
+                    .padding(vertical = 10.dp, horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                ManagerMark(option.pkg, option.label)
                 Column(Modifier.weight(1f)) {
                     Text(
                         option.label,
                         style = COUITheme.textStyles.body1,
-                        color = if (available) COUITheme.colorScheme.onSurface else COUITheme.colorScheme.onSurfaceContainerVariant
+                        color = when {
+                            !available -> c.disabledInk
+                            isSelected -> c.primaryInk
+                            else -> c.ink
+                        }
                     )
                     Text(
                         when {
                             option.installedVersionCode == null -> "未安装"
                             !option.certOk -> "签名不符"
-                            else -> "已安装 v" + (option.installedVersion ?: "-") + " · 可运行时就绪"
+                            else -> "v" + (option.installedVersion ?: "-") + " · 已安装"
                         },
                         style = COUITheme.textStyles.body2,
-                        color = if (available) COUITheme.colorScheme.onSurfaceContainerVariant else COUITheme.colorScheme.error
+                        color = if (available) c.muted else c.error
                     )
                 }
-                if (isSelected && available) {
-                    Icon(COUIIcons.Ok, contentDescription = "已选", tint = COUITheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) c.primary else Color.Transparent)
+                        .then(
+                            if (isSelected) Modifier
+                            else Modifier.border(1.5.dp, c.disabledInk.copy(alpha = 0.6f), CircleShape)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(COUIIcons.Ok, contentDescription = "已选", tint = c.onPrimary, modifier = Modifier.size(15.dp))
+                    }
                 }
             }
         }
     }
 }
-
 /** 越狱管理器选择列表。 */
 @Composable
 private fun JailManagerPanel(
     controller: JailbreakController,
     haptic: (CouiHapticEffect) -> Unit,
 ) {
+    val c = oneKeyColors()
     Column(Modifier.fillMaxWidth()) {
         if (controller.visibleManagers.isEmpty()) {
             Text(
                 "未检测到管理器，请先安装列表中的固定版本。",
                 style = COUITheme.textStyles.body2,
-                color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                color = c.muted,
                 modifier = Modifier.padding(vertical = 12.dp)
             )
         }
         controller.visibleManagers.forEach { manager ->
-            val selectable = !controller.running && manager.supported && manager.installedVersionCode != null &&
-                manager.certOk && (if (controller.adaptiveManagerEnabled) true
+            val selectable = !controller.running && manager.supported &&
+                manager.installedVersionCode != null && manager.certOk &&
+                (if (controller.adaptiveManagerEnabled) true
                 else (manager.kind != "finasu" && manager.installedVersionCode == manager.expectedVersionCode))
             val isSelected = controller.selectedManager == manager.kind
             Row(
@@ -1980,31 +2110,52 @@ private fun JailManagerPanel(
                     .clickable(enabled = selectable) {
                         haptic(CouiHapticEffect.Switch); controller.selectManager(manager.kind)
                     }
-                    .padding(vertical = 12.dp, horizontal = 10.dp),
+                    .padding(vertical = 10.dp, horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                ManagerMark(manager.pkg, manager.label)
                 Column(Modifier.weight(1f)) {
                     Text(
                         manager.label,
                         style = COUITheme.textStyles.body1,
-                        color = if (selectable) COUITheme.colorScheme.onSurface else COUITheme.colorScheme.onSurfaceContainerVariant
+                        color = when {
+                            !selectable -> c.disabledInk
+                            isSelected -> c.primaryInk
+                            else -> c.ink
+                        }
                     )
                     Text(
                         manager.statusText,
                         style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurfaceContainerVariant
+                        color = c.muted
                     )
                 }
-                RadioButton(
-                    selected = isSelected,
-                    onClick = null,
-                    enabled = selectable
-                )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) c.primary else Color.Transparent)
+                        .then(
+                            if (isSelected) Modifier
+                            else Modifier.border(1.5.dp, c.disabledInk.copy(alpha = 0.6f), CircleShape)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(COUIIcons.Ok, contentDescription = "已选", tint = c.onPrimary, modifier = Modifier.size(15.dp))
+                    }
+                }
             }
         }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "运行前选择管理器。未安装时，请先前往管理器下载。",
+            style = COUITheme.textStyles.body2,
+            color = c.muted
+        )
     }
 }
-
 /** 抽屉内的操作按钮：主色实心或浅底两种。 */
 @Composable
 private fun PanelButton(
@@ -2039,47 +2190,51 @@ private fun PanelButton(
 private fun ManagerDownloadPanel(
 ) {
     val downloadContext = LocalContext.current
+    val c = oneKeyColors()
+    val pkgByKind = remember { JailbreakController.get(downloadContext).managers.associate { it.kind to it.pkg } }
     Column(Modifier.fillMaxWidth()) {
         Text(
-            "均为官方最新正式版，下载后直接安装即可；已装管理器无需重复下载。",
+            "版本沿用项目记录，点击下载会打开对应官方发布页。",
             style = COUITheme.textStyles.body2,
-            color = COUITheme.colorScheme.onSurfaceContainerVariant,
-            modifier = Modifier.padding(bottom = 10.dp)
+            color = c.muted,
+            modifier = Modifier.padding(bottom = 8.dp)
         )
         ManagerDownloads.all.forEach { item ->
+            val pkg = pkgByKind[item.kind].orEmpty()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .clickable { openUrl(downloadContext, item.apkUrl) }
-                    .padding(vertical = 12.dp, horizontal = 10.dp),
+                    .padding(vertical = 10.dp, horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                ManagerMark(pkg, item.label)
                 Column(Modifier.weight(1f)) {
-                    Text(item.label, style = COUITheme.textStyles.body1)
+                    Text(item.label, style = COUITheme.textStyles.body1, color = c.ink)
                     Text(
                         item.version + " · " + item.versionCode,
                         style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurfaceContainerVariant
+                        color = c.muted
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("下载", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
-                    Spacer(Modifier.width(2.dp))
+                    Text("下载", style = COUITheme.textStyles.body2, color = c.primaryInk)
+                    Spacer(Modifier.width(4.dp))
                     Icon(
                         COUIIcons.Download,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = COUITheme.colorScheme.primary
+                        modifier = Modifier.size(18.dp),
+                        tint = c.primary
                     )
                 }
             }
         }
+        Spacer(Modifier.height(8.dp))
         Text(
             "打不开下载页时，可复制发布页链接到浏览器打开。",
             style = COUITheme.textStyles.body2,
-            color = COUITheme.colorScheme.onSurfaceContainerVariant,
-            modifier = Modifier.padding(top = 8.dp)
+            color = c.muted
         )
     }
 }
@@ -2162,42 +2317,87 @@ private fun ActionCard(
     onDiagnostics: () -> Unit,
     onRunJailbreak: () -> Unit,
 ) {
-    Card {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = { haptic(CouiHapticEffect.Switch); onRunJailbreak() },
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                enabled = controller.canRunExploit,
-                colors = ButtonDefaults.buttonColors(
-                    color = COUITheme.colorScheme.primary,
-                    disabledColor = COUITheme.colorScheme.primary.copy(alpha = 0.35f),
-                    contentColor = COUITheme.colorScheme.onPrimary,
-                    disabledContentColor = COUITheme.colorScheme.onPrimary.copy(alpha = 0.65f)
+    val c = oneKeyColors()
+    val managerLabel = controller.managers.firstOrNull { it.kind == controller.selectedManager }?.label ?: "未选择"
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(oneKeyCardColor())
+            .border(1.dp, oneKeyCardOutline(), RoundedCornerShape(20.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    when {
+                        controller.running -> "正在运行"
+                        controller.suCompatReady -> "运行完成"
+                        controller.canRunExploit -> "准备就绪"
+                        else -> "等待条件"
+                    },
+                    style = COUITheme.textStyles.headline2,
+                    color = c.ink
                 )
+                Text(
+                    managerLabel + " · 98260 运行链",
+                    style = COUITheme.textStyles.body2,
+                    color = c.muted
+                )
+            }
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(c.primarySoft),
+                contentAlignment = Alignment.Center
             ) {
-                if (controller.running) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("越狱中 (${controller.elapsedSeconds}s)")
-                } else {
-                    ButtonIconText(COUIIcons.Play, "运行 98260 越狱链")
-                }
+                Icon(
+                    if (controller.suCompatReady) COUIIcons.Ok else COUIIcons.Lock,
+                    contentDescription = null,
+                    tint = c.primary,
+                    modifier = Modifier.size(21.dp)
+                )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val progress by animateFloatAsState(controller.progress, spring(dampingRatio = 0.8f, stiffness = 180f), label = "progress")
-                Text(controller.stage, style = COUITheme.textStyles.body2, modifier = Modifier.weight(1f))
-                Text((progress * 100).toInt().toString() + "%", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
-            }
-            controller.platformReason?.let { Text(it, color = COUITheme.colorScheme.error, style = COUITheme.textStyles.body2) }
-            RunFlow(controller.progress, controller.running, controller.lastResultOk)
-            LinearProgressIndicator(progress = controller.progress, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(text = "环境诊断", onClick = onDiagnostics)
-            }
+        }
+        Spacer(Modifier.height(12.dp))
+        PanelButton(
+            text = if (controller.running) "运行中，请稍候" else "开始运行",
+            primary = true,
+            enabled = controller.canRunExploit && !controller.running,
+            modifier = Modifier.fillMaxWidth()
+        ) { haptic(CouiHapticEffect.Switch); onRunJailbreak() }
+        controller.platformReason?.let {
+            Spacer(Modifier.height(6.dp))
+            Text(it, color = c.error, style = COUITheme.textStyles.body2)
+        }
+        Spacer(Modifier.height(12.dp))
+        RunFlow(controller.progress, controller.running, controller.lastResultOk)
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                when {
+                    controller.running -> controller.stage.ifBlank { "运行中" }
+                    controller.suCompatReady -> "本次运行已完成"
+                    else -> "等待开始"
+                },
+                style = COUITheme.textStyles.body2,
+                color = c.muted,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                if (!controller.running && controller.suCompatReady && controller.progress < 0.99f) "100%"
+                else (controller.progress * 100).toInt().toString() + "%",
+                style = COUITheme.textStyles.body2,
+                color = c.primaryInk
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        LinearProgressIndicator(progress = controller.progress, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(4.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("失败可直接重试，内核异常时才需重启", style = COUITheme.textStyles.body2, color = c.muted, modifier = Modifier.weight(1f))
+            TextButton(text = "环境诊断", onClick = onDiagnostics)
         }
     }
 }
@@ -2366,12 +2566,13 @@ private fun HistoryScreen(
                             rows = groupRows.map { rec ->
                                 val isOk = rec.status == "ok"
                                 ListRow(
-                                    title = (if (isOk) "越狱成功" else "越狱中断") +
-                                        " · 用时 " + rec.durationSec + " 秒",
-                                    summary = HistoryStore.formatTime(rec.startedAt) + " · " + rec.manager +
-                                        " · v" + rec.versionName,
+                                    title = "98260 运行链",
+                                    summary = rec.manager + " · " +
+                                        HistoryStore.formatTime(rec.startedAt) + " · " +
+                                        (if (isOk) "运行成功" else "未完成") + " " +
+                                        String.format(java.util.Locale.US, "%.2fs", rec.durationSec.toDouble()),
                                     icon = if (isOk) COUIIcons.Ok else COUIIcons.Close,
-                                    iconTint = if (isOk) COUITheme.colorScheme.primary else COUITheme.colorScheme.error,
+                                    iconTint = if (isOk) oneKeyColors().success else oneKeyColors().error,
                                     arrow = true,
                                     onClick = { haptic(CouiHapticEffect.Switch); selected = rec }
                                 )
@@ -2382,11 +2583,11 @@ private fun HistoryScreen(
             }
             if (filtered.isEmpty()) {
                 item {
-                    Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    Card(Modifier.fillMaxWidth()) {
                         Text(
                             "当前筛选下没有记录",
                             style = COUITheme.textStyles.body2,
-                            color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                            color = oneKeyColors().muted,
                             modifier = Modifier.padding(16.dp)
                         )
                     }
@@ -2396,12 +2597,12 @@ private fun HistoryScreen(
                 Spacer(Modifier.height(16.dp))
                 Surface(
                     onClick = { haptic(CouiHapticEffect.Switch); onClearRequest() },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(46.dp),
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
                     shape = RoundedCornerShape(14.dp),
                     color = COUITheme.colorScheme.surfaceContainer
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("清空全部历史记录", style = COUITheme.textStyles.body1, color = COUITheme.colorScheme.error)
+                        Text("清空全部历史记录", style = COUITheme.textStyles.body1, color = oneKeyColors().error)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -2436,16 +2637,38 @@ private fun LogScreen(
     contentPadding: PaddingValues,
     onGoHome: () -> Unit,
     onExport: () -> Unit,
+    onCopy: () -> Unit,
+    onClear: () -> Unit,
 ) {
+    val c = oneKeyColors()
     val logs = controller.logs
-    val sec = controller.elapsedSeconds
-    val elapsedText = (sec / 60).toString().padStart(2, '0') + ":" + (sec % 60).toString().padStart(2, '0')
     val listState = rememberLazyListState()
     var autoScroll by remember { mutableStateOf(true) }
     var filter by remember { mutableIntStateOf(0) }
+
+    // 运行时长精确到小数点后两位：运行中按毫秒计时，结束后沿用控制器记录的秒数。
+    var startMs by remember { mutableStateOf<Long?>(null) }
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(controller.running) {
+        if (controller.running) {
+            startMs = System.currentTimeMillis()
+            while (controller.running) {
+                tick++
+                kotlinx.coroutines.delay(50)
+            }
+            startMs = null
+        }
+    }
+    val elapsedSeconds = if (controller.running && startMs != null) {
+        tick.let { (System.currentTimeMillis() - (startMs ?: 0L)) / 1000.0 }
+    } else {
+        controller.elapsedSeconds.toDouble()
+    }
+    val elapsedText = String.format(java.util.Locale.US, "%.2f", elapsedSeconds)
+
     val filtered = when (filter) {
-        1 -> logs.filter { logLevel(it) == 0 }
-        2 -> logs.filter { logLevel(it) >= 1 }
+        1 -> logs.filter { logLevel(it) >= 1 }
+        2 -> logs.filter { logLevel(it) == 2 }
         else -> logs
     }
     LaunchedEffect(filtered.size, autoScroll, filter) {
@@ -2453,91 +2676,155 @@ private fun LogScreen(
     }
 
     if (logs.isEmpty()) {
-        FullPageStatement(
-            title = "暂无运行日志",
-            content = "启动越狱任务或运行环境诊断后，系统底层与模块加载的实时输出将在此处串流呈现。",
-            primaryButtonText = "前往首页",
-            onPrimaryButtonClick = onGoHome,
-            modifier = Modifier.fillMaxSize().padding(contentPadding)
-        )
+        Column(
+            Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(60.dp))
+            Icon(COUIIcons.Notes, contentDescription = null, tint = c.primary, modifier = Modifier.size(32.dp))
+            Spacer(Modifier.height(12.dp))
+            Text("还没有运行日志", style = COUITheme.textStyles.headline2, color = c.ink)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "开始运行或执行环境诊断后，输出会出现在这里。",
+                style = COUITheme.textStyles.body2,
+                color = c.muted,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(16.dp))
+            PanelButton(text = "前往首页", modifier = Modifier.fillMaxWidth()) { onGoHome() }
+        }
         return
     }
 
     Column(Modifier.fillMaxSize().padding(contentPadding)) {
-        Card {
-            Column(Modifier.fillMaxWidth().padding(14.dp)) {
-                RunFlow(controller.progress, controller.running, controller.lastResultOk)
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        COUIIcons.Timer,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = COUITheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text("已用时间 " + elapsedText, style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
-                    Spacer(Modifier.weight(1f))
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(oneKeyCardColor())
+                .border(1.dp, oneKeyCardOutline(), RoundedCornerShape(20.dp))
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        controller.stage.ifBlank { if (controller.running) "运行中" else "就绪" },
-                        style = COUITheme.textStyles.body2,
-                        color = COUITheme.colorScheme.onSurfaceContainerVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        if (controller.running) "任务进行中" else if (logs.isNotEmpty()) "本次运行" else "等待运行",
+                        style = COUITheme.textStyles.headline2,
+                        color = c.ink
                     )
+                    Text(
+                        if (controller.running) controller.stage.ifBlank { "运行中" }
+                        else if (controller.lastResultOk == true) "运行结束" else "运行输出",
+                        style = COUITheme.textStyles.body2,
+                        color = c.muted
+                    )
+                }
+                Text(
+                    elapsedText + "s",
+                    style = COUITheme.textStyles.body2,
+                    fontFamily = FontFamily.Monospace,
+                    color = c.muted
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            RunFlow(controller.progress, controller.running, controller.lastResultOk)
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(c.segmentBg)
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            listOf("全部", "警告", "错误").forEachIndexed { index, label ->
+                val selected = filter == index
+                Surface(
+                    onClick = { haptic(CouiHapticEffect.Switch); filter = index },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (selected) c.surface else Color.Transparent,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            label,
+                            style = COUITheme.textStyles.body2,
+                            color = if (selected) c.primaryInk else c.muted
+                        )
+                    }
                 }
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Card(Modifier.fillMaxWidth().weight(1f)) {
-            Column(Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    listOf("全部", "警告", "错误").forEachIndexed { index, label ->
-                        val selected = filter == index
-                        Surface(
-                            onClick = { haptic(CouiHapticEffect.Switch); filter = index },
-                            shape = CircleShape,
-                            color = if (selected) COUITheme.colorScheme.primary else Color.Transparent,
-                            modifier = Modifier.padding(end = 6.dp)
-                        ) {
-                            Text(
-                                label,
-                                style = COUITheme.textStyles.body2,
-                                color = if (selected) COUITheme.colorScheme.onPrimary
-                                        else COUITheme.colorScheme.onSurfaceContainerVariant,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                            )
-                        }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Text("自动滚动", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant)
-                    Spacer(Modifier.width(6.dp))
-                    Switch(checked = autoScroll, onCheckedChange = { autoScroll = it })
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f).clickable { autoScroll = !autoScroll },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Switch(checked = autoScroll, onCheckedChange = { autoScroll = it })
+                Spacer(Modifier.width(8.dp))
+                Text("自动滚动", style = COUITheme.textStyles.body2, color = c.muted)
+            }
+            IconButton(onClick = onCopy, enabled = logs.isNotEmpty()) {
+                Icon(COUIIcons.Copy, contentDescription = "复制全部日志", tint = c.muted)
+            }
+            IconButton(onClick = onExport, enabled = logs.isNotEmpty()) {
+                Icon(COUIIcons.Download, contentDescription = "导出全部日志", tint = c.muted)
+            }
+            IconButton(onClick = onClear, enabled = logs.isNotEmpty() && !controller.running) {
+                Icon(COUIIcons.Delete, contentDescription = "清空日志", tint = c.muted)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(oneKeyCardColor())
+                .border(1.dp, oneKeyCardOutline(), RoundedCornerShape(20.dp))
+        ) {
+            if (filtered.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        if (logs.isEmpty()) "还没有运行日志" else "当前筛选下没有记录",
+                        style = COUITheme.textStyles.body2,
+                        color = c.muted
+                    )
                 }
-                HorizontalDivider()
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
+            } else {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 6.dp)) {
                     items(filtered.size) { idx ->
                         val line = filtered[idx]
-                        val color = when (logLevel(line)) {
-                            2 -> COUITheme.colorScheme.error
-                            1 -> Color(0xFFC77700)
-                            else -> if (logLevel(line) == 0 && isSuccessLog(line)) COUITheme.colorScheme.primary
-                                    else COUITheme.colorScheme.onSurface
+                        val level = logLevel(line)
+                        val tint = when {
+                            level == 2 -> c.error
+                            level == 1 -> c.warning
+                            isSuccessLog(line) -> c.success
+                            else -> c.muted
                         }
-                        Text(
-                            line,
-                            style = COUITheme.textStyles.body2,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = color,
-                            modifier = Modifier.padding(vertical = 1.dp)
-                        )
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text(
+                                line,
+                                style = COUITheme.textStyles.body2,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                lineHeight = 16.sp,
+                                color = when {
+                                    level == 2 -> c.error
+                                    level == 1 -> c.warning
+                                    isSuccessLog(line) -> c.success
+                                    else -> c.ink
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -2563,7 +2850,7 @@ private fun SmallTitle(text: String) {
     Text(
         text = text,
         style = COUITheme.textStyles.subtitle,
-        color = COUITheme.colorScheme.onSurfaceContainerVariant,
+        color = oneKeyColors().muted,
         modifier = Modifier.padding(start = 6.dp, top = 8.dp, bottom = 2.dp)
     )
 }
@@ -2571,8 +2858,8 @@ private fun SmallTitle(text: String) {
 @Composable
 private fun AboutScreen(
     controller: JailbreakController,
-    themeMode: String,
-    onToggleTheme: () -> Unit,
+    appearance: AppearanceMode,
+    onChangeAppearance: (AppearanceMode) -> Unit,
     haptic: (CouiHapticEffect) -> Unit,
     onOpenLog: () -> Unit,
     onNotice: () -> Unit,
@@ -2581,6 +2868,7 @@ private fun AboutScreen(
     contentPadding: PaddingValues,
 ) {
     val context = LocalContext.current
+    var showAppearanceSheet by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = contentPadding,
@@ -2597,7 +2885,7 @@ private fun AboutScreen(
                 Text(
                     "v" + BuildConfig.VERSION_NAME + " · " + BuildConfig.VERSION_CODE,
                     style = COUITheme.textStyles.body2,
-                    color = COUITheme.colorScheme.onSurfaceContainerVariant
+                    color = oneKeyColors().muted
                 )
             }
         }
@@ -2629,15 +2917,11 @@ private fun AboutScreen(
             ListCard(
                 rows = listOf(
                     ListRow(
-                        title = "主题色",
-                        summary = if (themeMode == "pink") "星苒粉 #FFC0CB" else "动态取色（跟随壁纸）",
+                        title = "外观",
+                        summary = appearanceLabel(appearance),
                         icon = COUIIcons.Theme,
-                        end = {
-                            Switch(
-                                checked = themeMode == "pink",
-                                onCheckedChange = { haptic(CouiHapticEffect.Switch); onToggleTheme() }
-                            )
-                        }
+                        arrow = true,
+                        onClick = { haptic(CouiHapticEffect.Switch); showAppearanceSheet = true }
                     ),
                     ListRow(
                         title = "自动匹配云端组件",
@@ -2707,11 +2991,138 @@ private fun AboutScreen(
             Text(
                 "GPL-3.0 · 作者 星苒鸭 · github.com/xingranya",
                 style = COUITheme.textStyles.body2,
-                color = COUITheme.colorScheme.onSurfaceContainerVariant,
+                color = oneKeyColors().muted,
                 modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 16.dp),
                 textAlign = TextAlign.Center
             )
         }
+    }
+
+    var appearanceVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(showAppearanceSheet) { if (showAppearanceSheet) appearanceVisible = true }
+    if (showAppearanceSheet) {
+        WindowBottomSheet(
+            show = appearanceVisible,
+            title = "外观",
+            onDismissRequest = { appearanceVisible = false },
+            onDismissFinished = { showAppearanceSheet = false; appearanceVisible = false }
+        ) {
+            AppearanceSheetContent(
+                current = appearance,
+                onPick = { mode -> haptic(CouiHapticEffect.Switch); onChangeAppearance(mode) }
+            )
+        }
+    }
+}
+
+/** 外观抽屉：三种模式 + 两档配色预览。 */
+@Composable
+private fun AppearanceSheetContent(
+    current: AppearanceMode,
+    onPick: (AppearanceMode) -> Unit,
+) {
+    val c = oneKeyColors()
+    Column(Modifier.fillMaxWidth().height(420.dp)) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AppearancePreview("浅色", LightOneKeyColors, Modifier.weight(1f))
+            AppearancePreview("深色", DarkOneKeyColors, Modifier.weight(1f))
+        }
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(oneKeyCardColor())) {
+            AppearanceMode.entries.forEachIndexed { index, mode ->
+                val selected = current == mode
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPick(mode) }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        when (mode) {
+                            AppearanceMode.LIGHT -> COUIIcons.Theme
+                            AppearanceMode.DARK -> COUIIcons.Hide
+                            AppearanceMode.SYSTEM -> COUIIcons.Settings
+                        },
+                        contentDescription = null,
+                        tint = c.primary,
+                        modifier = Modifier.size(21.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            when (mode) {
+                                AppearanceMode.LIGHT -> "浅色"
+                                AppearanceMode.DARK -> "深色"
+                                AppearanceMode.SYSTEM -> "跟随系统"
+                            },
+                            style = COUITheme.textStyles.body1,
+                            color = if (selected) c.primaryInk else c.ink
+                        )
+                        Text(
+                            when (mode) {
+                                AppearanceMode.LIGHT -> "灰白界面，搭配深玫瑰色"
+                                AppearanceMode.DARK -> "炭黑界面，搭配雾玫瑰色"
+                                AppearanceMode.SYSTEM -> "随设备的深浅外观自动变化"
+                            },
+                            style = COUITheme.textStyles.body2,
+                            color = c.muted
+                        )
+                    }
+                    Box(
+                        Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(if (selected) c.primary else Color.Transparent)
+                            .then(if (selected) Modifier else Modifier.border(1.5.dp, c.muted, CircleShape)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (selected) {
+                            Icon(COUIIcons.Ok, contentDescription = null, tint = c.onPrimary, modifier = Modifier.size(15.dp))
+                        }
+                    }
+                }
+                if (index != AppearanceMode.entries.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.fillMaxWidth().padding(start = 49.dp, end = 16.dp),
+                        color = c.outline
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "外观应用于全部页面、抽屉与提示，选择会被保留。",
+            style = COUITheme.textStyles.body2,
+            color = c.muted
+        )
+    }
+}
+
+@Composable
+private fun AppearancePreview(label: String, palette: OneKeyColors, modifier: Modifier = Modifier) {
+    val c = oneKeyColors()
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(palette.background)
+            .border(if (c.isDark == palette.isDark) 2.dp else 1.dp, if (c.isDark == palette.isDark) c.primary else c.outline, RoundedCornerShape(20.dp))
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(palette.deviceSurface)
+                .border(1.dp, palette.deviceOutline, RoundedCornerShape(8.dp))
+        )
+        Spacer(Modifier.height(8.dp))
+        Box(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(4.dp)).background(palette.primary))
+        Spacer(Modifier.height(8.dp))
+        Box(Modifier.fillMaxWidth().height(20.dp).clip(RoundedCornerShape(4.dp)).background(palette.surface))
+        Spacer(Modifier.height(8.dp))
+        Text(label, style = COUITheme.textStyles.body2, color = palette.ink)
     }
 }
 
@@ -2727,7 +3138,7 @@ private fun AppreciationDialog(onMessage: (String) -> Unit, onDismiss: (Boolean)
     }
     WindowDialog(title = "免费声明 · 禁止倒卖", show = true, onDismissRequest = { close() }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("倒卖必究", style = COUITheme.textStyles.subtitle, color = COUITheme.colorScheme.error)
+            Text("倒卖必究", style = COUITheme.textStyles.subtitle, color = oneKeyColors().error)
             Text("本工具免费分享，禁止倒卖。QQ群：1121682811。赞赏完全自愿，不影响任何功能。", style = COUITheme.textStyles.body2, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
             Image(painterResource(R.drawable.appreciation), contentDescription = "作者赞赏码", modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(12.dp)))
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {

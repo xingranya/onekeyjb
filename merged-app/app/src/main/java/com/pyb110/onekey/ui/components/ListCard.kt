@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.pyb110.onekey.ui.oneKeyColors
 import io.github.suqi8.coui.kmp.basic.BasicComponent
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.DividerDefaults
@@ -41,6 +42,8 @@ data class ListRow(
     val enabled: Boolean = true,
     val onClick: (() -> Unit)? = null,
     val iconTint: Color? = null,
+    /** 自定义左前导（例如应用真实图标）；给了它就不再画 [icon]。 */
+    val leading: (@Composable () -> Unit)? = null,
 )
 
 /** 页面左右边距，与 COUI 设置页同一档。 */
@@ -57,23 +60,28 @@ fun ListCard(
     modifier: Modifier = Modifier,
 ) {
     if (rows.isEmpty()) return
-    val hasIcon = rows.any { it.icon != null }
-    Card(modifier = modifier.fillMaxWidth().padding(horizontal = PageMargin)) {
+    val hasIcon = rows.any { it.icon != null || it.leading != null }
+    // 页面已通过 contentPadding 给出 12dp 边距，这里不再叠加，保证与自绘卡片同宽。
+    Card(modifier = modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
             rows.forEachIndexed { index, row ->
                 BasicComponent(
                     title = row.title,
                     summary = row.summary,
                     enabled = row.enabled,
-                    startAction = row.icon?.let { icon ->
-                        {
-                            Icon(
-                                icon,
-                                contentDescription = null,
-                                modifier = Modifier.padding(end = 14.dp),
-                                tint = row.iconTint ?: COUITheme.colorScheme.primary,
-                            )
+                    startAction = when {
+                        row.leading != null -> row.leading
+                        row.icon != null -> {
+                            {
+                                Icon(
+                                    row.icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(end = 14.dp),
+                                    tint = row.iconTint ?: COUITheme.colorScheme.primary,
+                                )
+                            }
                         }
+                        else -> null
                     },
                     endActions = when {
                         row.end != null -> { { row.end.invoke() } }
@@ -94,7 +102,8 @@ fun ListCard(
                     HorizontalDivider(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = if (hasIcon) 52.dp else DividerDefaults.CardInset, end = DividerDefaults.CardInset),
+                            .padding(start = if (hasIcon) 60.dp else DividerDefaults.CardInset, end = 16.dp),
+                        color = oneKeyColors().outline,
                     )
                 }
             }
@@ -112,13 +121,13 @@ fun SectionTitle(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = PageMargin + 4.dp, end = PageMargin + 4.dp, top = 20.dp, bottom = 8.dp),
+            .padding(start = 4.dp, end = 4.dp, top = 20.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = text,
-            style = COUITheme.textStyles.body1,
-            color = COUITheme.colorScheme.onSurfaceContainerVariant,
+            style = COUITheme.textStyles.body2,
+            color = oneKeyColors().muted,
             modifier = Modifier.weight(1f),
         )
         trailing?.invoke()
