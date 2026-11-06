@@ -1497,6 +1497,8 @@ private fun OptionsCard(
                     Text(
                         text = if (controller.hotSwitchAvailable)
                             "当前 " + controller.activeKernelManager.ifBlank { "未知" } + "；切换只改内核 profile，不重启、不重新越狱。"
+                        else if (controller.hotSwitchLoaderInstalled)
+                            "通用加载器已安装；请重启手机，然后重新运行一次越狱以加载通用模块。"
                         else if (!controller.serviceReady)
                             "服务离线，启动 Stellar 并授权后可检测热切换节点。"
                         else if (controller.rootedThisBoot)
@@ -1518,7 +1520,7 @@ private fun OptionsCard(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(COUITheme.colorScheme.surfaceContainer)
-                            .clickable(enabled = controller.hotSwitchAvailable && installed.isNotEmpty()) { selectorOpen = true }
+                            .clickable(enabled = installed.isNotEmpty() && !controller.running) { selectorOpen = true }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -1559,24 +1561,66 @@ private fun OptionsCard(
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("运行前加载通用模块", style = COUITheme.textStyles.body1)
-                            Text(
-                                "当前执行引擎固定使用管理器自带的 ksud，无法加载外部模块；该功能暂不可用。",
-                                style = COUITheme.textStyles.body2,
-                                color = COUITheme.colorScheme.onSurfaceContainerVariant
-                            )
-                        }
-                        Switch(
-                            checked = false,
-                            onCheckedChange = { },
-                            enabled = false
+                    Column(Modifier.fillMaxWidth()) {
+                        Text(
+                            if (controller.hotSwitchLoaderInstalled) "通用加载器：已安装" else "通用加载器：未安装",
+                            style = COUITheme.textStyles.body1,
+                            color = if (controller.hotSwitchLoaderInstalled) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurface
                         )
+                        Text(
+                            "热切换需要通用模块。安装会备份并替换管理器目录下的 libksud.so，可随时还原；" +
+                                "安装后需重启手机并重新运行一次越狱。",
+                            style = COUITheme.textStyles.body2,
+                            color = COUITheme.colorScheme.onSurfaceContainerVariant
+                        )
+                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Surface(
+                                onClick = {
+                                    haptic(CouiHapticEffect.Switch)
+                                    controller.installHotSwitchLoader { ok, msg ->
+                                        controller.addLog(if (ok) "加载器：" + msg else "加载器：" + msg)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                enabled = !controller.loaderBusy && controller.suCompatReady,
+                                color = COUITheme.colorScheme.surfaceContainer
+                            ) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text("安装加载器", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
+                                }
+                            }
+                            Surface(
+                                onClick = {
+                                    haptic(CouiHapticEffect.Switch)
+                                    controller.rebootDevice()
+                                },
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                enabled = !controller.loaderBusy && controller.suCompatReady,
+                                color = COUITheme.colorScheme.primary
+                            ) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text("重启手机", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onPrimary)
+                                }
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Surface(
+                                onClick = {
+                                    haptic(CouiHapticEffect.Switch)
+                                    controller.restoreHotSwitchLoader { _, _ -> }
+                                },
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                enabled = !controller.loaderBusy && controller.suCompatReady,
+                                color = COUITheme.colorScheme.surfaceContainer
+                            ) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text("还原加载器", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.onSurfaceContainerVariant)
+                                }
+                            }
+                        }
                     }
                     Spacer(Modifier.height(10.dp))
                     val canSwitch = controller.hotSwitchAvailable && controller.suCompatReady && !controller.running && !controller.preparing && selectedTarget.isNotBlank() && !controller.isSwitchingManager

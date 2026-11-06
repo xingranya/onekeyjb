@@ -46,6 +46,7 @@ class JailbreakController private constructor(private val context: Context) {
     }
 
     private val prefs = context.getSharedPreferences("merged", Context.MODE_PRIVATE)
+    private val UNIVERSAL_KSUD_SIZE = 12335680
     private val legacyPrefs = context.getSharedPreferences("onekey", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(Dispatchers.IO)
     // 必须早于 init 块初始化：init 里的 refreshState() 可能触发 addLog 的 synchronized(logLock)
@@ -98,8 +99,11 @@ class JailbreakController private constructor(private val context: Context) {
     /** 状态探测的诊断摘要，便于定位"显示未越狱"这类问题。 */
     var probeDetail: String by mutableStateOf(""); private set
     /** 是否在越狱时加载通用多管理器模块（热切换前提，默认关闭以保持既有成功率）。 */
-    /** 执行引擎不支持外部 ksud（实测 PYB110_KSUD/PYB110_MANAGER_PKG 均被忽略），暂固定关闭。 */
+    /** 执行引擎不支持外部 ksud（实测 PYB110_KSUD/PYB110_MANAGER_PKG 均被忽略），固定关闭。 */
     val universalModuleEnabled: Boolean = false
+    /** 管理器加载器是否已被替换为通用加载器（决定热切换能否真正启用）。 */
+    var hotSwitchLoaderInstalled: Boolean by mutableStateOf(false); private set
+    var loaderBusy: Boolean by mutableStateOf(false); private set
     /** 本次开机是否已成功越狱（与 boot_id 绑定，重启后自动失效）。 */
     var rootedThisBoot: Boolean by mutableStateOf(false); private set
 
@@ -238,6 +242,7 @@ class JailbreakController private constructor(private val context: Context) {
                 hotSwitchAvailable = false
                 activeKernelManager = ""
             }
+            if (serviceReady && serviceGranted) checkLoaderState()
             deviceInfo = buildString {
                 append((profile?.model ?: "UNKNOWN") + " · Android ").append(Build.VERSION.RELEASE)
                 append(" · SELinux ").append(selinux)
@@ -402,6 +407,101 @@ class JailbreakController private constructor(private val context: Context) {
         susfsEnabled = enabled
         prefs.edit().putBoolean("susfs_enabled", enabled).apply()
         addLog(if (enabled) "已开启 SUSFS 支持（执行器加载模块后生效）" else "已关闭 SUSFS 支持")
+    }
+
+    private fun selectedPkg(): String? = managers.firstOrNull { it.kind == selectedManager }?.pkg
+
+    private fun loaderScript(action: String, staged: String): String {
+        val pkg = selectedPkg() ?: return "echo NO_PKG; exit 9"
+        return "P=\$(pm path " + pkg + " 2>/dev/null | head -1 | sed 's/^package://'); " +
+            "[ -n \"\$P\" ] || { echo NO_APK; exit 10; }; " +
+            "D=\$(dirname \"\$P\"); F=\"\$D/lib/arm64/libksud.so\"; " +
+            "B=/data/local/tmp/onekey-libksud-backup.so; " +
+            when (action) {
+                "install" -> "if [ ! -f \"\$B\" ]; then cp \"\$F\" \"\$B\" || { echo BACKUP_FAIL; exit 11; }; fi; " +
+                    "cp " + staged + " \"\$F.new\" || { echo COPY_FAIL; exit 12; }; " +
+                    "chmod 755 \"\$F.new\" && mv -f \"\$F.new\" \"\$F\" || { echo MOVE_FAIL; exit 13; }; " +
+                    "echo OK; ls -l \"\$F\""
+                else -> "[ -f \"\$B\" ] || { echo NO_BACKUP; exit 14; }; " +
+                    "cp \"\$B\" \"\$F.new\" || { echo COPY_FAIL; exit 15; }; " +
+                    "chmod 755 \"\$F.new\" && mv -f \"\$F.new\" \"\$F\" || { echo MOVE_FAIL; exit 16; }; " +
+                    "echo OK; ls -l \"\$F\""
+            }
+    }
+
+    /** 整机重启：通用模块必须在开机后第一次越狱时加载。 */
+    fun rebootDevice() {
+        if (running) { addLog("运行中不能重启"); return }
+        addLog("正在重启手机…")
+        scope.launch {
+            val r = StellarShell.run("su -c reboot", 15)
+            if (r.code != 0) {
+                runCatching {
+                    val pm = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                    pm.reboot(null)
+                }.onFailure { addLog("重启失败：" + (it.message ?: "无权限")) }
+            }
+        }
+    }
+
+    fun checkLoaderState() {
+        val pkg = selectedPkg() ?: return
+        scope.launch {
+            val out = runCatching {
+                StellarShell.run("P=\$(pm path " + pkg + " | head -1 | sed 's/^package://'); " +
+                    "D=\$(dirname \"\$P\"); stat -c %s \"\$D/lib/arm64/libksud.so\" 2>/dev/null", 12).output
+            }.getOrDefault("")
+            hotSwitchLoaderInstalled = out.trim() == UNIVERSAL_KSUD_SIZE.toString()
+        }
+    }
+
+    fun installHotSwitchLoader(onDone: (Boolean, String) -> Unit) {
+        if (loaderBusy || running) return
+        if (!suCompatReady) return onDone(false, "请先完成一键越狱")
+        loaderBusy = true
+        addLog("正在安装通用加载器（会备份原文件，可随时还原）")
+        scope.launch {
+            try {
+                val staged = "/data/local/tmp/onekey-universal-ksud"
+                if (ShizukuShell.stageAsset(context, "core/exec/ksud-universal", staged, 755).code != 0) {
+                    return@launch finishLoader(false, "通用加载器投放失败", onDone)
+                }
+                val r = StellarShell.run("su -c '" + loaderScript("install", staged) + "'", 60)
+                val ok = r.output.contains("OK") && !r.output.contains("FAIL")
+                if (ok) {
+                    hotSwitchLoaderInstalled = true
+                    addLog("通用加载器已安装：重启手机后重新运行越狱即可启用热切换")
+                } else {
+                    addLog("安装失败：" + r.output.trim().take(120))
+                }
+                finishLoader(ok, if (ok) "已安装，需重启后运行越狱" else "安装失败", onDone)
+            } catch (e: Throwable) {
+                finishLoader(false, "安装异常：" + (e.message ?: e.javaClass.simpleName), onDone)
+            }
+        }
+    }
+
+    fun restoreHotSwitchLoader(onDone: (Boolean, String) -> Unit) {
+        if (loaderBusy || running) return
+        if (!suCompatReady) return onDone(false, "请先完成一键越狱")
+        loaderBusy = true
+        addLog("正在还原管理器原加载器")
+        scope.launch {
+            try {
+                val r = StellarShell.run("su -c '" + loaderScript("restore", "") + "'", 60)
+                val ok = r.output.contains("OK")
+                if (ok) { hotSwitchLoaderInstalled = false; addLog("已还原管理器原加载器") }
+                else addLog("还原失败：" + r.output.trim().take(120))
+                finishLoader(ok, if (ok) "已还原" else "还原失败", onDone)
+            } catch (e: Throwable) {
+                finishLoader(false, "还原异常：" + (e.message ?: e.javaClass.simpleName), onDone)
+            }
+        }
+    }
+
+    private fun finishLoader(ok: Boolean, msg: String, onDone: (Boolean, String) -> Unit) {
+        loaderBusy = false
+        onDone(ok, msg)
     }
 
     fun updateVfs(enabled: Boolean) {
