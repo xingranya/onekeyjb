@@ -1324,7 +1324,11 @@ private fun HeroCard(controller: JailbreakController) {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "98260 越狱链" +
-                            " · " + (if (controller.suCompatReady) "SU 就绪" else "未提权"),
+                            " · " + when {
+                                controller.suCompatReady -> "SU 就绪"
+                                controller.rootedThisBoot -> "已越狱（服务离线）"
+                                else -> "未提权"
+                            },
                     style = COUITheme.textStyles.body2,
                     color = COUITheme.colorScheme.onSurfaceContainerVariant
                 )
@@ -1369,6 +1373,7 @@ private fun StatusCard(controller: JailbreakController) {
             Text(
                 when {
                     controller.suCompatReady -> "默认 SU：已就绪"
+                    controller.rootedThisBoot -> "默认 SU：本次开机已越狱；服务离线无法实时校验，启动 Stellar 即可复查"
                     else -> "默认 SU：未就绪（重新运行一次越狱即可）"
                 },
                 style = COUITheme.textStyles.body2,
@@ -1492,8 +1497,10 @@ private fun OptionsCard(
                     Text(
                         text = if (controller.hotSwitchAvailable)
                             "当前 " + controller.activeKernelManager.ifBlank { "未知" } + "；切换只改内核 profile，不重启、不重新越狱。"
-                        else if (controller.suCompatReady)
-                            "当前加载的是单管理器模块（无热切换节点）。重启手机后重新运行一次越狱，即可启用热切换。"
+                        else if (!controller.serviceReady)
+                            "服务离线，启动 Stellar 并授权后可检测热切换节点。"
+                        else if (controller.rootedThisBoot)
+                            "已越狱；当前加载的是单管理器模块。开启下方通用模块并重启后运行，即可启用热切换。"
                         else
                             "尚未越狱，热切换不可用。",
                         style = COUITheme.textStyles.body2,

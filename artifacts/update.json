@@ -1,12 +1,23 @@
 {
-  "versionCode": 187,
-  "versionName": "2.18.20",
-  "publishedAt": "2026-11-06T09:26:00+08:00",
-  "size": 23837237,
-  "sha256": "fc9013639977d3a25d85c5a5d2e3c5107c3382a80b27af4964b526125e895a58",
+  "versionCode": 188,
+  "versionName": "2.18.21",
+  "publishedAt": "2026-11-06T09:35:00+08:00",
+  "size": 23837233,
+  "sha256": "d3d25791ae8ff102b391a1b32ef24c34a9999a5ade1fb87655241ad63ec6becd",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.20\n\n- 修复未启动 Stellar 时点击开始导致的闪退\n- 修正中止判定：同一次失败不再被误计为两次，重试次数放宽到 4 次",
+  "changelog": "v2.18.21\n\n- 修复越狱成功后仍显示未提权：状态改为按本次开机的成功记录判定，不再完全依赖 Stellar\n- 服务离线时明确提示「已越狱（服务离线）」，热切换面板区分「服务离线」与「单管理器模块」\n- boot_id 改为本地读取，服务未就绪也能判断是否需要重启",
   "versions": [
+    {
+      "versionName": "2.18.21",
+      "versionCode": 188,
+      "publishedAt": "2026-11-06T09:35:00+08:00",
+      "size": 23837233,
+      "notes": [
+        "修复越狱成功后仍显示未提权：状态改为按本次开机的成功记录判定，不再完全依赖 Stellar",
+        "服务离线时明确提示「已越狱（服务离线）」，热切换面板区分「服务离线」与「单管理器模块」",
+        "boot_id 改为本地读取，服务未就绪也能判断是否需要重启"
+      ]
+    },
     {
       "versionName": "2.18.20",
       "versionCode": 187,

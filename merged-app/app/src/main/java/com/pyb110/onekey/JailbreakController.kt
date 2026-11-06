@@ -97,6 +97,8 @@ class JailbreakController private constructor(private val context: Context) {
     var hotSwitchMessage: String by mutableStateOf(""); private set
     /** 是否在越狱时加载通用多管理器模块（热切换前提，默认关闭以保持既有成功率）。 */
     var universalModuleEnabled: Boolean by mutableStateOf(prefs.getBoolean("universal_module", false)); private set
+    /** 本次开机是否已成功越狱（与 boot_id 绑定，重启后自动失效）。 */
+    var rootedThisBoot: Boolean by mutableStateOf(false); private set
 
     private var autoRepairTried = false
 
@@ -116,8 +118,18 @@ class JailbreakController private constructor(private val context: Context) {
         addLog(if (granted) "Stellar 权限已授予" else "Stellar 权限被拒绝")
     }
 
+    private fun localBootId(): String = runCatching {
+        File("/proc/sys/kernel/random/boot_id").readText().trim()
+    }.getOrDefault("")
+
+    private fun refreshRootedFlag() {
+        val saved = prefs.getString("success_boot_id", "").orEmpty()
+        rootedThisBoot = saved.isNotBlank() && saved == localBootId()
+    }
+
     init {
         HistoryStore.attach(context)
+        refreshRootedFlag()
         runCatching {
             Stellar.addBinderReceivedListenerSticky(binderListener, null)
             Stellar.addBinderDeadListener(deadListener, null)
@@ -160,6 +172,7 @@ class JailbreakController private constructor(private val context: Context) {
 
     fun refreshState() {
         if (isSwitchingManager) return
+        refreshRootedFlag()
         serviceReady = StellarShell.available()
         serviceGranted = StellarShell.hasPermission()
         if (!RunState.active && lockFile().isFile()) {
@@ -558,9 +571,7 @@ class JailbreakController private constructor(private val context: Context) {
         if (!acquireRunLock()) return
         // 引擎自带约束：失败后必须冷启动再重跑，否则会反复冲击已污染的内核。
         // 读取失败（例如 Stellar 未就绪）不阻断运行，交给后续服务检查处理。
-        val bootNow = runCatching {
-            ShizukuShell.run("cat /proc/sys/kernel/random/boot_id 2>/dev/null", 8).output.trim()
-        }.getOrDefault("")
+        val bootNow = localBootId()
         val dirtyBoot = prefs.getString("failed_boot_id", "").orEmpty()
         if (bootNow.isNotBlank() && dirtyBoot.isNotBlank() && bootNow == dirtyBoot) {
             addLog("上次越狱未完成，内核可能已被污染；请重启手机后再试（本次已阻止运行）")
@@ -711,7 +722,8 @@ class JailbreakController private constructor(private val context: Context) {
                 }
                 // 失败且已进入内核写入阶段 → 记录本次 boot，强制下次先重启。
                 if (ok) {
-                    prefs.edit().remove("failed_boot_id").apply()
+                    prefs.edit().remove("failed_boot_id").putString("success_boot_id", startBootId).apply()
+                    rootedThisBoot = startBootId.isNotBlank() && startBootId == localBootId()
                 } else if (RunReport.wroteKernel) {
                     prefs.edit().putString("failed_boot_id", startBootId).apply()
                     addLog("已记录：下次运行前需要重启手机")
