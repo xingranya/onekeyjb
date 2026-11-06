@@ -1,12 +1,23 @@
 {
-  "versionCode": 191,
-  "versionName": "2.18.24",
-  "publishedAt": "2026-11-06T09:52:00+08:00",
-  "size": 23837233,
-  "sha256": "ac568d74f2300921661a08508885b6e8e5ac9f4a1c2250b3a32e924d28fc0561",
+  "versionCode": 192,
+  "versionName": "2.18.25",
+  "publishedAt": "2026-11-06T10:12:00+08:00",
+  "size": 23837237,
+  "sha256": "f0516b99ca93d7f5c4f8a689807e7ed2b0f20b666037b05f562a3973e2a83e87",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.24\n\n- 检测与切换按钮改为并排（左检测、右切换）\n- 热切换面板新增状态诊断行：服务/授权/su/本次开机越狱记录，便于定位误判\n- 服务在线但未授权时自动发起授权申请",
+  "changelog": "v2.18.25\n\n- 定位并修复「开启通用模块后仍无热切换节点」：内核已有管理器模块时 late-load 会直接跳过，导致静默失败\n- 运行前检测：已加载单管理器模块且无节点时阻止运行，明确提示需重启后再试\n- 通用模块加载结果落盘回读，日志明确写出「加载成功 / 未生效」",
   "versions": [
+    {
+      "versionName": "2.18.25",
+      "versionCode": 192,
+      "publishedAt": "2026-11-06T10:12:00+08:00",
+      "size": 23837237,
+      "notes": [
+        "定位并修复「开启通用模块后仍无热切换节点」：内核已有管理器模块时 late-load 会直接跳过，导致静默失败",
+        "运行前检测：已加载单管理器模块且无节点时阻止运行，明确提示需重启后再试",
+        "通用模块加载结果落盘回读，日志明确写出「加载成功 / 未生效」"
+      ]
+    },
     {
       "versionName": "2.18.24",
       "versionCode": 191,

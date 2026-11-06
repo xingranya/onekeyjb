@@ -77,7 +77,7 @@ object OneKeyEngine {
                 "  \"" + d + "K\" late-load --allow-shell --package-name \"" + d + "PKG\"",
                 "  RC=" + d + "?",
                 "fi",
-                "if [ -f /proc/kernelsu_manager ]; then echo UNIVERSAL_NODE_OK; else echo UNIVERSAL_NODE_MISSING; fi",
+                "if [ -f /proc/kernelsu_manager ]; then echo UNIVERSAL_NODE_OK; echo OK > \"" + ws + "/universal-result\"; else echo UNIVERSAL_NODE_MISSING; echo MISSING > \"" + ws + "/universal-result\"; fi",
                 "exit " + d + "RC"
             ).joinToString("\n")
             val quoted = "'" + wrapper.replace("'", "'\\''") + "'"
@@ -172,8 +172,17 @@ object OneKeyEngine {
             return false
         }
         // 明确区分“拿到了 root”和“内核暴露了热切换节点”，避免两者混淆。
-        val node = ShizukuShell.run("timeout 5 su -c 'test -f /proc/kernelsu_manager && echo YES || echo NO'", 12).output.trim()
+        val node = ShizukuShell.run("test -e /proc/kernelsu_manager && echo YES || echo NO", 10).output.trim()
         hotSwitchReady = node == "YES"
+        if (universal) {
+            val result = ShizukuShell.run("cat " + ws + "/universal-result 2>/dev/null", 10).output.trim()
+            when {
+                hotSwitchReady -> log("通用模块加载成功，热切换节点已就绪")
+                result.contains("MISSING") -> log("通用模块未生效：内核里可能已存在管理器模块（late-load 会直接跳过）")
+                result.isBlank() -> log("通用模块未回报结果，可能被引擎抑制输出")
+                else -> log("通用模块状态：" + result)
+            }
+        }
         if (ok) {
             log(if (hotSwitchReady) "热切换节点已就绪：/proc/kernelsu_manager"
                 else "本次未启用热切换节点（加载的是单管理器模块），管理器切换需重新加载通用模块")

@@ -605,6 +605,18 @@ class JailbreakController private constructor(private val context: Context) {
             releaseRunLock()
             return
         }
+        // 内核已加载单管理器模块时，late-load 会直接跳过，通用模块无法生效。
+        // 此时继续运行只会让人误以为开关生效，必须要求冷启动。
+        if (universalModuleEnabled && serviceReady) {
+            val loaded = StellarShell.run("grep -c '^kernelsu ' /proc/modules 2>/dev/null || echo 0", 10).output.trim()
+            val node = StellarShell.run("test -e /proc/kernelsu_manager && echo YES || echo NO", 10).output.trim()
+            if ((loaded.toIntOrNull() ?: 0) > 0 && !node.contains("YES")) {
+                addLog("内核已加载单管理器模块，通用模块无法在本次开机生效；请重启手机后再运行")
+                stage = "需重启后再试"
+                releaseRunLock()
+                return
+            }
+        }
         running = true
         val runAdaptive = adaptiveManagerEnabled
         val runKind = selectedManager
