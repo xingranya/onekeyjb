@@ -98,7 +98,8 @@ class JailbreakController private constructor(private val context: Context) {
     /** 状态探测的诊断摘要，便于定位"显示未越狱"这类问题。 */
     var probeDetail: String by mutableStateOf(""); private set
     /** 是否在越狱时加载通用多管理器模块（热切换前提，默认关闭以保持既有成功率）。 */
-    var universalModuleEnabled: Boolean by mutableStateOf(prefs.getBoolean("universal_module", false)); private set
+    /** 执行引擎不支持外部 ksud（实测 PYB110_KSUD/PYB110_MANAGER_PKG 均被忽略），暂固定关闭。 */
+    val universalModuleEnabled: Boolean = false
     /** 本次开机是否已成功越狱（与 boot_id 绑定，重启后自动失效）。 */
     var rootedThisBoot: Boolean by mutableStateOf(false); private set
 
@@ -401,13 +402,6 @@ class JailbreakController private constructor(private val context: Context) {
         susfsEnabled = enabled
         prefs.edit().putBoolean("susfs_enabled", enabled).apply()
         addLog(if (enabled) "已开启 SUSFS 支持（执行器加载模块后生效）" else "已关闭 SUSFS 支持")
-    }
-
-    fun updateUniversalModule(enabled: Boolean) {
-        universalModuleEnabled = enabled
-        prefs.edit().putBoolean("universal_module", enabled).apply()
-        addLog(if (enabled) "已开启通用多管理器模块：下次运行将加载它，可启用热切换（需重启后运行）"
-               else "已关闭通用多模块，恢复使用管理器自带模块（成功率更高）")
     }
 
     fun updateVfs(enabled: Boolean) {

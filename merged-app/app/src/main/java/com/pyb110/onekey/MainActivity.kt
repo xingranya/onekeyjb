@@ -1567,15 +1567,15 @@ private fun OptionsCard(
                         Column(Modifier.weight(1f)) {
                             Text("运行前加载通用模块", style = COUITheme.textStyles.body1)
                             Text(
-                                "开启后下次越狱加载通用模块，才可用热切换；需重启后运行。",
+                                "当前执行引擎固定使用管理器自带的 ksud，无法加载外部模块；该功能暂不可用。",
                                 style = COUITheme.textStyles.body2,
                                 color = COUITheme.colorScheme.onSurfaceContainerVariant
                             )
                         }
                         Switch(
-                            checked = controller.universalModuleEnabled,
-                            onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateUniversalModule(it) },
-                            enabled = !controller.running
+                            checked = false,
+                            onCheckedChange = { },
+                            enabled = false
                         )
                     }
                     Spacer(Modifier.height(10.dp))

@@ -1,12 +1,22 @@
 {
-  "versionCode": 192,
-  "versionName": "2.18.25",
-  "publishedAt": "2026-11-06T10:12:00+08:00",
+  "versionCode": 193,
+  "versionName": "2.18.26",
+  "publishedAt": "2026-11-06T10:40:00+08:00",
   "size": 23837237,
-  "sha256": "f0516b99ca93d7f5c4f8a689807e7ed2b0f20b666037b05f562a3973e2a83e87",
+  "sha256": "a3b00b54840b861c6b799cffd0b0d6eb7003d36d58e1b5d070f52f23d8ed073a",
   "apkUrl": "https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/OneKeyJB-latest.apk",
-  "changelog": "v2.18.25\n\n- 定位并修复「开启通用模块后仍无热切换节点」：内核已有管理器模块时 late-load 会直接跳过，导致静默失败\n- 运行前检测：已加载单管理器模块且无节点时阻止运行，明确提示需重启后再试\n- 通用模块加载结果落盘回读，日志明确写出「加载成功 / 未生效」",
+  "changelog": "v2.18.26\n\n- 通用模块开关改为不可用并说明原因：实测执行引擎固定使用管理器自带 ksud，PYB110_KSUD / PYB110_MANAGER_PKG 均被忽略\n- 避免继续误导用户重复越狱",
   "versions": [
+    {
+      "versionName": "2.18.26",
+      "versionCode": 193,
+      "publishedAt": "2026-11-06T10:40:00+08:00",
+      "size": 23837237,
+      "notes": [
+        "通用模块开关改为不可用并说明原因：实测执行引擎固定使用管理器自带 ksud，PYB110_KSUD / PYB110_MANAGER_PKG 均被忽略",
+        "避免继续误导用户重复越狱"
+      ]
+    },
     {
       "versionName": "2.18.25",
       "versionCode": 192,
