@@ -95,6 +95,8 @@ class JailbreakController private constructor(private val context: Context) {
     var activeKernelManager: String by mutableStateOf(""); private set
     var isSwitchingManager: Boolean by mutableStateOf(false); private set
     var hotSwitchMessage: String by mutableStateOf(""); private set
+    /** 是否在越狱时加载通用多管理器模块（热切换前提，默认关闭以保持既有成功率）。 */
+    var universalModuleEnabled: Boolean by mutableStateOf(prefs.getBoolean("universal_module", false)); private set
 
     private var autoRepairTried = false
 
@@ -362,6 +364,13 @@ class JailbreakController private constructor(private val context: Context) {
         addLog(if (enabled) "已开启 SUSFS 支持（执行器加载模块后生效）" else "已关闭 SUSFS 支持")
     }
 
+    fun updateUniversalModule(enabled: Boolean) {
+        universalModuleEnabled = enabled
+        prefs.edit().putBoolean("universal_module", enabled).apply()
+        addLog(if (enabled) "已开启通用多管理器模块：下次运行将加载它，可启用热切换（需重启后运行）"
+               else "已关闭通用多模块，恢复使用管理器自带模块（成功率更高）")
+    }
+
     fun updateVfs(enabled: Boolean) {
         vfsEnabled = enabled
         prefs.edit().putBoolean("vfs_enabled", enabled).apply()
@@ -547,6 +556,15 @@ class JailbreakController private constructor(private val context: Context) {
             return
         }
         if (!acquireRunLock()) return
+        // 引擎自带约束：失败后必须冷启动再重跑，否则会反复冲击已污染的内核。
+        val bootNow = ShizukuShell.run("cat /proc/sys/kernel/random/boot_id 2>/dev/null", 8).output.trim()
+        val dirtyBoot = prefs.getString("failed_boot_id", "").orEmpty()
+        if (bootNow.isNotBlank() && dirtyBoot.isNotBlank() && bootNow == dirtyBoot) {
+            addLog("上次越狱未完成，内核可能已被污染；请重启手机后再试（本次已阻止运行）")
+            stage = "需重启后再试"
+            releaseRunLock()
+            return
+        }
         running = true
         val runAdaptive = adaptiveManagerEnabled
         val runKind = selectedManager
@@ -613,7 +631,8 @@ class JailbreakController private constructor(private val context: Context) {
                         { addLog(it) },
                         { stage = it; HistoryStore.updateStage(it) },
                         { progress = it / 100f },
-                        susfsEnabled, vfsEnabled, unloadKernelGuard, antiRootGuard, softRebootFix
+                        susfsEnabled, vfsEnabled, unloadKernelGuard, antiRootGuard, softRebootFix,
+                        universalModuleEnabled
                     )
                 } else if (isNewKernel && NativeExecutor.available(context)) {
                     stage = "运行自研执行器"
@@ -686,6 +705,13 @@ class JailbreakController private constructor(private val context: Context) {
                     val nativeSu = StellarShell.run("timeout 6 su -c 'id -u' 2>/dev/null; true", 15).output.trim()
                     val overlaySu = StellarShell.run("[ -x /system_ext/bin/su ] && grep -q su_compat /proc/mounts && echo READY || echo MISSING", 15)
                     suCompatReady = nativeSu == "0" || overlaySu.output.contains("READY")
+                }
+                // 失败且已进入内核写入阶段 → 记录本次 boot，强制下次先重启。
+                if (ok) {
+                    prefs.edit().remove("failed_boot_id").apply()
+                } else if (RunReport.wroteKernel) {
+                    prefs.edit().putString("failed_boot_id", startBootId).apply()
+                    addLog("已记录：下次运行前需要重启手机")
                 }
                 HistoryStore.finish(ok, stage, elapsedSeconds)
                 refreshState()

@@ -29,6 +29,7 @@ object OneKeyEngine {
         unloadGuard: Boolean,
         disableAntiRoot: Boolean,
         softReboot: Boolean,
+        useUniversalModule: Boolean,
     ): Boolean {
         val ws = ROOT + "-" + System.currentTimeMillis()
         if (!ShizukuShell.run("mkdir -p " + ws + " && chmod 700 " + ws + " && echo OK", 20).output.contains("OK")) {
@@ -40,7 +41,38 @@ object OneKeyEngine {
         if (susfs) ShizukuShell.stageAsset(context, "core/exec/susfs_guard_lkm.ko", ws + "/susfs_guard_lkm.ko", 644)
         if (vfs) ShizukuShell.stageAsset(context, "core/exec/hybridmount-6.18.21.ko", ws + "/hybridmount-6.18.21.ko", 644)
         // 通用多管理器模块：只有它能提供 /proc/kernelsu_manager（管理器自带的 LKM 是单管理器构建）。
-        val universal = ShizukuShell.stageAsset(context, "core/exec/ksud-universal", ws + "/ksud-universal", 755).code == 0
+        var universal = false
+        if (useUniversalModule &&
+            ShizukuShell.stageAsset(context, "core/exec/ksud-universal", ws + "/ksud-universal", 755).code == 0) {
+            // 包装脚本接管 late-load：--kmi 被拒绝时自动降级，并回报节点是否出现。
+            val d = "$"
+            val wrapper = listOf(
+                "#!/system/bin/sh",
+                "PKG=\"\"",
+                "while [ " + d + "# -gt 0 ]; do",
+                "  case \"" + d + "1\" in",
+                "    --package-name) PKG=\"" + d + "2\"; shift 2 ;;",
+                "    *) shift ;;",
+                "  esac",
+                "done",
+                "K=\"" + ws + "/ksud-universal\"",
+                "\"" + d + "K\" late-load --kmi android17-6.18 --allow-shell --package-name \"" + d + "PKG\"",
+                "RC=" + d + "?",
+                "if [ \"" + d + "RC\" -ne 0 ]; then",
+                "  \"" + d + "K\" late-load --allow-shell --package-name \"" + d + "PKG\"",
+                "  RC=" + d + "?",
+                "fi",
+                "if [ -f /proc/kernelsu_manager ]; then echo UNIVERSAL_NODE_OK; else echo UNIVERSAL_NODE_MISSING; fi",
+                "exit " + d + "RC"
+            ).joinToString("\n")
+            val quoted = "'" + wrapper.replace("'", "'\\''") + "'"
+            val staged = ShizukuShell.run(
+                "printf '%s\\n' " + quoted + " > " + ws + "/ksud-wrapper && chmod 755 " + ws + "/ksud-wrapper && echo WOK",
+                20
+            )
+            universal = staged.output.contains("WOK")
+            if (!universal) log("通用模块包装脚本写入失败，回退到管理器自带模块")
+        }
         val k = when (managerKind) {
             "kernelsu" -> "kernelsu"
             "next" -> "next"
@@ -55,16 +87,37 @@ object OneKeyEngine {
             " PYB110_DISABLE_ANTIROOT=" + (if (disableAntiRoot) "1" else "0") +
             " PYB110_SOFT_REBOOT=" + (if (softReboot) "1" else "0") +
             " PYB110_REBOOT=" + (if (softReboot) "1" else "0") +
-            (if (universal) " PYB110_KSUD=" + ws + "/ksud-universal" else "")
+            (if (universal) " PYB110_KSUD=" + ws + "/ksud-wrapper" else "")
         val cmd = "cd " + ws + " && " + env + " ./onekey-98260 run 2>&1"
         log("执行引擎启动（manager=" + k + "，" + (if (universal) "通用多管理器模块" else "管理器自带模块") + "）")
         var ok = false
+        var abortReason: String? = null
+        var sawPermissive = false
+        var failedStageSignals = 0
         try {
             val proc = ShizukuShell.start(cmd) { raw ->
                 var line = raw.trim()
                 if (line.isEmpty()) return@start
                 // 外部引擎的标识串不外泄到我们的日志
                 line = line.replace("PYB110_", "").replace("t98260", "98260-engine")
+                if (line.contains("SELINUX=permissive")) sawPermissive = true
+                // 竞态没落地时引擎会继续盲写并反复重试，这是内核被拖挂的直接原因：立即中止。
+                // 引擎每次失败都会重打一轮；允许重试一次，第二次失败即中止，避免持续冲击内核。
+                if (abortReason == null && (line.contains("rc=-1") || line.contains("HIT=0") || line.contains("RECLAIM_FREED=0"))) {
+                    failedStageSignals += 1
+                    val reason = when {
+                        line.contains("RECLAIM_FREED=0") -> "对象回收失败（RECLAIM_FREED=0）"
+                        line.contains("HIT=0") -> "写入未命中（HIT=0）"
+                        else -> "该阶段未成功（rc=-1）"
+                    }
+                    if (failedStageSignals >= 2) {
+                        abortReason = reason
+                        RunReport.stop("布置提权原语", reason)
+                        log("连续两次未命中（" + reason + "），立即中止以避免内核进入不稳定状态")
+                    } else {
+                        log("本次未命中（" + reason + "），允许再试一次")
+                    }
+                }
                 when {
                     line.startsWith("[1/4]") -> { stage("布置提权原语"); progress(35) }
                     line.startsWith("[2/4]") -> { stage("加载内核模块"); progress(65) }
@@ -72,23 +125,40 @@ object OneKeyEngine {
                     line.startsWith("[4/4]") -> { stage("管理器收尾"); progress(90) }
                     line == "MODULE_LOADED" -> log("内核模块已加载")
                     line.startsWith("SU_ID_RC=") -> log("su 校验：" + line)
+                    line.contains("UNIVERSAL_NODE_OK") -> log("通用模块已加载，热切换节点就绪")
+                    line.contains("UNIVERSAL_NODE_MISSING") -> log("通用模块未能提供热切换节点")
                     line == "DONE" -> { ok = true; progress(100) }
                     line.startsWith("KSUD_MISSING") || line.contains("FAIL") -> RunReport.stop("执行器", line.take(120))
                     else -> if (line.length in 3..200) log("  " + line)
                 }
             }
-            val deadline = System.currentTimeMillis() + 180_000
-            while (proc.isRunning() && System.currentTimeMillis() < deadline) Thread.sleep(300)
-            if (proc.isRunning()) { proc.destroy(); log("引擎超时，已终止") }
+            // 首次失败就停：引擎自身的 attempt 重试会把内核越打越乱。
+            val deadline = System.currentTimeMillis() + 90_000
+            while (proc.isRunning() && abortReason == null && System.currentTimeMillis() < deadline) Thread.sleep(200)
+            if (proc.isRunning()) {
+                proc.destroy()
+                runCatching { ShizukuShell.run("pkill -9 -f onekey-98260; true", 10) }
+                if (abortReason == null) { abortReason = "执行超时（90 秒）"; log("引擎超时，已终止") }
+            }
         } catch (e: Throwable) {
             log("引擎异常：" + (e.message ?: e.javaClass.simpleName))
         } finally {
-            ShizukuShell.run("rm -rf " + ws + "; true", 10)
+            ShizukuShell.run("pkill -9 -f onekey-98260; rm -rf " + ws + "; true", 10)
+        }
+        // 中止后若已把 SELinux 改为 permissive，尽量恢复，减少残留影响。
+        if (abortReason != null && sawPermissive) {
+            val restored = ShizukuShell.run("timeout 5 su -c 'setenforce 1' 2>&1; timeout 5 su -c getenforce", 12).output.trim()
+            log("已尝试恢复 SELinux：" + restored.lineSequence().lastOrNull().orEmpty())
         }
         if (ok) {
             val check = ShizukuShell.run("timeout 5 /system/bin/su -c id 2>&1", 10).output
             ok = check.contains("uid=0")
             if (ok) RunReport.markWrote("加载内核模块")
+        }
+        if (abortReason != null) {
+            RunReport.stop("布置提权原语", abortReason!!)
+            log("本次已中止：" + abortReason + "；建议重启后再试")
+            return false
         }
         // 明确区分“拿到了 root”和“内核暴露了热切换节点”，避免两者混淆。
         val node = ShizukuShell.run("timeout 5 su -c 'test -f /proc/kernelsu_manager && echo YES || echo NO'", 12).output.trim()

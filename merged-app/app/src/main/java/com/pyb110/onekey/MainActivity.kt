@@ -1551,6 +1551,26 @@ private fun OptionsCard(
                             }
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("运行前加载通用模块", style = COUITheme.textStyles.body1)
+                            Text(
+                                "开启后下次越狱加载通用模块，才可用热切换；需重启后运行。",
+                                style = COUITheme.textStyles.body2,
+                                color = COUITheme.colorScheme.onSurfaceContainerVariant
+                            )
+                        }
+                        Switch(
+                            checked = controller.universalModuleEnabled,
+                            onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateUniversalModule(it) },
+                            enabled = !controller.running
+                        )
+                    }
                     Spacer(Modifier.height(10.dp))
                     val canSwitch = controller.hotSwitchAvailable && controller.suCompatReady && !controller.running && !controller.preparing && selectedTarget.isNotBlank() && !controller.isSwitchingManager
                     Surface(
