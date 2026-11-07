@@ -1712,9 +1712,9 @@ internal fun appearanceLabel(mode: AppearanceMode): String = when (mode) {
 private fun managerHint(kind: String): String = when (kind) {
     "next" -> "KernelSU-Next v3.4.2（versionCode 33355，支持自适应与云端模块）"
     "kernelsu" -> "KernelSU 官方 v3.3.1（versionCode 32680，支持自适应与云端模块）"
-    "sukisu" -> "SukiSU Ultra v4.3.0-r1（versionCode 41140，支持自适应与云端模块）"
+    "sukisu" -> "SukiSU Ultra v4.3.0-r2（versionCode 41150，支持自适应与云端模块）"
     "bakasu" -> "BakaSU v4.2.0-rc3（versionCode 35171，支持自适应与云端模块）"
-    "finasu" -> "FinaSU v1.4.5（versionCode 33168，支持自适应与云端模块）"
+    "finasu" -> "FinaSU v1.5.0（versionCode 33174，支持自适应与云端模块）"
     else -> ""
 }
 

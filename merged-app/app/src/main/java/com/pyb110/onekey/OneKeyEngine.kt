@@ -139,7 +139,11 @@ object OneKeyEngine {
                     line.contains("UNIVERSAL_NODE_OK") -> log("通用模块已加载，热切换节点就绪")
                     line.contains("UNIVERSAL_NODE_MISSING") -> log("通用模块未能提供热切换节点")
                     line == "DONE" -> { ok = true; progress(100) }
-                    line.startsWith("KSUD_MISSING") || line.contains("FAIL") -> RunReport.stop("执行器", line.take(120))
+                    line.startsWith("KSUD_MISSING") -> {
+                        RunReport.stop("执行器", "管理器 APK 里没有 libksud.so")
+                        log("该管理器把加载器改了名；完成一次越狱后本应用会自动归一化，或改用其他管理器先越狱")
+                    }
+                    line.contains("FAIL") -> RunReport.stop("执行器", line.take(120))
                     else -> if (line.length in 3..200) log("  " + line)
                 }
             }

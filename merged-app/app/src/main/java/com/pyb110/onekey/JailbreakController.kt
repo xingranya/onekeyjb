@@ -282,9 +282,9 @@ class JailbreakController private constructor(private val context: Context) {
         val defs = listOf(
             Triple("next", "KernelSU-Next", "com.rifsxd.ksunext") to 33355,
             Triple("kernelsu", "KernelSU 官方", "me.weishu.kernelsu") to 32680,
-            Triple("sukisu", "SukiSU Ultra", "com.sukisu.ultra") to 41140,
+            Triple("sukisu", "SukiSU Ultra", "com.sukisu.ultra") to 41150,
             Triple("bakasu", "BakaSU", "com.resukisu.resukisu") to 35171,
-            Triple("finasu", "FinaSU", "me.yuki.fina") to 33168,
+            Triple("finasu", "FinaSU", "me.yuki.fina") to 33174,
         )
         return defs.map { (triple, expected) ->
             val (kind, label, staticPkg) = triple
@@ -466,6 +466,13 @@ class JailbreakController private constructor(private val context: Context) {
         loaderBusy = true
         addLog("正在安装通用加载器（会备份原文件，可随时还原）")
         scope.launch {
+            runCatching {
+                StellarShell.run("su -c '" + KsudNormalizer.script(selectedPkg().orEmpty()) + "'", 40)
+            }.getOrNull()?.let { pre ->
+                if (KsudNormalizer.parse(pre.output) is KsudNormalizer.Result.Materialized) {
+                    addLog("已先归一化管理器 ksud，再安装通用加载器")
+                }
+            }
             try {
                 val staged = "/data/local/tmp/onekey-universal-ksud"
                 if (ShizukuShell.stageAsset(context, "core/exec/ksud-universal", staged, 755).code != 0) {
@@ -725,6 +732,19 @@ class JailbreakController private constructor(private val context: Context) {
                 stage = "需重启后再试"
                 releaseRunLock()
                 return
+            }
+        }
+        // 有些管理器把 ksud 改名成随机库，引擎按 libksud.so 找不到会直接失败。
+        // 已经有 root 时先把真 ksud 归一化回固定路径，保证本次与后续运行都可用。
+        if (suCompatReady) {
+            runCatching {
+                StellarShell.run("su -c '" + KsudNormalizer.script(selectedPkg().orEmpty()) + "'", 40)
+            }.getOrNull()?.let { r ->
+                when (val parsed = KsudNormalizer.parse(r.output)) {
+                    is KsudNormalizer.Result.Materialized -> addLog("加载器归一化：已用 " + parsed.source + " 补齐 libksud.so")
+                    KsudNormalizer.Result.Missing -> addLog("加载器归一化：未在管理器 APK 里找到 ksud（-V 无版本行）")
+                    else -> Unit
+                }
             }
         }
         running = true

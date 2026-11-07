@@ -47,10 +47,10 @@ object ManagerDownloads {
         ManagerDownload(
             kind = "finasu",
             label = "FinaSU",
-            version = "v1.4.5",
-            versionCode = 33168,
-            apkUrl = "https://github.com/LyraVoid/FinaSU/releases/download/v1.4.5/FinaSU_v1.4.5_33168-release.apk",
-            pageUrl = "https://github.com/LyraVoid/FinaSU/releases/tag/v1.4.5",
+            version = "v1.5.0",
+            versionCode = 33174,
+            apkUrl = "https://github.com/LyraVoid/FinaSU/releases/download/v1.5.0/FinaSU_v1.5.0_33174-release.apk",
+            pageUrl = "https://github.com/LyraVoid/FinaSU/releases/tag/v1.5.0",
         ),
     )
 }
