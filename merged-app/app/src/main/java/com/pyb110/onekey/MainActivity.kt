@@ -1709,13 +1709,9 @@ internal fun appearanceLabel(mode: AppearanceMode): String = when (mode) {
     AppearanceMode.SYSTEM -> "跟随系统"
 }
 
-private fun managerHint(kind: String): String = when (kind) {
-    "next" -> "KernelSU-Next v3.4.2（versionCode 33355，支持自适应与云端模块）"
-    "kernelsu" -> "KernelSU 官方 v3.3.1（versionCode 32680，支持自适应与云端模块）"
-    "sukisu" -> "SukiSU Ultra v4.3.0-r2（versionCode 41150，支持自适应与云端模块）"
-    "bakasu" -> "BakaSU v4.2.0-rc3（versionCode 35171，支持自适应与云端模块）"
-    "finasu" -> "FinaSU v1.5.0（versionCode 33174，支持自适应与云端模块）"
-    else -> ""
+private fun managerHint(kind: String): String {
+    val d = ManagerDownloads.latest(kind) ?: return "支持自适应与云端模块"
+    return d.label + " " + d.version + "（versionCode " + d.versionCode + "，支持自适应与云端模块）"
 }
 
 @Composable
@@ -2176,15 +2172,31 @@ private fun ManagerDownloadPanel(
 ) {
     val downloadContext = LocalContext.current
     val c = oneKeyColors()
-    val pkgByKind = remember { JailbreakController.get(downloadContext).managers.associate { it.kind to it.pkg } }
+    val controller = remember { JailbreakController.get(downloadContext) }
+    val pkgByKind = remember { controller.managers.associate { it.kind to it.pkg } }
+    var items by remember { mutableStateOf(ManagerDownloads.all()) }
+    var syncing by remember { mutableStateOf(false) }
+    val panelScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        if (ManagerDownloads.isFresh()) {
+            items = ManagerDownloads.all()
+            return@LaunchedEffect
+        }
+        syncing = true
+        withContext(Dispatchers.IO) { controller.refreshManagerCatalog(true) }
+        items = ManagerDownloads.all()
+        syncing = false
+    }
+
     Column(Modifier.fillMaxWidth()) {
         Text(
-            "版本沿用项目记录，点击下载会打开对应官方发布页。",
+            if (items.isEmpty()) "正在获取官方最新版本…" else "版本取自官方最新发布，点击下载打开对应发布页。",
             style = COUITheme.textStyles.body2,
             color = c.muted,
             modifier = Modifier.padding(bottom = 8.dp)
         )
-        ManagerDownloads.all.forEach { item ->
+        items.forEach { item ->
             val pkg = pkgByKind[item.kind].orEmpty()
             Row(
                 modifier = Modifier
@@ -2212,6 +2224,22 @@ private fun ManagerDownloadPanel(
                         modifier = Modifier.size(18.dp),
                         tint = c.primary
                     )
+                }
+            }
+        }
+        if (items.isEmpty() && !syncing) {
+            Text(
+                "暂未获取到官方版本信息，请检查网络后重新获取。",
+                style = COUITheme.textStyles.body2,
+                color = c.muted
+            )
+            Spacer(Modifier.height(10.dp))
+            PanelButton("重新获取") {
+                panelScope.launch {
+                    syncing = true
+                    withContext(Dispatchers.IO) { controller.refreshManagerCatalog(true) }
+                    items = ManagerDownloads.all()
+                    syncing = false
                 }
             }
         }

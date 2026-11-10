@@ -192,7 +192,9 @@ class JailbreakController private constructor(private val context: Context) {
             lockFile().delete()
             addLog("已清理上次中断留下的运行锁，可直接重试")
         }
+        ManagerDownloads.load(context)
         managers = buildManagers()
+        refreshManagerCatalog()
         platformReason = SecurityCheck.reason(context)
         if (adaptiveManagerEnabled) {
             val valid = managers.filter { it.supported && it.installedVersionCode != null && it.certOk }
@@ -276,16 +278,35 @@ class JailbreakController private constructor(private val context: Context) {
         } catch (e: Throwable) { emptyList() }
     }
 
+    /** 后台同步五家官方版本；提取不到的那一家不会出现在「管理器下载」里。 */
+    fun refreshManagerCatalog(force: Boolean = false) {
+        if (!force && ManagerDownloads.isFresh()) {
+            managers = buildManagers()
+            return
+        }
+        scope.launch {
+            val ok = runCatching { ManagerDownloads.refresh(context) }.getOrDefault(false)
+            managers = buildManagers()
+            val detail = ManagerDownloads.all().joinToString("，") { it.label + " " + it.version }
+            addLog(
+                if (ok) "管理器版本已同步：" + detail
+                else "管理器版本未完全获取" + (ManagerDownloads.lastError?.let { "（" + it + "）" } ?: "") +
+                    if (detail.isNotBlank()) "；已获取：" + detail else ""
+            )
+        }
+    }
+
     private fun buildManagers(): List<ManagerOption> {
         val entries = installedEntries()
         val byCert = entries.groupBy { it.cert }
+        // 期望版本不写死：取官方 Release 实际提取到的 versionCode；未提取到记 0（自适应模式下不参与拦截）。
         val defs = listOf(
-            Triple("next", "KernelSU-Next", "com.rifsxd.ksunext") to 33355,
-            Triple("kernelsu", "KernelSU 官方", "me.weishu.kernelsu") to 32680,
-            Triple("sukisu", "SukiSU Ultra", "com.sukisu.ultra") to 41150,
-            Triple("bakasu", "BakaSU", "com.resukisu.resukisu") to 35171,
-            Triple("finasu", "FinaSU", "me.yuki.fina") to 33174,
-        )
+            Triple("next", "KernelSU-Next", "com.rifsxd.ksunext"),
+            Triple("kernelsu", "KernelSU 官方", "me.weishu.kernelsu"),
+            Triple("sukisu", "SukiSU Ultra", "com.sukisu.ultra"),
+            Triple("bakasu", "BakaSU", "com.resukisu.resukisu"),
+            Triple("finasu", "FinaSU", "me.yuki.fina"),
+        ).map { it to (ManagerDownloads.latest(it.first)?.versionCode ?: 0) }
         return defs.map { (triple, expected) ->
             val (kind, label, staticPkg) = triple
             val cert = expectedCert[kind]
@@ -304,6 +325,7 @@ class JailbreakController private constructor(private val context: Context) {
                 installedCode == null -> "未安装 · 请安装后再选择"
                 adaptiveManagerEnabled && !certOk -> "签名不匹配，已拒绝"
                 adaptiveManagerEnabled -> "已安装 " + (chosen?.version ?: "") + " · 可运行时适配"
+                expected <= 0 -> "已安装 " + (chosen?.version ?: "") + " · 未取得官方最新版本"
                 installedCode != expected -> "版本不匹配：需要 " + expected + "，当前 " + installedCode
                 !certOk -> "签名不匹配，已拒绝"
                 else -> "已安装 · 版本与签名匹配"
