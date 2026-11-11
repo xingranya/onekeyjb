@@ -430,8 +430,8 @@ private fun AppRoot(
                             "失败时日志会写明停在哪一步；只有在真的写入内核后才会提示重启，未写入可直接再试。"
                         ))
                         ManualSection("三、拓展功能（5 项）", listOf(
-                            "越狱后禁用安全弹窗：停用安全守护/安全中心，不影响截屏。",
-                            "越狱后软重启：系统拦截原生调用时，软重启用户态恢复 root。",
+                            "越狱后禁用安全弹窗：停掉安全守护/安全中心进程并抑制反 root 弹窗，不改包状态、不重启。",
+                            "越狱后软重启：默认关闭。开启后越狱成功会执行一次 setprop ctl.restart zygote；关闭则不重启。",
                             "越狱后卸载内核安全防护：卸载 oplus_secure_guard 一类内核防护模块。",
                             "SUSFS 支持：越狱后加载隐藏模块（需要执行器侧配合）。",
                             "VFS 支持：加载 hybridmount 做路径重定向，仅 6.18 内核生效。"
@@ -2273,12 +2273,13 @@ private fun FeatureTogglePanel(
             ),
             ListRow(
                 title = "越狱后软重启",
-                summary = "ColorOS 拦截原生调用时，软重启用户态恢复 root",
+                summary = if (controller.softRebootAfter) "开启：成功后重启一次用户态（内核模块保持加载）"
+                          else "关闭：成功后保持当前会话，不会自动重启",
                 icon = COUIIcons.Refresh,
                 end = {
                     Switch(
-                        checked = controller.softRebootFix,
-                        onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateSoftRebootFix(it) },
+                        checked = controller.softRebootAfter,
+                        onCheckedChange = { haptic(CouiHapticEffect.Switch); controller.updateSoftRebootAfter(it) },
                         enabled = !controller.running
                     )
                 }

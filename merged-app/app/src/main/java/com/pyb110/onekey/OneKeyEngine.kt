@@ -43,7 +43,6 @@ object OneKeyEngine {
         vfs: Boolean,
         unloadGuard: Boolean,
         disableAntiRoot: Boolean,
-        softReboot: Boolean,
         useUniversalModule: Boolean,
     ): Boolean {
         val ws = ROOT + "-" + System.currentTimeMillis()
@@ -55,39 +54,10 @@ object OneKeyEngine {
         }
         if (susfs) ShizukuShell.stageAsset(context, "core/exec/susfs_guard_lkm.ko", ws + "/susfs_guard_lkm.ko", 644)
         if (vfs) ShizukuShell.stageAsset(context, "core/exec/hybridmount-6.18.21.ko", ws + "/hybridmount-6.18.21.ko", 644)
-        // 通用多管理器模块：只有它能提供 /proc/kernelsu_manager（管理器自带的 LKM 是单管理器构建）。
-        var universal = false
-        if (useUniversalModule &&
-            ShizukuShell.stageAsset(context, "core/exec/ksud-universal", ws + "/ksud-universal", 755).code == 0) {
-            // 包装脚本接管 late-load：--kmi 被拒绝时自动降级，并回报节点是否出现。
-            val d = "$"
-            val wrapper = listOf(
-                "#!/system/bin/sh",
-                "PKG=\"\"",
-                "while [ " + d + "# -gt 0 ]; do",
-                "  case \"" + d + "1\" in",
-                "    --package-name) PKG=\"" + d + "2\"; shift 2 ;;",
-                "    *) shift ;;",
-                "  esac",
-                "done",
-                "K=\"" + ws + "/ksud-universal\"",
-                "\"" + d + "K\" late-load --kmi android17-6.18 --allow-shell --package-name \"" + d + "PKG\"",
-                "RC=" + d + "?",
-                "if [ \"" + d + "RC\" -ne 0 ]; then",
-                "  \"" + d + "K\" late-load --allow-shell --package-name \"" + d + "PKG\"",
-                "  RC=" + d + "?",
-                "fi",
-                "if [ -f /proc/kernelsu_manager ]; then echo UNIVERSAL_NODE_OK; echo OK > \"" + ws + "/universal-result\"; else echo UNIVERSAL_NODE_MISSING; echo MISSING > \"" + ws + "/universal-result\"; fi",
-                "exit " + d + "RC"
-            ).joinToString("\n")
-            val quoted = "'" + wrapper.replace("'", "'\\''") + "'"
-            val staged = ShizukuShell.run(
-                "printf '%s\\n' " + quoted + " > " + ws + "/ksud-wrapper && chmod 755 " + ws + "/ksud-wrapper && echo WOK",
-                20
-            )
-            universal = staged.output.contains("WOK")
-            if (!universal) log("通用模块包装脚本写入失败，回退到管理器自带模块")
-        }
+        // 通用多管理器模块：由引擎按 PYB110_UNIVERSAL 自行加载并写 /proc/kernelsu_manager。
+        val universal = useUniversalModule &&
+            ShizukuShell.stageAsset(context, "core/exec/ksud-universal", ws + "/ksud-universal", 755).code == 0
+        if (useUniversalModule && !universal) log("通用加载器投放失败，回退到管理器自带模块")
         val k = when (managerKind) {
             "kernelsu" -> "kernelsu"
             "next" -> "next"
@@ -95,14 +65,16 @@ object OneKeyEngine {
             "bakasu" -> "bakasu"
             else -> "finasu"
         }
+        val kmi = DeviceProfiles.current()?.kmi ?: "android17-6.18"
         val env = "PYB110_DIR=" + ws + " PYB110_MANAGER=" + k + " PYB110_LATE_LOAD=1" +
+            " PYB110_KMI=" + kmi +
             " PYB110_SUSFS=" + (if (susfs) "1" else "0") +
+            " PYB110_SUSFS_KO=" + ws + "/susfs_guard_lkm.ko" +
             " PYB110_VFS=" + (if (vfs) "1" else "0") +
+            " PYB110_VFS_KO=" + ws + "/hybridmount-6.18.21.ko" +
             " PYB110_UNLOAD_GUARD=" + (if (unloadGuard) "1" else "0") +
             " PYB110_DISABLE_ANTIROOT=" + (if (disableAntiRoot) "1" else "0") +
-            " PYB110_SOFT_REBOOT=" + (if (softReboot) "1" else "0") +
-            " PYB110_REBOOT=" + (if (softReboot) "1" else "0") +
-            (if (universal) " PYB110_KSUD=" + ws + "/ksud-wrapper" else "")
+            (if (universal) " PYB110_UNIVERSAL=1 PYB110_UNIVERSAL_KSUD=" + ws + "/ksud-universal" else "")
         val cmd = "cd " + ws + " && " + env + " ./onekey-98260 run 2>&1"
         log("执行引擎启动（manager=" + k + "，" + (if (universal) "通用多管理器模块" else "管理器自带模块") + "）")
         var ok = false
@@ -115,6 +87,7 @@ object OneKeyEngine {
                 if (line.isEmpty()) return@start
                 // 外部引擎的标识串不外泄到我们的日志
                 line = line.replace("PYB110_", "").replace("t98260", "98260-engine")
+                    .replace("k61821", "98260-engine")
                 if (line.contains("SELINUX=permissive")) sawPermissive = true
                 // 竞态没落地时引擎会继续盲写并反复重试，这是内核被拖挂的直接原因：立即中止。
                 // 一次尝试会同时打出 HIT=0 与 rc=-1，只按 rc 行计一次失败，避免把单次失败当成两次。
@@ -136,8 +109,10 @@ object OneKeyEngine {
                     line == "MODULE_LOADED" -> { markRootedNow(context); log("内核模块已加载") }
                     line.startsWith("SU_ID_RC=0") -> { markRootedNow(context); log("su 校验：" + line) }
                     line.startsWith("SU_ID_RC=") -> log("su 校验：" + line)
-                    line.contains("UNIVERSAL_NODE_OK") -> log("通用模块已加载，热切换节点就绪")
-                    line.contains("UNIVERSAL_NODE_MISSING") -> log("通用模块未能提供热切换节点")
+                    line.startsWith("UNIVERSAL_LOADER=") -> log("通用加载器已接管模块加载")
+                    line.startsWith("MANAGER_SWITCH_RC=") -> log("管理器切换：" + line)
+                    line.startsWith("MANAGER_SWITCH_NO_APK") -> log("管理器切换失败：找不到 APK")
+                    line.startsWith("MANAGER_SWITCH_NO_UID") -> log("管理器切换失败：找不到应用数据目录")
                     line == "DONE" -> { ok = true; progress(100) }
                     line.startsWith("KSUD_MISSING") -> {
                         RunReport.stop("执行器", "管理器 APK 里没有 libksud.so")
@@ -179,13 +154,10 @@ object OneKeyEngine {
         val node = ShizukuShell.run("test -e /proc/kernelsu_manager && echo YES || echo NO", 10).output.trim()
         hotSwitchReady = node == "YES"
         if (universal) {
-            val result = ShizukuShell.run("cat " + ws + "/universal-result 2>/dev/null", 10).output.trim()
-            when {
-                hotSwitchReady -> log("通用模块加载成功，热切换节点已就绪")
-                result.contains("MISSING") -> log("通用模块未生效：内核里可能已存在管理器模块（late-load 会直接跳过）")
-                result.isBlank() -> log("通用模块未回报结果，可能被引擎抑制输出")
-                else -> log("通用模块状态：" + result)
-            }
+            log(
+                if (hotSwitchReady) "通用模块加载成功，热切换节点已就绪"
+                else "通用模块未生效：内核里可能已存在管理器模块（late-load 会直接跳过），需重启后再试"
+            )
         }
         if (ok) {
             log(if (hotSwitchReady) "热切换节点已就绪：/proc/kernelsu_manager"

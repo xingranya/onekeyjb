@@ -69,19 +69,21 @@ class JailbreakController private constructor(private val context: Context) {
     val adaptiveManagerEnabled: Boolean = true
     var runtimeAdapter: RuntimeExtractor.Adapter? by mutableStateOf(null); private set
     var preparing: Boolean by mutableStateOf(false); private set
-    var antiRootGuard: Boolean by mutableStateOf(prefs.getBoolean("antiroot", true)); private set
+    var antiRootGuard: Boolean by mutableStateOf(prefs.getBoolean("antiroot", false)); private set
     var cloudAuto: Boolean by mutableStateOf(prefs.getBoolean("cloud_auto", true)); private set
     var updateStatus: String by mutableStateOf("尚未检查更新"); private set
     var checkingUpdate: Boolean by mutableStateOf(false); private set
-    /** ColorOS 17 安全机制会拦截原生内核调用；越狱后软重启用户态可恢复 su（内核 LKM 保持加载）。 */
-    var softRebootFix: Boolean by mutableStateOf(prefs.getBoolean("soft_reboot_fix", true)); private set
-    /** 越狱后卸载内核安全防护（oplus_secure_guard 等）。 */
-    var unloadKernelGuard: Boolean by mutableStateOf(prefs.getBoolean("unload_kernel_guard", true)); private set
+    /** 越狱成功后是否软重启（只重启用户态，内核模块保持加载）。默认关闭，关闭时绝不主动重启。 */
+    var softRebootAfter: Boolean by mutableStateOf(prefs.getBoolean("soft_reboot_after", false)); private set
+    /** 越狱后卸载内核安全防护（oplus_secure_guard 等）。默认关闭。 */
+    var unloadKernelGuard: Boolean by mutableStateOf(prefs.getBoolean("unload_kernel_guard", false)); private set
     /** SUSFS 隐藏支持（需要执行器侧加载模块）。 */
     var susfsEnabled: Boolean by mutableStateOf(prefs.getBoolean("susfs_enabled", false)); private set
     /** VFS（hybridmount）支持，仅 6.18 内核。 */
     var vfsEnabled: Boolean by mutableStateOf(prefs.getBoolean("vfs_enabled", false)); private set
     var running: Boolean by mutableStateOf(false); private set
+    /** 同一次运行最多下发一次软重启。 */
+    @Volatile private var softRebootIssued = false
     var elapsedSeconds: Long by mutableStateOf(0L); private set
     var progress: Float by mutableStateOf(0f); private set
     var stage: String by mutableStateOf("就绪"); private set
@@ -622,10 +624,13 @@ class JailbreakController private constructor(private val context: Context) {
         return managers.firstOrNull { it.pkg == status.packageName }?.label.orEmpty()
     }
 
-    fun updateSoftRebootFix(enabled: Boolean) {
-        softRebootFix = enabled
-        prefs.edit().putBoolean("soft_reboot_fix", enabled).apply()
-        addLog(if (enabled) "已开启「越狱后软重启修复」：ColorOS 安全机制拦截时自动软重启恢复 su" else "已关闭「越狱后软重启修复」")
+    fun updateSoftRebootAfter(enabled: Boolean) {
+        softRebootAfter = enabled
+        prefs.edit().putBoolean("soft_reboot_after", enabled).apply()
+        addLog(
+            if (enabled) "已开启「越狱后软重启」：成功后执行一次 setprop ctl.restart zygote"
+            else "已关闭「越狱后软重启」：越狱成功后保持当前会话，不重启"
+        )
     }
 
 
@@ -770,6 +775,7 @@ class JailbreakController private constructor(private val context: Context) {
             }
         }
         running = true
+        softRebootIssued = false
         val runAdaptive = adaptiveManagerEnabled
         val runKind = selectedManager
         runCatching { JailbreakRunService.start(context) }
@@ -835,7 +841,7 @@ class JailbreakController private constructor(private val context: Context) {
                         { addLog(it) },
                         { stage = it; HistoryStore.updateStage(it) },
                         { progress = it / 100f },
-                        susfsEnabled, vfsEnabled, unloadKernelGuard, antiRootGuard, softRebootFix,
+                        susfsEnabled, vfsEnabled, unloadKernelGuard, antiRootGuard,
                         universalModuleEnabled
                     )
                 } else if (isNewKernel && NativeExecutor.available(context)) {
@@ -857,7 +863,7 @@ class JailbreakController private constructor(private val context: Context) {
                         adapter,
                         antiRootGuard,
                         false,
-                        softRebootFix,
+                        softRebootAfter,
                         logSink = { addLog(it) },
                         stageSink = { stage = it; HistoryStore.updateStage(it) },
                         progressSink = { progress = it / 100f }
@@ -918,6 +924,15 @@ class JailbreakController private constructor(private val context: Context) {
                     if (hotSwitchWanted && !hotSwitchLoaderInstalled) {
                         addLog("检测到通用加载器缺失（可能管理器已升级），正在自动重装")
                         installHotSwitchLoader { _, _ -> }
+                    }
+                    // 软重启只由本应用按开关显式执行；关闭时保持当前会话，绝不自动重启。
+                    if (softRebootAfter && !softRebootIssued) {
+                        softRebootIssued = true
+                        addLog("按设置执行越狱后软重启（只重启用户态，内核模块保持加载）")
+                        val rc = StellarShell.run("su -c 'setprop ctl.restart zygote' 2>&1", 20).code
+                        addLog(if (rc == 0) "软重启已下发：zygote 将重启一次" else "软重启下发失败 rc=" + rc)
+                    } else if (!softRebootAfter) {
+                        addLog("未开启「越狱后软重启」，保持当前会话不重启")
                     }
                 } else if (RunReport.wroteKernel) {
                     prefs.edit().putString("failed_boot_id", startBootId).apply()

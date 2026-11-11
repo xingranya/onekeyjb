@@ -33,11 +33,13 @@ object Safer {
                 continue
             }
             saved.add(p to state)
-            if (state == "e") {
-                val r = ShizukuShell.run("pm disable-user --user 0 $p 2>&1; am force-stop $p 2>&1", 20)
-                log("安全组件暂停 $p: " + r.output.trim().take(120))
-            }
+            // 只停进程、不改包状态：pm disable-user 会改 PackageManager 数据，
+            // 在 ColorOS 上可能连带 system_server 重启，看起来像"自动软重启"。
+            val r = ShizukuShell.run("am force-stop $p 2>&1", 15)
+            log("安全组件已停止 $p：" + r.output.trim().take(120))
         }
+        val antiRoot = ShizukuShell.run("stop riskdetect 2>&1", 15)
+        log("反 root 弹窗抑制：stop riskdetect rc=" + antiRoot.code)
         lastSaved = saved
         return saved
     }
