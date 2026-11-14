@@ -24,8 +24,8 @@ android {
         applicationId = "dev.onekey.jb"
         minSdk = 33
         targetSdk = 37
-        versionCode = 204
-        versionName = "2.19.6"
+        versionCode = 205
+        versionName = "2.19.7"
     }
     buildFeatures {
         compose = true
@@ -57,6 +57,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    testOptions {
+        // ManagerDownloads 依赖 org.json，JVM 单测里让 android.jar 的桩方法返回默认值
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 
@@ -81,4 +85,6 @@ dependencies {
     implementation("com.github.roro2239.Stellar-API:api:1.0.3")
     implementation("com.github.roro2239.Stellar-API:provider:1.0.3")
     implementation("com.github.roro2239.Stellar-API:shared:1.0.3")
+
+    testImplementation("junit:junit:4.13.2")
 }

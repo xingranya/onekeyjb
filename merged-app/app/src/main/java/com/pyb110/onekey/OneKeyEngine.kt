@@ -25,12 +25,38 @@ object OneKeyEngine {
         }
     }
 
+    /**
+     * 残留 runner 清理：runner 的 parked 子进程用 prctl 改名成 t98260-hold / t61269-hold，
+     * 并持有提权后的 root cred —— shell(uid 2000) 既按 cmdline 匹配不到 comm，也无权杀 uid 0。
+     * 因此 cmdline + comm 双路匹配，root 可用时以 root 身份执行；
+     * 用 KILL_DONE 回执确认，收不到就写日志，不再用 "; true" 静默吞掉失败。
+     */
+    private fun killRunner(log: (String) -> Unit, useRoot: Boolean) {
+        // 模式写成 onekey-9826[0]：pkill -f 匹配整条 cmdline，直写 onekey-98260 会连承载本次清理的
+        // sh -c / su -c 自身一起杀掉，后面的 comm 兜底与 KILL_DONE 回执就都跑不到了。
+        val inner = "pkill -9 -f onekey-9826[0] 2>/dev/null; " +
+            "for p in /proc/[0-9]*; do c=\$(cat \$p/comm 2>/dev/null); " +
+            "case \"\$c\" in t98260-hold|t61269-hold|yexec) " +
+            "kill -9 \$(basename \$p) 2>/dev/null;; esac; done; echo KILL_DONE"
+        val cmd = if (useRoot) "su -c '" + inner + "' 2>&1" else inner
+        val r = ShizukuShell.run(cmd, 15)
+        if (!r.output.contains("KILL_DONE")) log("残留进程清理未确认：" + r.output.trim().take(120))
+    }
+
     /** 本次运行后内核是否暴露了 /proc/kernelsu_manager。 */
     @Volatile var hotSwitchReady: Boolean = false
         private set
 
+    /**
+     * 销毁执行器进程失败时置位：runner 可能仍在跑且持有 root cred，
+     * 本进程内不再复用 98260 通道，让分派回退到自研执行器。
+     */
+    @Volatile var engineBroken: Boolean = false
+        private set
+
     /** 该机型对应的执行器是否已内置。 */
     fun available(context: Context, profile: DeviceProfile?): Boolean = try {
+        if (engineBroken) return false
         val asset = profile?.runnerAsset ?: return false
         context.assets.open(asset).close(); true
     } catch (e: Throwable) { false }
@@ -93,6 +119,7 @@ object OneKeyEngine {
                 // 外部引擎的标识串不外泄到我们的日志
                 line = line.replace("PYB110_", "").replace("t98260", "98260-engine")
                     .replace("k61821", "98260-engine")
+                    .replace("t61269", "98260-engine").replace("k61269", "98260-engine")
                 if (line.contains("SELINUX=permissive")) sawPermissive = true
                 // 竞态没落地时引擎会继续盲写并反复重试，这是内核被拖挂的直接原因：立即中止。
                 // 一次尝试会同时打出 HIT=0 与 rc=-1，只按 rc 行计一次失败，避免把单次失败当成两次。
@@ -111,7 +138,7 @@ object OneKeyEngine {
                     line.startsWith("[2/4]") -> { stage("加载内核模块"); progress(65) }
                     line.startsWith("[3/4]") -> { stage("等待 su"); progress(80) }
                     line.startsWith("[4/4]") -> { stage("管理器收尾"); progress(90) }
-                    line == "MODULE_LOADED" -> { markRootedNow(context); log("内核模块已加载") }
+                    line == "MODULE_LOADED" -> { RunReport.markWrote("加载内核模块"); markRootedNow(context); log("内核模块已加载") }
                     line.startsWith("SU_ID_RC=0") -> { markRootedNow(context); log("su 校验：" + line) }
                     line.startsWith("SU_ID_RC=") -> log("su 校验：" + line)
                     line.startsWith("UNIVERSAL_LOADER=") -> log("通用加载器已接管模块加载")
@@ -131,24 +158,29 @@ object OneKeyEngine {
             val deadline = System.currentTimeMillis() + 90_000
             while (proc.isRunning() && abortReason == null && System.currentTimeMillis() < deadline) Thread.sleep(200)
             if (proc.isRunning()) {
-                proc.destroy()
-                runCatching { ShizukuShell.run("pkill -9 -f onekey-98260; true", 10) }
+                runCatching { proc.destroy() }.onFailure {
+                    engineBroken = true
+                    log("执行器进程销毁失败，已标记引擎不可用：" + (it.message ?: it.javaClass.simpleName))
+                }
+                killRunner(log, useRoot = false)
                 if (abortReason == null) { abortReason = "执行超时（90 秒）"; log("引擎超时，已终止") }
+            }
+            // root 校验必须早于清理：holder 持有 root cred，先确认 root 可用，finally 才能以 root 身份杀掉它。
+            if (ok) {
+                val check = ShizukuShell.run("timeout 5 /system/bin/su -c id 2>&1", 10).output
+                ok = check.contains("uid=0")
+                if (ok) RunReport.markWrote("加载内核模块")
             }
         } catch (e: Throwable) {
             log("引擎异常：" + (e.message ?: e.javaClass.simpleName))
         } finally {
-            ShizukuShell.run("pkill -9 -f onekey-98260; rm -rf " + ws + "; true", 10)
+            killRunner(log, useRoot = ok)
+            ShizukuShell.run("rm -rf " + ws + "; true", 10)
         }
         // 中止后若已把 SELinux 改为 permissive，尽量恢复，减少残留影响。
         if (abortReason != null && sawPermissive) {
             val restored = ShizukuShell.run("timeout 5 su -c 'setenforce 1' 2>&1; timeout 5 su -c getenforce", 12).output.trim()
             log("已尝试恢复 SELinux：" + restored.lineSequence().lastOrNull().orEmpty())
-        }
-        if (ok) {
-            val check = ShizukuShell.run("timeout 5 /system/bin/su -c id 2>&1", 10).output
-            ok = check.contains("uid=0")
-            if (ok) RunReport.markWrote("加载内核模块")
         }
         if (abortReason != null) {
             RunReport.stop("布置提权原语", abortReason!!)

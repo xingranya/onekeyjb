@@ -183,7 +183,7 @@ object ManagerDownloads {
     }
 
     /** 从资产名里取 versionCode，形如 KernelSU_v3.3.1_32680-release.apk。 */
-    private fun versionCodeOf(fileName: String): Int? {
+    internal fun versionCodeOf(fileName: String): Int? {
         val m = Regex("_(\\d{4,})(?=[.-])").find(fileName) ?: return null
         return m.groupValues[1].toIntOrNull()
     }

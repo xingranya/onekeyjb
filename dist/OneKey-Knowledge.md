@@ -1,6 +1,6 @@
 # OneKey 知识库（合集）
 
-> 版本 2.19.3 / 201。不含任何密钥、口令或签名文件内容。
+> 版本 2.19.6 / 204。不含任何密钥、口令或签名文件内容。
 
 
 
@@ -949,7 +949,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.19.3）
+# 12 · 版本变更史（2.18.0 → 2.19.7）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -957,7 +957,11 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
-| **2.19.3** | 201 | 五家管理器同步 + ksud 归一化 | FinaSU → v1.5.0 / 33174；SukiSU 期望版本 → 41150；新增 `KsudNormalizer`（按 `-V` 输出识别真 ksud 并补回 `libksud.so`） |
+| **2.19.7** | 205 | 审计问题 1–5 修复 | 残留进程清理改用 root + comm 双路匹配（`pkill` 模式写 `onekey-9826[0]` 避免杀）且先验 root 后清理；`MODULE_LOADED` 即 `markWrote` 使 `wroteKernel` 真实；自研执行器回退分支可达并如实告知 plant 未完成；删死 Java 2249 行（`readAsset` 先内联进 `ShizukuShell`）；删死资产 8,871,727 B（含 grab.sh）；抽出 `MarkdownParser` 并补 4 个 parser 单测 |
+| 2.19.6 | 204 | 彻底移除 MIT 衍生代码 + 全机型换 Shark 执行器 | 删除 ghostkey 原生后端（源码/驱动/profile/产物）与 4 个 onuce 载荷；6.18.21 与 6.12.69 各内置一份 Shark runner（上游 v2.3.2 / `49c3b0e`）；新增 6.12 SUSFS 模块；VFS 仅 6.18 生效；补 `LICENSES/MIT-pc98260.txt` 与历史署名；应用内第三方声明改为 Markdown 渲染 |
+| 2.19.5 | 203 | 软重启开关真正生效 + 合并 Shark v2.1 | 「越狱后软重启」默认关闭且由应用显式执行（关闭时不重启）；antiRootGuard / unloadKernelGuard 默认关闭；安全组件改为只 force-stop、不 `pm disable-user`；引擎换成上游 v2.1 的 6.18.21 runner（支持 `PYB110_UNIVERSAL` / `SUSFS_KO` / `VFS_KO` / `KMI`），KMI 按机型取值 |
+| **2.19.4** | 202 | 管理器版本运行时提取 | 五家版本/资产改为从官方 Release 实时提取；提取不到不展示；结果缓存 6 小时 |
+| 2.19.3 | 201 | 五家管理器同步 + ksud 归一化 | FinaSU → v1.5.0 / 33174；SukiSU 期望版本 → 41150；新增 `KsudNormalizer`（按 `-V` 输出识别真 ksud 并补回 `libksud.so`） |
 | 2.19.2 | 200 | 合入 KSU-Universal v1.2.0 | 内置加载器 12,335,680 → 12,652,520 B；同步 `UNIVERSAL_KSUD_SIZE` 与第三方声明 |
 | 2.19.1 | 199 | 首页精简 | 移除运行卡里的「环境诊断」按钮；移除「高级设置」与其展开的越狱方式卡 |
 | 2.19.0 | 198 | 界面按网页原型重做 | 语义色板、设备卡四列、外观三态、拓展功能分组、日志/历史/关于/手册重做、抽屉单一实例 |
@@ -1097,6 +1101,81 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 ### 18. 未签名包能装但装上后拒绝执行
 
 **原因**：`SecurityCheck` 校验安装包签名指纹，非本项目签名的包一律拒绝。
+
+### 20. 「越狱后软重启」开关拨了没反应，开与关都照样重启
+
+**症状**：拓展功能里的「越狱后软重启」无论开还是关，越狱成功后系统都会重启一次。
+
+**根因（三条叠加）**：
+1. 开关只做了两件事：写 prefs、把 `PYB110_SOFT_REBOOT` / `PYB110_REBOOT` 拼进引擎环境变量；而引擎**根本不读这两个变量**（引擎的 `PYB110_` 全集里没有它们），所以开关是死开关。
+2. 应用自身也没有任何重启调用（`RestartManager.request()` 零调用点），所以"没有自动重启代码"并不等于"不会重启"。
+3. 真正扰动系统的是成功后的 `hardenAfterSuccess()` → `Safer.disable()`：它执行 `pm disable-user com.coloros.securityguard` / `com.oplus.safecenter`，改的是 PackageManager 数据，ColorOS 上很容易连带 system_server 重启；同时 `unloadKernelGuard` 默认开会去 `rmmod oplus_secure_guard_new`。
+
+**修法**：
+- 软重启改为**应用侧显式动作**：`softRebootAfter` 默认 false，只有开关打开且越狱成功才执行一次 `su -c 'setprop ctl.restart zygote'`，并用 `softRebootIssued` 保证单次运行最多一次；关闭时只记一行「保持当前会话不重启」。
+- 安全组件从 `pm disable-user` 改为 `am force-stop` + `stop riskdetect`，不改包状态。
+- `antiRootGuard`、`unloadKernelGuard` 默认改为 false。
+
+**教训**：给引擎传环境变量前，先在二进制里数一遍该变量出现次数；0 次就是没人读，别指望它生效。
+
+### 21. 上游 runner 换了命名与协议，包装脚本可以退役
+
+**现象**：通用多管理器模块靠一段 shell 包装脚本 + `PYB110_KSUD` 假接线实现，脆弱且 `--kmi` 写死 `android17-6.18`。
+
+**根因**：我们内置的引擎是上游改名前的旧构建（`usage: t98260 run`），不支持 `PYB110_UNIVERSAL`。
+
+**修法**：换用上游 v2.1 的 `libk61821.so`（`usage: k61821 run | ksud | __plant`，451,536 B，SHA-256 `4c88a76a…`），env 增加 `PYB110_UNIVERSAL=1` / `PYB110_UNIVERSAL_KSUD` / `PYB110_SUSFS_KO` / `PYB110_VFS_KO`，`PYB110_KMI` 改由 `DeviceProfiles.kmi` 提供；删除 25 行包装脚本。
+
+### 22. 引入外部 PoC 源码没补署名，且漏查了无扩展名的 assets 二进制
+
+**症状**：上游作者在其他仓库连提三个 issue 要求补 MIT 署名；自查发现本仓库同样命中。
+
+**根因**：
+1. `cpp/ghostkey/pc98260_su.c` / `pc98260_rootd.c` 改编自 MIT 项目，保留上游 80/83 与 87/100 非空行，但文件头无版权行，声明文件里也没有原项目链接与 MIT 全文。
+2. 第一轮排查只搜了 `*.so` 与 `libcve98260*`，**漏掉了无扩展名的 `assets/ghostkey/ghostkey98260`**，误判成"产物未分发"。
+3. 进一步复扫发现 `onuce_*` 载荷也内嵌同一 rootd 实现（含 `[rootd] startup failed errno=%d (%s)` 原文与源文件名 `pc98260_rootd.c`）。
+
+**修法**：
+- 删除 ghostkey 全套与 4 个 onuce 载荷，改用上游按内核拆分的 Shark runner（6.18.21 / 6.12.69），二者均不含该 MIT 部分；
+- 补 `LICENSES/MIT-pc98260.txt`（上游 LICENSE 原样）+ 声明第五节历史署名与来源链。
+
+**教训**：
+1. 排查二进制来源时**按内容扫全部 assets 文件**，不要按扩展名过滤——可执行产物常常没有后缀；
+2. 删 HEAD 不追溯既往：历史提交与已发布 APK 仍构成"分发"，署名不能省；
+3. 删资产前先查回退分支：`GhostKeyEngine` 投放失败返回 `false` 而非 `null`，只删文件会让调用方不回退，直接坏掉。
+
+### 23. grep 被 head 截断，把活代码误判成死代码
+
+**症状**：审计时判定 `Prep.java`（384 行）为零引用死代码，准备删除。
+
+**根因**：核实命令写成 `grep -nE "\bPrep\b|..." ShizukuShell.java | head -5`，
+5 条 `ProcessRunner` 命中占满了输出，真正的第 159 行 `Prep.readAsset(in)` 被截掉。
+而 `ShizukuShell.stageAsset` 每次资产投放都走这一行 —— 删掉 `Prep.java` 会让整个 App 的投放全挂。
+
+**修法**：先把 `readAsset` 内联进 `ShizukuShell`（改名 `readAssetBytes`），再删 `Prep.java`。
+
+**教训**：**判断"是否死代码"的 grep 一律不加 head/tail 截断**；
+输出长就换更精确的模式或按文件分组，绝不能靠截断后的前几条下结论。
+
+### 24. 越狱后残留进程杀不掉：shell 身份杀不了 root cred 的 holder
+
+**症状**：越狱成功后进程管理器里长期残留两个 `onekey-98260`（实测 PID 17418 / 17462）。
+
+**根因**：
+1. 收尾用 `pkill -9 -f onekey-98260; true`，以 shell（uid 2000）身份执行；
+2. 上游 `plant_core.inc` 用 `prctl(PR_SET_NAME, "t98260-hold" / "t61269-hold")` 给 parked 子进程改名，
+   并让它持有提权后的 **root cred** → shell 杀 uid 0 进程返回 EPERM；
+3. 末尾 `; true` 把失败吞掉，日志里看不出任何异常；
+4. 而且 `finally` 的清理跑在 `su -c id` 校验**之前**，顺序反了。
+
+**修法**：
+- 先验 root（`su -c id` = 0），再清理；
+- 清理用 root 身份，且 **cmdline + comm 双路匹配**：`pkill -f` 之外再遍历 `/proc/*/comm`
+  命中 `t98260-hold|t61269-hold|yexec` 逐个 `kill -9`；
+- 用 `echo KILL_DONE` 做回执，收不到就记日志，不再 `; true` 静默。
+
+**教训**：杀"自己启动的进程"也要考虑它可能已经提权；
+`prctl` 改的是 comm 不是 cmdline，只按 `-f` 匹配会漏。
 
 ### 19. GitHub push 偶发 `TLS connect error / unexpected eof`
 

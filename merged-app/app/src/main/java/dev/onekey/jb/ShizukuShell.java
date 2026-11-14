@@ -3,6 +3,7 @@ package dev.onekey.jb;
 import android.content.Context;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -156,10 +157,25 @@ public final class ShizukuShell {
 
     public static Result stageAsset(Context ctx, String asset, String dest, int mode) {
         try (InputStream in = ctx.getAssets().open(asset)) {
-            return stageBytes(Prep.readAsset(in), dest, mode);
+            return stageBytes(readAssetBytes(in), dest, mode);
         } catch (Exception e) {
             return new Result(-1, "读取组件失败：" + asset + " " + e);
         }
+    }
+
+    /**
+     * 把资产流读进内存，上限 64 MiB，超限直接抛错。
+     * 供 stageAsset 使用；缓冲区大小与上限沿用原实现，行为不变。
+     */
+    private static byte[] readAssetBytes(InputStream in) throws IOException {
+        ByteArrayOutputStream bo = new ByteArrayOutputStream(1 << 20);
+        byte[] buf = new byte[1 << 16];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            if (bo.size() + n > (64 << 20)) throw new IOException("组件超过 64 MiB，停止读取");
+            bo.write(buf, 0, n);
+        }
+        return bo.toByteArray();
     }
 
     public static Result stageBytes(byte[] data, String dest, int mode) {

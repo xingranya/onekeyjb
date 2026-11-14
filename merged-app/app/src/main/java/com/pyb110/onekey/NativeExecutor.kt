@@ -28,13 +28,19 @@ object NativeExecutor {
         }
         // 投放执行器与符号表（符号表按机型档案选）
         val profile = DeviceProfiles.current()
-        val symbols = profile?.symbolsAsset ?: "core/symbols.txt"
+        val symbols = profile?.symbolsAsset
         if (ShizukuShell.stageAsset(context, "core/exec/onekey-exec", "$ws/onekey-exec", 755).code != 0) {
             log("执行器投放失败")
             return false
         }
-        if (ShizukuShell.stageAsset(context, symbols, "$ws/device-symbols.txt", 644).code != 0) {
-            log("符号表投放失败：" + symbols)
+        // 无内置符号表的机型不投放，也不拿其它机型的符号表顶替：内核地址不同，用错会写错位置。
+        if (symbols != null) {
+            if (ShizukuShell.stageAsset(context, symbols, "$ws/device-symbols.txt", 644).code != 0) {
+                log("符号表投放失败：" + symbols)
+                return false
+            }
+        } else {
+            log("该机型无内置符号表，自研执行器不可用")
             return false
         }
         val cmd = "cd $ws && ./onekey-exec run $ws $backend 2>&1"

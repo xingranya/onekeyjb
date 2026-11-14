@@ -1,7 +1,7 @@
 一加16提权越狱 · 第三方组件说明
 
 本应用内置的部分引导组件来自公开开源项目，遵循其各自的开源许可证：
-- take_slide / loader / writer / forker 等引导组件：公开仓库，Apache-2.0
+- 早期引导组件（take_slide / writer / forker 等，Apache-2.0）已随执行器换代移除，当前版本不再内置
 - KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU 内核与用户态组件：各自项目许可证
 - COUI 组件库：https://github.com/suqi8/coui
 - Stellar：https://github.com/roro2239/Stellar
