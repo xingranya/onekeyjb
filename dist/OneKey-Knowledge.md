@@ -1,6 +1,6 @@
 # OneKey 知识库（合集）
 
-> 版本 2.19.6 / 204。不含任何密钥、口令或签名文件内容。
+> 版本 2.19.8 / 206。不含任何密钥、口令或签名文件内容。
 
 
 
@@ -949,7 +949,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.19.7）
+# 12 · 版本变更史（2.18.0 → 2.19.8）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -957,7 +957,8 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
-| **2.19.7** | 205 | 审计问题 1–5 修复 | 残留进程清理改用 root + comm 双路匹配（`pkill` 模式写 `onekey-9826[0]` 避免杀）且先验 root 后清理；`MODULE_LOADED` 即 `markWrote` 使 `wroteKernel` 真实；自研执行器回退分支可达并如实告知 plant 未完成；删死 Java 2249 行（`readAsset` 先内联进 `ShizukuShell`）；删死资产 8,871,727 B（含 grab.sh）；抽出 `MarkdownParser` 并补 4 个 parser 单测 |
+| **2.19.8** | 206 | 移除未完成的自研执行器 + 资产瘦身 | `native/executor/main.c:66` 的 plant 阶段标注「尚未实现（M2）」，`onekey-exec run` 不可能成功 → 删除 `NativeExecutor.kt`、回退分支、`onekey-exec` 与两份 6.18 符号表（13.08 MB 未压缩）；`DeviceProfile.symbolsAsset` 字段随之移除；另删重复 `assets/avatar.png`（与 res/drawable-nodpi 字节相同）与零投放的 `su_forward` / `su_path_compat.sh`；执行器成为唯一通道 |
+| 2.19.7 | 205 | 审计问题 1–5 修复 | 残留进程清理改用 root + comm 双路匹配（`pkill` 模式写 `onekey-9826[0]` 避免杀）且先验 root 后清理；`MODULE_LOADED` 即 `markWrote` 使 `wroteKernel` 真实；自研执行器回退分支可达并如实告知 plant 未完成；删死 Java 2249 行（`readAsset` 先内联进 `ShizukuShell`）；删死资产 8,871,727 B（含 grab.sh）；抽出 `MarkdownParser` 并补 4 个 parser 单测 |
 | 2.19.6 | 204 | 彻底移除 MIT 衍生代码 + 全机型换 Shark 执行器 | 删除 ghostkey 原生后端（源码/驱动/profile/产物）与 4 个 onuce 载荷；6.18.21 与 6.12.69 各内置一份 Shark runner（上游 v2.3.2 / `49c3b0e`）；新增 6.12 SUSFS 模块；VFS 仅 6.18 生效；补 `LICENSES/MIT-pc98260.txt` 与历史署名；应用内第三方声明改为 Markdown 渲染 |
 | 2.19.5 | 203 | 软重启开关真正生效 + 合并 Shark v2.1 | 「越狱后软重启」默认关闭且由应用显式执行（关闭时不重启）；antiRootGuard / unloadKernelGuard 默认关闭；安全组件改为只 force-stop、不 `pm disable-user`；引擎换成上游 v2.1 的 6.18.21 runner（支持 `PYB110_UNIVERSAL` / `SUSFS_KO` / `VFS_KO` / `KMI`），KMI 按机型取值 |
 | **2.19.4** | 202 | 管理器版本运行时提取 | 五家版本/资产改为从官方 Release 实时提取；提取不到不展示；结果缓存 6 小时 |
@@ -1176,6 +1177,25 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 **教训**：杀"自己启动的进程"也要考虑它可能已经提权；
 `prctl` 改的是 comm 不是 cmdline，只按 `-f` 匹配会漏。
+
+### 25. 「回退通道」的后端其实没实现，回退等于注定失败
+
+**症状**：审计发现自研执行器回退分支不可达，计划把它改成「运行失败后回退」。
+
+**根因**：读 `native/executor/main.c` 才发现
+- `:54` `if (access(sym, R_OK) != 0)` → preflight 强制要求符号表；
+- `:66` `printf("ERROR=plant 尚未实现（M2 进行中）")` → **plant 阶段根本没写**。
+
+也就是说 `onekey-exec run` 永远走不到加载模块，回退只会稳定产生一次注定失败的重试。
+原计划「修回退」的前提不成立。
+
+**修法**：改为**删**——移除 `NativeExecutor.kt`、回退分支、`onekey-exec` 与两份符号表，
+执行器成为唯一通道；`native/executor/` 源码保留作为 M2 的 WIP，但不随包分发。
+
+**教训**：
+1. 决定"修还是删"一条通道前，**先读它的后端实现**，别只看调用侧的分支条件；
+2. 压缩率会骗人：13.08 MB 的文本符号表删掉后，APK 只小了 2.71 MB —— 
+   **估算安装包收益要看压缩后，不能拿未压缩字节直接减**。
 
 ### 19. GitHub push 偶发 `TLS connect error / unexpected eof`
 

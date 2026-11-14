@@ -14,8 +14,6 @@ data class DeviceProfile(
     val runnerAsset: String,
     /** SUSFS 模块资产；不同 KMI 需要各自编译的模块。 */
     val susfsAsset: String,
-    /** 内核符号表资产，供自研执行器与运行时自适应使用；无内置符号表的机型为 null。 */
-    val symbolsAsset: String?,
     /** 是否支持 hybridmount VFS 重定向（仅 6.18 内核有对应模块）。 */
     val vfsSupported: Boolean = false,
 )
@@ -31,7 +29,6 @@ object DeviceProfiles {
         kmi = "android17-6.18",
         runnerAsset = "core/exec/onekey-98260",
         susfsAsset = "core/exec/susfs_guard_lkm.ko",
-        symbolsAsset = "core/symbols.txt",
         vfsSupported = true,
     )
 
@@ -45,7 +42,6 @@ object DeviceProfiles {
         kmi = "android17-6.18",
         runnerAsset = "core/exec/onekey-98260",
         susfsAsset = "core/exec/susfs_guard_lkm.ko",
-        symbolsAsset = "core/symbols-1701201.txt",
         vfsSupported = true,
     )
 
@@ -59,7 +55,6 @@ object DeviceProfiles {
         kmi = "android16-6.12",
         runnerAsset = "core/exec/onekey-98260-61269",
         susfsAsset = "core/exec/susfs_guard_lkm_612.ko",
-        symbolsAsset = null,
     )
 
     val all = listOf(PYB110, PYB110_201, PMS110)

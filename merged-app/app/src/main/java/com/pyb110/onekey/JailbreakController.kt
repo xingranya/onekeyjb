@@ -831,14 +831,8 @@ class JailbreakController private constructor(private val context: Context) {
                     }
                 }
                 RunReport.reset()
-                // 全部机型统一走按内核拆分的 98260 执行器；引擎不可用时按后端回退到自研执行器。
+                // 全部机型统一走按内核拆分的 98260 执行器（唯一通道）。
                 val runner = profile
-                                // 自研执行器目前只实现 kernelsu / sukisu 两个后端，其余管理器不接。
-                val nativeBackend = when (chosen.kind) {
-                    "kernelsu" -> "kernelsu"
-                    "sukisu" -> "sukisu"
-                    else -> null
-                }
                 when {
                     runner != null && OneKeyEngine.available(context, runner) -> {
                         stage = "运行 98260 执行引擎"
@@ -852,22 +846,10 @@ class JailbreakController private constructor(private val context: Context) {
                             universalModuleEnabled
                         )
                     }
-                    nativeBackend != null && NativeExecutor.available(context) -> {
-                        addLog("98260 执行器不可用，回退到自研执行器（后端 " + nativeBackend + "）")
-                        addLog("注意：自研执行器的 plant 阶段尚未完成，本次回退可能无法完成")
-                        stage = "运行自研执行器"
-                        progress = 0.05f
-                        ok = NativeExecutor.run(
-                            context, nativeBackend,
-                            { addLog(it) },
-                            { stage = it; HistoryStore.updateStage(it) },
-                            { progress = it / 100f }
-                        )
-                    }
                     else -> {
-                        stage = "执行器缺失"
-                        addLog("当前设备或管理器组合暂无可用执行器，已停止")
-                        RunReport.stop("选择执行器", "该机型/管理器组合暂无可用执行器")
+                        stage = "执行器不可用"
+                        addLog("当前内核的执行器不可用，已停止；请确认安装包完整，或重启手机后重试")
+                        RunReport.stop("选择执行器", "执行器资产缺失或上次运行未正常退出")
                         ok = false
                     }
                 }
