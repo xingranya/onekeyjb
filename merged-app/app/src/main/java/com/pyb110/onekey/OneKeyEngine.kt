@@ -29,12 +29,15 @@ object OneKeyEngine {
     @Volatile var hotSwitchReady: Boolean = false
         private set
 
-    fun available(context: Context): Boolean = try {
-        context.assets.open("core/exec/onekey-98260").close(); true
+    /** 该机型对应的执行器是否已内置。 */
+    fun available(context: Context, profile: DeviceProfile?): Boolean = try {
+        val asset = profile?.runnerAsset ?: return false
+        context.assets.open(asset).close(); true
     } catch (e: Throwable) { false }
 
     fun run(
         context: Context,
+        profile: DeviceProfile,
         managerKind: String,
         log: (String) -> Unit,
         stage: (String) -> Unit,
@@ -49,11 +52,14 @@ object OneKeyEngine {
         if (!ShizukuShell.run("mkdir -p " + ws + " && chmod 700 " + ws + " && echo OK", 20).output.contains("OK")) {
             log("工作目录创建失败"); return false
         }
-        if (ShizukuShell.stageAsset(context, "core/exec/onekey-98260", ws + "/onekey-98260", 755).code != 0) {
+        if (ShizukuShell.stageAsset(context, profile.runnerAsset, ws + "/onekey-98260", 755).code != 0) {
             log("执行引擎投放失败"); return false
         }
-        if (susfs) ShizukuShell.stageAsset(context, "core/exec/susfs_guard_lkm.ko", ws + "/susfs_guard_lkm.ko", 644)
-        if (vfs) ShizukuShell.stageAsset(context, "core/exec/hybridmount-6.18.21.ko", ws + "/hybridmount-6.18.21.ko", 644)
+        // VFS 只有 6.18 内核有对应模块；6.12 上直接跳过，避免投放无效模块。
+        val vfsOn = vfs && profile.vfsSupported
+        if (vfs && !profile.vfsSupported) log("当前内核不支持 VFS 重定向，已跳过")
+        if (susfs) ShizukuShell.stageAsset(context, profile.susfsAsset, ws + "/susfs_guard_lkm.ko", 644)
+        if (vfsOn) ShizukuShell.stageAsset(context, "core/exec/hybridmount-6.18.21.ko", ws + "/hybridmount-6.18.21.ko", 644)
         // 通用多管理器模块：由引擎按 PYB110_UNIVERSAL 自行加载并写 /proc/kernelsu_manager。
         val universal = useUniversalModule &&
             ShizukuShell.stageAsset(context, "core/exec/ksud-universal", ws + "/ksud-universal", 755).code == 0
@@ -65,12 +71,11 @@ object OneKeyEngine {
             "bakasu" -> "bakasu"
             else -> "finasu"
         }
-        val kmi = DeviceProfiles.current()?.kmi ?: "android17-6.18"
         val env = "PYB110_DIR=" + ws + " PYB110_MANAGER=" + k + " PYB110_LATE_LOAD=1" +
-            " PYB110_KMI=" + kmi +
+            " PYB110_KMI=" + profile.kmi +
             " PYB110_SUSFS=" + (if (susfs) "1" else "0") +
             " PYB110_SUSFS_KO=" + ws + "/susfs_guard_lkm.ko" +
-            " PYB110_VFS=" + (if (vfs) "1" else "0") +
+            " PYB110_VFS=" + (if (vfsOn) "1" else "0") +
             " PYB110_VFS_KO=" + ws + "/hybridmount-6.18.21.ko" +
             " PYB110_UNLOAD_GUARD=" + (if (unloadGuard) "1" else "0") +
             " PYB110_DISABLE_ANTIROOT=" + (if (disableAntiRoot) "1" else "0") +

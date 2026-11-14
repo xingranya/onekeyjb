@@ -5,6 +5,9 @@
 - KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU 内核与用户态组件：各自项目许可证
 - COUI 组件库：https://github.com/suqi8/coui
 - Stellar：https://github.com/roro2239/Stellar
+- Shark 98260 执行器（6.18.21 / 6.12.69）与 6.12 SUSFS 模块：Yunnijian，GPL-3.0 / GPL-2.0
+- pc98260 su/rootd（已全部移除）：Copyright (c) 2026 quyicheng03-boop，MIT；
+  历史版本曾分发其改编源码与编译产物，详见 THIRD_PARTY_NOTICES.md 第五节与 LICENSES/MIT-pc98260.txt
 
 以上组件仅用于本应用自身的越狱流程，不对外提供、不单独分发。
 应用本体免费，禁止倒卖。作者：星苒鸭 · github.com/xingranya · xran.uk

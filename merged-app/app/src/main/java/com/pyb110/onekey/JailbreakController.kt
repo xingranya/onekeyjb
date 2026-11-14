@@ -831,20 +831,20 @@ class JailbreakController private constructor(private val context: Context) {
                     }
                 }
                 RunReport.reset()
-                // 新内核优先：98260 执行引擎（若已放入 core/exec/onekey-98260）→ 自研执行器 → onuce
-                val isNewKernel = profile?.onuceAsset?.contains("_201") == true
-                if (isNewKernel && OneKeyEngine.available(context)) {
+                // 全部机型统一走按内核拆分的 98260 执行器；6.18 额外保留自研执行器作为回退。
+                val runner = profile
+                if (runner != null && OneKeyEngine.available(context, runner)) {
                     stage = "运行 98260 执行引擎"
                     progress = 0.05f
                     ok = OneKeyEngine.run(
-                        context, chosen.kind,
+                        context, runner, chosen.kind,
                         { addLog(it) },
                         { stage = it; HistoryStore.updateStage(it) },
                         { progress = it / 100f },
                         susfsEnabled, vfsEnabled, unloadKernelGuard, antiRootGuard,
                         universalModuleEnabled
                     )
-                } else if (isNewKernel && NativeExecutor.available(context)) {
+                } else if (runner != null && runner.vfsSupported && NativeExecutor.available(context)) {
                     stage = "运行自研执行器"
                     progress = 0.05f
                     ok = NativeExecutor.run(
@@ -854,20 +854,10 @@ class JailbreakController private constructor(private val context: Context) {
                         { progress = it / 100f }
                     )
                 } else {
-                    stage = "运行 98260 实验链"
-                    progress = 0.05f
-                    ok = Cve98260Engine.run(
-                        context,
-                        chosen.pkg,
-                        runKind,
-                        adapter,
-                        antiRootGuard,
-                        false,
-                        softRebootAfter,
-                        logSink = { addLog(it) },
-                        stageSink = { stage = it; HistoryStore.updateStage(it) },
-                        progressSink = { progress = it / 100f }
-                    )
+                    stage = "执行器缺失"
+                    addLog("未找到当前内核对应的执行器，已停止；请确认安装包完整或重新安装本应用")
+                    RunReport.stop("准备执行器", "缺少当前内核的执行器资产")
+                    ok = false
                 }
             } catch (e: Throwable) {
                 addLog("98260 异常: " + e)

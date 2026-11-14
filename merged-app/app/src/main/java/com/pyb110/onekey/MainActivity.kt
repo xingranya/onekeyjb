@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.suqi8.coui.kmp.basic.*
 import com.pyb110.onekey.ui.components.ListCard
+import com.pyb110.onekey.ui.components.MarkdownText
 import com.pyb110.onekey.ui.components.ListRow
 import com.pyb110.onekey.ui.components.SectionTitle
 
@@ -453,7 +454,6 @@ private fun AppRoot(
                 val noticeText = remember {
                     runCatching {
                         ctx.assets.open("THIRD_PARTY_NOTICES.md").bufferedReader().use { it.readText() }
-                            .replace("**", "").replace("## ", "").replace("# ", "")
                     }.getOrDefault("第三方声明加载失败，请查看应用仓库中的 THIRD_PARTY_NOTICES.md")
                 }
                 WindowDialog(title = "第三方组件说明", show = true, onDismissRequest = { showThirdParty = false }) {
@@ -464,10 +464,9 @@ private fun AppRoot(
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 20.dp)
                     ) {
-                        Text(
-                            noticeText,
-                            style = COUITheme.textStyles.body2,
-                            color = oneKeyColors().muted
+                        MarkdownText(
+                            markdown = noticeText,
+                            onLinkClick = { url -> openUrl(ctx, url) },
                         )
                         DialogActions(
                             DialogAction("复制全文", COUIIcons.Copy) {

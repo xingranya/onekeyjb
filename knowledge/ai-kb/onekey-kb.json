@@ -1,7 +1,7 @@
 {
   "name": "OneKey 越狱工具知识库",
-  "version": "2.19.5",
-  "generated_at": "2026-11-11",
+  "version": "2.19.6",
+  "generated_at": "2026-11-14",
   "count": 80,
   "paragraphs": [
     {
@@ -655,19 +655,19 @@
       "source": "knowledge/11-热切换与通用模块.md"
     },
     {
-      "id": "12-版本变更史#12 · 版本变更史（2.18.0 → 2.19.5）",
-      "title": "12 · 版本变更史（2.18.0 → 2.19.5） · 12 · 版本变更史（2.18.0 → 2.19.5）",
+      "id": "12-版本变更史#12 · 版本变更史（2.18.0 → 2.19.6）",
+      "title": "12 · 版本变更史（2.18.0 → 2.19.6） · 12 · 版本变更史（2.18.0 → 2.19.6）",
       "content": "只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。",
       "tags": [
         "12-版本变更史",
-        "12 · 版本变更史（2.18.0 → 2.19.5）"
+        "12 · 版本变更史（2.18.0 → 2.19.6）"
       ],
       "source": "knowledge/12-版本变更史.md"
     },
     {
       "id": "12-版本变更史#2.19.x",
-      "title": "12 · 版本变更史（2.18.0 → 2.19.5） · 2.19.x",
-      "content": "| 版本 | code | 主题 | 关键内容 |\n| --- | --- | --- | --- |\n| **2.19.5** | 203 | 软重启开关真正生效 + 合并 Shark v2.1 | 「越狱后软重启」默认关闭且由应用显式执行（关闭时不重启）；antiRootGuard / unloadKernelGuard 默认关闭；安全组件改为只 force-stop、不 `pm disable-user`；引擎换成上游 v2.1 的 6.18.21 runner（支持 `PYB110_UNIVERSAL` / `SUSFS_KO` / `VFS_KO` / `KMI`），KMI 按机型取值 |\n| **2.19.4** | 202 | 管理器版本运行时提取 | 五家版本/资产改为从官方 Release 实时提取；提取不到不展示；结果缓存 6 小时 |\n| 2.19.3 | 201 | 五家管理器同步 + ksud 归一化 | FinaSU → v1.5.0 / 33174；SukiSU 期望版本 → 41150；新增 `KsudNormalizer`（按 `-V` 输出识别真 ksud 并补回 `libksud.so`） |\n| 2.19.2 | 200 | 合入 KSU-Universal v1.2.0 | 内置加载器 12,335,680 → 12,652,520 B；同步 `UNIVERSAL_KSUD_SIZE` 与第三方声明 |\n| 2.19.1 | 199 | 首页精简 | 移除运行卡里的「环境诊断」按钮；移除「高级设置」与其展开的越狱方式卡 |\n| 2.19.0 | 198 | 界面按网页原型重做 | 语义色板、设备卡四列、外观三态、拓展功能分组、日志/历史/关于/手册重做、抽屉单一实例 |",
+      "title": "12 · 版本变更史（2.18.0 → 2.19.6） · 2.19.x",
+      "content": "| 版本 | code | 主题 | 关键内容 |\n| --- | --- | --- | --- |\n| **2.19.6** | 204 | 彻底移除 MIT 衍生代码 + 全机型换 Shark 执行器 | 删除 ghostkey 原生后端（源码/驱动/profile/产物）与 4 个 onuce 载荷；6.18.21 与 6.12.69 各内置一份 Shark runner（上游 v2.3.2 / `49c3b0e`）；新增 6.12 SUSFS 模块；VFS 仅 6.18 生效；补 `LICENSES/MIT-pc98260.txt` 与历史署名；应用内第三方声明改为 Markdown 渲染 |\n| 2.19.5 | 203 | 软重启开关真正生效 + 合并 Shark v2.1 | 「越狱后软重启」默认关闭且由应用显式执行（关闭时不重启）；antiRootGuard / unloadKernelGuard 默认关闭；安全组件改为只 force-stop、不 `pm disable-user`；引擎换成上游 v2.1 的 6.18.21 runner（支持 `PYB110_UNIVERSAL` / `SUSFS_KO` / `VFS_KO` / `KMI`），KMI 按机型取值 |\n| **2.19.4** | 202 | 管理器版本运行时提取 | 五家版本/资产改为从官方 Release 实时提取；提取不到不展示；结果缓存 6 小时 |\n| 2.19.3 | 201 | 五家管理器同步 + ksud 归一化 | FinaSU → v1.5.0 / 33174；SukiSU 期望版本 → 41150；新增 `KsudNormalizer`（按 `-V` 输出识别真 ksud 并补回 `libksud.so`） |\n| 2.19.2 | 200 | 合入 KSU-Universal v1.2.0 | 内置加载器 12,335,680 → 12,652,520 B；同步 `UNIVERSAL_KSUD_SIZE` 与第三方声明 |\n| 2.19.1 | 199 | 首页精简 | 移除运行卡里的「环境诊断」按钮；移除「高级设置」与其展开的越狱方式卡 |\n| 2.19.0 | 198 | 界面按网页原型重做 | 语义色板、设备卡四列、外观三态、拓展功能分组、日志/历史/关于/手册重做、抽屉单一实例 |",
       "tags": [
         "12-版本变更史",
         "2.19.x"
@@ -676,7 +676,7 @@
     },
     {
       "id": "12-版本变更史#2.18.x（热切换与稳定性）",
-      "title": "12 · 版本变更史（2.18.0 → 2.19.5） · 2.18.x（热切换与稳定性）",
+      "title": "12 · 版本变更史（2.18.0 → 2.19.6） · 2.18.x（热切换与稳定性）",
       "content": "| 版本 | code | 关键内容 |\n| --- | --- | --- |\n| 2.18.30 | 197 | 管理器升级后自动补装加载器；还原时清长期启用标记 |\n| 2.18.29 | 196 | 面板显示 primary 原文；切换后强制停止全部管理器 |\n| 2.18.28 | 195 | 目标管理器随时可选；新增安装/重启/还原加载器 |\n| 2.18.27 | 194 | 加载器安装与还原界面 |\n| 2.18.26 | 193 | 通用模块开关标注\"引擎不支持外部 ksud\" |\n| 2.18.25 | 192 | 运行前拦截\"已加载单管理器模块\"；加载结果落盘回读 |\n| 2.18.24 | 191 | 检测与切换并排；状态诊断行；未授权自动申请 |\n| 2.18.23 | 190 | root 多路探测；节点探测与 su 解耦 |\n| 2.18.22 | 189 | 成功后即时落盘状态（软重启前也留住） |\n| 2.18.21 | 188 | 按 boot_id 判定\"本次开机已越狱\" |\n| 2.18.20 | 187 | 修复未启动 Stellar 时闪退；失败计数改为按次 |\n| 2.18.19 | 186 | 恢复默认单管理器路径，通用模块改为按需 |\n| 2.18.18 | 185 | 内置 ksud-universal；新增「管理器下载」 |\n| 2.18.17 | 184 | 管理器热切换（首版） |\n| 2.18.16 | 183 | 适配 ColorOS 17.0.1.201（新内核 g7fcbff） |",
       "tags": [
         "12-版本变更史",
@@ -686,7 +686,7 @@
     },
     {
       "id": "12-版本变更史#2.18.0 ~ 2.18.15",
-      "title": "12 · 版本变更史（2.18.0 → 2.19.5） · 2.18.0 ~ 2.18.15",
+      "title": "12 · 版本变更史（2.18.0 → 2.19.6） · 2.18.0 ~ 2.18.15",
       "content": "围绕 98260 链在不同小版本上的稳定性：重复运行锁、日志落盘、失败归因、软重启判定、\n权限修复、诊断导出、安全组件停用/恢复等。细粒度条目见 GitHub Releases。",
       "tags": [
         "12-版本变更史",
@@ -696,7 +696,7 @@
     },
     {
       "id": "12-版本变更史#版本号规则",
-      "title": "12 · 版本变更史（2.18.0 → 2.19.5） · 版本号规则",
+      "title": "12 · 版本变更史（2.18.0 → 2.19.6） · 版本号规则",
       "content": "- `versionCode` 单调递增，当前 201；**必须比线上大**，否则覆盖安装与更新提示都会错乱；\n- `versionName` 与 Release tag 一致（`v2.19.3` ↔ `2.19.3`）；\n- 不发 pre-release，全部直接发正式版。",
       "tags": [
         "12-版本变更史",
@@ -747,7 +747,7 @@
     {
       "id": "13-踩坑与修复记录#发布相关",
       "title": "13 · 踩坑与修复记录 · 发布相关",
-      "content": "### 17. CI 报 `Keystore file not set for signing config release`\n\n**根因**：仓库不含 `keystore.properties`（已 gitignore），签名配置却无条件创建。\n**修法**：`build.gradle.kts` 里按文件是否存在条件启用签名；本地发版时手动放入 `keystore.properties` + keystore。\n\n### 18. 未签名包能装但装上后拒绝执行\n\n**原因**：`SecurityCheck` 校验安装包签名指纹，非本项目签名的包一律拒绝。\n\n### 20. 「越狱后软重启」开关拨了没反应，开与关都照样重启\n\n**症状**：拓展功能里的「越狱后软重启」无论开还是关，越狱成功后系统都会重启一次。\n\n**根因（三条叠加）**：\n1. 开关只做了两件事：写 prefs、把 `PYB110_SOFT_REBOOT` / `PYB110_REBOOT` 拼进引擎环境变量；而引擎**根本不读这两个变量**（引擎的 `PYB110_` 全集里没有它们），所以开关是死开关。\n2. 应用自身也没有任何重启调用（`RestartManager.request()` 零调用点），所以\"没有自动重启代码\"并不等于\"不会重启\"。\n3. 真正扰动系统的是成功后的 `hardenAfterSuccess()` → `Safer.disable()`：它执行 `pm disable-user com.coloros.securityguard` / `com.oplus.safecenter`，改的是 PackageManager 数据，ColorOS 上很容易连带 system_server 重启；同时 `unloadKernelGuard` 默认开会去 `rmmod oplus_secure_guard_new`。\n\n**修法**：\n- 软重启改为**应用侧显式动作**：`softRebootAfter` 默认 false，只有开关打开且越狱成功才执行一次 `su -c 'setprop ctl.restart zygote'`，并用 `softRebootIssued` 保证单次运行最多一次；关闭时只记一行「保持当前会话不重启」。\n- 安全组件从 `pm disable-user` 改为 `am force-stop` + `stop riskdetect`，不改包状态。\n- `antiRootGuard`、`unloadKernelGuard` 默认改为 false。\n\n**教训**：给引擎传环境变量前，先在二进制里数一遍该变量出现次数；0 次就是没人读，别指望它生效。\n\n### 21. 上游 runner 换了命名与协议，包装脚本可以退役\n\n**现象**：通用多管理器模块靠一段 shell 包装脚本 + `PYB110_KSUD` 假接线实现，脆弱且 `--kmi` 写死 `android17-6.18`。\n\n**根因**：我们内置的引擎是上游改名前的旧构建（`usage: t98260 run`），不支持 `PYB110_UNIVERSAL`。\n\n**修法**：换用上游 v2.1 的 `libk61821.so`（`usage: k61821 run | ksud | __plant`，451,536 B，SHA-256 `4c88a76a…`），env 增加 `PYB110_UNIVERSAL=1` / `PYB110_UNIVERSAL_KSUD` / `PYB110_SUSFS_KO` / `PYB110_VFS_KO`，`PYB110_KMI` 改由 `DeviceProfiles.kmi` 提供；删除 25 行包装脚本。\n\n### 19. GitHub push 偶发 `TLS connect error / unexpected eof`\n\n**处理**：重试即可（网络问题，不是仓库状态问题）；长命令用后台任务，避免前台超时把任务打断。",
+      "content": "### 17. CI 报 `Keystore file not set for signing config release`\n\n**根因**：仓库不含 `keystore.properties`（已 gitignore），签名配置却无条件创建。\n**修法**：`build.gradle.kts` 里按文件是否存在条件启用签名；本地发版时手动放入 `keystore.properties` + keystore。\n\n### 18. 未签名包能装但装上后拒绝执行\n\n**原因**：`SecurityCheck` 校验安装包签名指纹，非本项目签名的包一律拒绝。\n\n### 20. 「越狱后软重启」开关拨了没反应，开与关都照样重启\n\n**症状**：拓展功能里的「越狱后软重启」无论开还是关，越狱成功后系统都会重启一次。\n\n**根因（三条叠加）**：\n1. 开关只做了两件事：写 prefs、把 `PYB110_SOFT_REBOOT` / `PYB110_REBOOT` 拼进引擎环境变量；而引擎**根本不读这两个变量**（引擎的 `PYB110_` 全集里没有它们），所以开关是死开关。\n2. 应用自身也没有任何重启调用（`RestartManager.request()` 零调用点），所以\"没有自动重启代码\"并不等于\"不会重启\"。\n3. 真正扰动系统的是成功后的 `hardenAfterSuccess()` → `Safer.disable()`：它执行 `pm disable-user com.coloros.securityguard` / `com.oplus.safecenter`，改的是 PackageManager 数据，ColorOS 上很容易连带 system_server 重启；同时 `unloadKernelGuard` 默认开会去 `rmmod oplus_secure_guard_new`。\n\n**修法**：\n- 软重启改为**应用侧显式动作**：`softRebootAfter` 默认 false，只有开关打开且越狱成功才执行一次 `su -c 'setprop ctl.restart zygote'`，并用 `softRebootIssued` 保证单次运行最多一次；关闭时只记一行「保持当前会话不重启」。\n- 安全组件从 `pm disable-user` 改为 `am force-stop` + `stop riskdetect`，不改包状态。\n- `antiRootGuard`、`unloadKernelGuard` 默认改为 false。\n\n**教训**：给引擎传环境变量前，先在二进制里数一遍该变量出现次数；0 次就是没人读，别指望它生效。\n\n### 21. 上游 runner 换了命名与协议，包装脚本可以退役\n\n**现象**：通用多管理器模块靠一段 shell 包装脚本 + `PYB110_KSUD` 假接线实现，脆弱且 `--kmi` 写死 `android17-6.18`。\n\n**根因**：我们内置的引擎是上游改名前的旧构建（`usage: t98260 run`），不支持 `PYB110_UNIVERSAL`。\n\n**修法**：换用上游 v2.1 的 `libk61821.so`（`usage: k61821 run | ksud | __plant`，451,536 B，SHA-256 `4c88a76a…`），env 增加 `PYB110_UNIVERSAL=1` / `PYB110_UNIVERSAL_KSUD` / `PYB110_SUSFS_KO` / `PYB110_VFS_KO`，`PYB110_KMI` 改由 `DeviceProfiles.kmi` 提供；删除 25 行包装脚本。\n\n### 22. 引入外部 PoC 源码没补署名，且漏查了无扩展名的 assets 二进制\n\n**症状**：上游作者在其他仓库连提三个 issue 要求补 MIT 署名；自查发现本仓库同样命中。\n\n**根因**：\n1. `cpp/ghostkey/pc98260_su.c` / `pc98260_rootd.c` 改编自 MIT 项目，保留上游 80/83 与 87/100 非空行，但文件头无版权行，声明文件里也没有原项目链接与 MIT 全文。\n2. 第一轮排查只搜了 `*.so` 与 `libcve98260*`，**漏掉了无扩展名的 `assets/ghostkey/ghostkey98260`**，误判成\"产物未分发\"。\n3. 进一步复扫发现 `onuce_*` 载荷也内嵌同一 rootd 实现（含 `[rootd] startup failed errno=%d (%s)` 原文与源文件名 `pc98260_rootd.c`）。\n\n**修法**：\n- 删除 ghostkey 全套与 4 个 onuce 载荷，改用上游按内核拆分的 Shark runner（6.18.21 / 6.12.69），二者均不含该 MIT 部分；\n- 补 `LICENSES/MIT-pc98260.txt`（上游 LICENSE 原样）+ 声明第五节历史署名与来源链。\n\n**教训**：\n1. 排查二进制来源时**按内容扫全部 assets 文件**，不要按扩展名过滤——可执行产物常常没有后缀；\n2. 删 HEAD 不追溯既往：历史提交与已发布 APK 仍构成\"分发\"，署名不能省；\n3. 删资产前先查回退分支：`GhostKeyEngine` 投放失败返回 `false` 而非 `null`，只删文件会让调用方不回退，直接坏掉。\n\n### 19. GitHub push 偶发 `TLS connect error / unexpected eof`\n\n**处理**：重试即可（网络问题，不是仓库状态问题）；长命令用后台任务，避免前台超时把任务打断。",
       "tags": [
         "13-踩坑与修复记录",
         "发布相关"

@@ -8,13 +8,16 @@ data class DeviceProfile(
     val model: String,
     val device: String?,
     val kernelRelease: String,
-    /** 内核模块 KMI 标识，传给 98260 引擎的 PYB110_KMI。 */
+    /** 内核模块 KMI 标识，传给执行器的 PYB110_KMI。 */
     val kmi: String,
+    /** 该机型使用的 98260 执行器资产（按内核拆分的 runner）。 */
+    val runnerAsset: String,
+    /** SUSFS 模块资产；不同 KMI 需要各自编译的模块。 */
+    val susfsAsset: String,
+    /** 内核符号表资产，供自研执行器与运行时自适应使用。 */
     val symbolsAsset: String,
-    val onuceSymbolsAsset: String,
-    val onuceAsset: String,
-    /** 98260 原生执行器是否按当前内核构建标定过；未标定时只允许尝试，失败不算回归。 */
-    val onuceVerified: Boolean = true,
+    /** 是否支持 hybridmount VFS 重定向（仅 6.18 内核有对应模块）。 */
+    val vfsSupported: Boolean = false,
 )
 
 object DeviceProfiles {
@@ -26,12 +29,13 @@ object DeviceProfiles {
         device = "OP64E1L1",
         kernelRelease = "6.18.21-android17-5-gf957accaf563-ab15926176-4k",
         kmi = "android17-6.18",
+        runnerAsset = "core/exec/onekey-98260",
+        susfsAsset = "core/exec/susfs_guard_lkm.ko",
         symbolsAsset = "core/symbols.txt",
-        onuceSymbolsAsset = "core/symbols.txt",
-        onuceAsset = "core/onuce/onuce_111_98260",
+        vfsSupported = true,
     )
 
-    /** 一加 16 · ColorOS 17.0.1.201（内核 commit 7fcbffcad3e1，执行器已按新构建放行）。 */
+    /** 一加 16 · ColorOS 17.0.1.201（内核 commit 7fcbffcad3e1）。 */
     val PYB110_201 = DeviceProfile(
         id = "pyb110",
         displayName = "OnePlus 16",
@@ -39,13 +43,13 @@ object DeviceProfiles {
         device = "OP64E1L1",
         kernelRelease = "6.18.21-android17-5-g7fcbffcad3e1-ab16353812-4k",
         kmi = "android17-6.18",
+        runnerAsset = "core/exec/onekey-98260",
+        susfsAsset = "core/exec/susfs_guard_lkm.ko",
         symbolsAsset = "core/symbols-1701201.txt",
-        onuceSymbolsAsset = "core/symbols-1701201.txt",
-        onuceAsset = "core/onuce/onuce_111_98260_201",
-        // 偏移仍由 symbols 文件提供；新构建尚未在真机跑通整链，失败请导出日志。
-        onuceVerified = false,
+        vfsSupported = true,
     )
 
+    /** 一加 Ace 7 Pro · 6.12.69。 */
     val PMS110 = DeviceProfile(
         id = "pms110",
         displayName = "OnePlus Ace 7 Pro",
@@ -53,9 +57,9 @@ object DeviceProfiles {
         device = null,
         kernelRelease = "6.12.69-android16-6-g242e1a07f878-ab15865446-4k",
         kmi = "android16-6.12",
-        symbolsAsset = "core/onuce/device-symbols-612.txt",
-        onuceSymbolsAsset = "core/onuce/device-symbols-612.txt",
-        onuceAsset = "core/onuce/onuce_111_64560",
+        runnerAsset = "core/exec/onekey-98260-61269",
+        susfsAsset = "core/exec/susfs_guard_lkm_612.ko",
+        symbolsAsset = "core/device-symbols-612.txt",
     )
 
     val all = listOf(PYB110, PYB110_201, PMS110)
