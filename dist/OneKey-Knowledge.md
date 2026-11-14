@@ -1,6 +1,6 @@
 # OneKey 知识库（合集）
 
-> 版本 2.19.8 / 206。不含任何密钥、口令或签名文件内容。
+> 版本 2.19.9 / 207。不含任何密钥、口令或签名文件内容。
 
 
 
@@ -949,7 +949,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.19.8）
+# 12 · 版本变更史（2.18.0 → 2.19.9）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -957,7 +957,8 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
-| **2.19.8** | 206 | 移除未完成的自研执行器 + 资产瘦身 | `native/executor/main.c:66` 的 plant 阶段标注「尚未实现（M2）」，`onekey-exec run` 不可能成功 → 删除 `NativeExecutor.kt`、回退分支、`onekey-exec` 与两份 6.18 符号表（13.08 MB 未压缩）；`DeviceProfile.symbolsAsset` 字段随之移除；另删重复 `assets/avatar.png`（与 res/drawable-nodpi 字节相同）与零投放的 `su_forward` / `su_path_compat.sh`；执行器成为唯一通道 |
+| **2.19.9** | 207 | UI 结构重构（行为不变） | `MainActivity.kt` 3226 → 50 行，只留 Activity 壳；45 个声明搬进 `ui/components`、`ui/screen`、`ui/sheet`、`ui/dialog`、`ui/UiHelpers`；`AppRoot` 独立成 `ui/AppRoot.kt`(390) 并抽出 7 个无状态弹窗；删 7 个零引用死函数(130 行)；`HomeCards` 拆成 188+254。45 个搬迁声明逐字保真、符号守恒零搬漏、APK 字节数不变 |
+| 2.19.8 | 206 | 移除未完成的自研执行器 + 资产瘦身 | `native/executor/main.c:66` 的 plant 阶段标注「尚未实现（M2）」，`onekey-exec run` 不可能成功 → 删除 `NativeExecutor.kt`、回退分支、`onekey-exec` 与两份 6.18 符号表（13.08 MB 未压缩）；`DeviceProfile.symbolsAsset` 字段随之移除；另删重复 `assets/avatar.png`（与 res/drawable-nodpi 字节相同）与零投放的 `su_forward` / `su_path_compat.sh`；执行器成为唯一通道 |
 | 2.19.7 | 205 | 审计问题 1–5 修复 | 残留进程清理改用 root + comm 双路匹配（`pkill` 模式写 `onekey-9826[0]` 避免杀）且先验 root 后清理；`MODULE_LOADED` 即 `markWrote` 使 `wroteKernel` 真实；自研执行器回退分支可达并如实告知 plant 未完成；删死 Java 2249 行（`readAsset` 先内联进 `ShizukuShell`）；删死资产 8,871,727 B（含 grab.sh）；抽出 `MarkdownParser` 并补 4 个 parser 单测 |
 | 2.19.6 | 204 | 彻底移除 MIT 衍生代码 + 全机型换 Shark 执行器 | 删除 ghostkey 原生后端（源码/驱动/profile/产物）与 4 个 onuce 载荷；6.18.21 与 6.12.69 各内置一份 Shark runner（上游 v2.3.2 / `49c3b0e`）；新增 6.12 SUSFS 模块；VFS 仅 6.18 生效；补 `LICENSES/MIT-pc98260.txt` 与历史署名；应用内第三方声明改为 Markdown 渲染 |
 | 2.19.5 | 203 | 软重启开关真正生效 + 合并 Shark v2.1 | 「越狱后软重启」默认关闭且由应用显式执行（关闭时不重启）；antiRootGuard / unloadKernelGuard 默认关闭；安全组件改为只 force-stop、不 `pm disable-user`；引擎换成上游 v2.1 的 6.18.21 runner（支持 `PYB110_UNIVERSAL` / `SUSFS_KO` / `VFS_KO` / `KMI`），KMI 按机型取值 |
@@ -1196,6 +1197,26 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 1. 决定"修还是删"一条通道前，**先读它的后端实现**，别只看调用侧的分支条件；
 2. 压缩率会骗人：13.08 MB 的文本符号表删掉后，APK 只小了 2.71 MB —— 
    **估算安装包收益要看压缩后，不能拿未压缩字节直接减**。
+
+### 26. 按花括号配平提取函数时，签名里的默认 lambda 参数会被当成函数体起点
+
+**症状**：拆分 MainActivity 时，提取器把 `BlurBar` 截成 11 行（实际 34 行），
+生成的新文件编译报一堆 Unresolved reference。
+
+**根因**：`BlurBar` 的签名含默认 lambda 参数
+`onHeight: (Int) -> Unit = {}`。提取器从声明行开始数花括号，
+参数列表里的 `{}` 被当作函数体开始，配平后立刻判定结束。
+
+**修法**：先跳过声明自身的**参数列表**（圆括号配平）再开始数花括号。
+修好后全量扫 52 个顶层声明，只有这一处受影响。
+
+**教训**：
+1. 写代码提取/搬迁工具时，**必须对全部目标声明做边界自检**（首行是签名、尾行是 `}`、行数与预期比对），
+   不能只抽查几个；
+2. 搬完要做**逐字保真断言**（`to_internal(原文) in 新文件`）与**符号守恒断言**
+   （新集合 == 旧集合 − 已知删除项），这两条能同时挡住搬漏、搬重、截断；
+3. 跨包搬迁还要补同包符号的 import（如 `BuildConfig`、`R`），
+   原文件同包不需要 import，搬走后就缺了。
 
 ### 19. GitHub push 偶发 `TLS connect error / unexpected eof`
 
