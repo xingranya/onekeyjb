@@ -33,19 +33,9 @@ import com.pyb110.onekey.ui.components.ButtonIconText
 import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.components.DialogActions
 import com.pyb110.onekey.ui.oneKeyColors
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Close
-import io.github.suqi8.coui.kmp.icon.extended.Copy
-import io.github.suqi8.coui.kmp.icon.extended.Download
-import io.github.suqi8.coui.kmp.icon.extended.Ok
-import io.github.suqi8.coui.kmp.icon.extended.Report
-import io.github.suqi8.coui.kmp.icon.extended.ScreenCapture
-import io.github.suqi8.coui.kmp.icon.extended.Search
-import io.github.suqi8.coui.kmp.icon.extended.Unlock
-import io.github.suqi8.coui.kmp.theme.COUITheme
-import io.github.suqi8.coui.kmp.theme.LocalDismissState
-import io.github.suqi8.coui.kmp.window.WindowDialog
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.COUITheme
+import com.pyb110.onekey.ui.theme.*
 
 @Composable
 internal fun DiagnosticsDialog(

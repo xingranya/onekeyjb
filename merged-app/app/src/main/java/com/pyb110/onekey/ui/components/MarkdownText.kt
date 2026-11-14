@@ -22,8 +22,9 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import io.github.suqi8.coui.kmp.theme.COUITheme
+import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.oneKeyColors
+import com.pyb110.onekey.ui.theme.*
 
 /**
  * 轻量 Markdown 渲染：标题、段落、无序列表、表格、分隔线，

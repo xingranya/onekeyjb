@@ -74,11 +74,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
     implementation("androidx.core:core-ktx:1.17.0")
 
-    // COUI —— ColorOS 风格 Compose Multiplatform 组件库（替换 Miuix）
-    implementation("io.github.suqi8.coui.kmp:coui-ui:1.1.0")
-    implementation("io.github.suqi8.coui.kmp:coui-preference:1.1.0")
-    implementation("io.github.suqi8.coui.kmp:coui-icons:1.1.0")
-    implementation("io.github.suqi8.coui.kmp:coui-blur:1.1.0")
+    // COUI —— ColorOS 17 原生观感组件库（io.github.itoseo:coui，与 Shark / LuckyTool 同源）
+    implementation("io.github.itoseo:coui:0.0.1-alpha11")
+    // 图标：COUI alpha11 起不再自带图标包，改用 Google 官方 Material 图标
+    implementation("androidx.compose.material:material-icons-extended")
 
     // Stellar API（Shizuku 深度分支，ColorOS 17 上可用；替换 Shizuku）
     implementation("com.github.roro2239.Stellar-API:aidl:1.0.3")

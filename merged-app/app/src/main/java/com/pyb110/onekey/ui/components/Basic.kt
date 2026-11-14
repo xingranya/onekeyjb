@@ -14,8 +14,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.pyb110.onekey.R
 import com.pyb110.onekey.ui.oneKeyColors
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.theme.COUITheme
+import com.pyb110.onekey.ui.theme.COUITheme
+import com.pyb110.onekey.ui.theme.*
 
 data class DialogAction(
     val label: String,

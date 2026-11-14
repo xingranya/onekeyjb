@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import com.pyb110.onekey.JailbreakController
 import com.pyb110.onekey.ui.AppearanceMode
-import io.github.suqi8.coui.kmp.basic.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import com.pyb110.onekey.ui.theme.*
 
 internal fun openUrl(context: Context, url: String) {
     runCatching {

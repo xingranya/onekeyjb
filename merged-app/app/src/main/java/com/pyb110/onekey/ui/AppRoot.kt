@@ -46,24 +46,11 @@ import com.pyb110.onekey.ui.sheet.HotSwitchPanel
 import com.pyb110.onekey.ui.sheet.JailManagerPanel
 import com.pyb110.onekey.ui.sheet.ManagerDownloadPanel
 import com.pyb110.onekey.ui.sheet.TargetPickerPanel
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.blur.layerBackdrop
-import io.github.suqi8.coui.kmp.blur.rememberLayerBackdrop
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Close
-import io.github.suqi8.coui.kmp.icon.extended.Copy
-import io.github.suqi8.coui.kmp.icon.extended.Delete
-import io.github.suqi8.coui.kmp.icon.extended.Download
-import io.github.suqi8.coui.kmp.icon.extended.Info
-import io.github.suqi8.coui.kmp.icon.extended.Ok
-import io.github.suqi8.coui.kmp.icon.extended.Play
-import io.github.suqi8.coui.kmp.icon.extended.Settings
-import io.github.suqi8.coui.kmp.theme.COUITheme
-import io.github.suqi8.coui.kmp.utils.COUIPopupUtils.Companion.COUIPopupHost
-import io.github.suqi8.coui.kmp.utils.CouiHapticEffect
-import io.github.suqi8.coui.kmp.utils.rememberCouiHaptic
-import io.github.suqi8.coui.kmp.window.WindowBottomSheet
-import io.github.suqi8.coui.kmp.window.WindowDialog
+import com.pyb110.onekey.ui.theme.layerBackdrop
+import com.pyb110.onekey.ui.theme.rememberLayerBackdrop
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.COUITheme
+import com.pyb110.onekey.ui.theme.COUIPopupHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -75,6 +62,7 @@ import com.pyb110.onekey.ui.dialog.ThirdPartyDialog
 import com.pyb110.onekey.ui.dialog.ManualDialog
 import com.pyb110.onekey.ui.dialog.UpdateUi
 import com.pyb110.onekey.ui.dialog.UpdateDialog
+import com.pyb110.onekey.ui.theme.*
 
 @Composable
 internal fun AppRoot(
@@ -147,7 +135,6 @@ internal fun AppRoot(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(state = snackbarHostState) },
         containerColor = oneKeyColors().background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { _ ->

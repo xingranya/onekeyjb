@@ -9,10 +9,8 @@ import androidx.compose.ui.unit.dp
 import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.components.DialogActions
 import com.pyb110.onekey.ui.components.ManualSection
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Ok
-import io.github.suqi8.coui.kmp.window.WindowDialog
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.*
 
 @Composable
 internal fun ManualDialog(onDismiss: () -> Unit) {

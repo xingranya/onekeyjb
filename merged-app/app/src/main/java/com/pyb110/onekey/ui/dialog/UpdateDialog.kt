@@ -10,13 +10,9 @@ import com.pyb110.onekey.UpdateChecker
 import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.components.DialogActions
 import com.pyb110.onekey.ui.oneKeyColors
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Close
-import io.github.suqi8.coui.kmp.icon.extended.Download
-import io.github.suqi8.coui.kmp.icon.extended.Info
-import io.github.suqi8.coui.kmp.theme.COUITheme
-import io.github.suqi8.coui.kmp.window.WindowDialog
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.COUITheme
+import com.pyb110.onekey.ui.theme.*
 
 internal data class UpdateUi(
     val info: UpdateChecker.Info,

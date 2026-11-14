@@ -15,13 +15,12 @@ import com.pyb110.onekey.ui.components.ManagerMark
 import com.pyb110.onekey.ui.components.PanelButton
 import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.openUrl
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Download
-import io.github.suqi8.coui.kmp.theme.COUITheme
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.COUITheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.pyb110.onekey.ui.theme.*
 
 @Composable
 internal fun ManagerDownloadPanel(

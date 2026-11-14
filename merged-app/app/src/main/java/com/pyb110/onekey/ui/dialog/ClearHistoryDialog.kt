@@ -6,12 +6,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.components.DialogActions
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Close
-import io.github.suqi8.coui.kmp.icon.extended.Delete
-import io.github.suqi8.coui.kmp.theme.COUITheme
-import io.github.suqi8.coui.kmp.window.WindowDialog
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.COUITheme
+import com.pyb110.onekey.ui.theme.*
 
 @Composable
 internal fun ClearHistoryDialog(onCancel: () -> Unit, onConfirm: () -> Unit) {

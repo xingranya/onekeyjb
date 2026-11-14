@@ -15,10 +15,9 @@ import androidx.compose.ui.unit.dp
 import com.pyb110.onekey.JailbreakController
 import com.pyb110.onekey.ui.components.ManagerMark
 import com.pyb110.onekey.ui.oneKeyColors
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Ok
-import io.github.suqi8.coui.kmp.theme.COUITheme
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.COUITheme
+import com.pyb110.onekey.ui.theme.*
 
 /** 目标管理器选择列表。 */
 @Composable

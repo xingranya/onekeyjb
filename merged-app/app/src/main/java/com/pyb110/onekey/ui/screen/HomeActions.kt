@@ -19,20 +19,9 @@ import com.pyb110.onekey.ui.components.RunFlow
 import com.pyb110.onekey.ui.oneKeyCardColor
 import com.pyb110.onekey.ui.oneKeyCardOutline
 import com.pyb110.onekey.ui.oneKeyColors
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Close
-import io.github.suqi8.coui.kmp.icon.extended.Download
-import io.github.suqi8.coui.kmp.icon.extended.Lock
-import io.github.suqi8.coui.kmp.icon.extended.Notes
-import io.github.suqi8.coui.kmp.icon.extended.Ok
-import io.github.suqi8.coui.kmp.icon.extended.Replace
-import io.github.suqi8.coui.kmp.icon.extended.Report
-import io.github.suqi8.coui.kmp.icon.extended.Settings
-import io.github.suqi8.coui.kmp.icon.extended.Tasks
-import io.github.suqi8.coui.kmp.icon.extended.Tune
-import io.github.suqi8.coui.kmp.theme.COUITheme
-import io.github.suqi8.coui.kmp.utils.CouiHapticEffect
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.COUITheme
+import com.pyb110.onekey.ui.theme.*
 
 @Composable
 internal fun ResultBanner(

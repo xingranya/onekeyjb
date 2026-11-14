@@ -13,16 +13,9 @@ import com.pyb110.onekey.ui.components.PanelButton
 import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.components.ListCard
 import com.pyb110.onekey.ui.components.ListRow
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Hide
-import io.github.suqi8.coui.kmp.icon.extended.Lock
-import io.github.suqi8.coui.kmp.icon.extended.Play
-import io.github.suqi8.coui.kmp.icon.extended.Refresh
-import io.github.suqi8.coui.kmp.icon.extended.Tasks
-import io.github.suqi8.coui.kmp.icon.extended.Unlock
-import io.github.suqi8.coui.kmp.theme.COUITheme
-import io.github.suqi8.coui.kmp.utils.CouiHapticEffect
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.COUITheme
+import com.pyb110.onekey.ui.theme.*
 
 @Composable
 internal fun FeatureTogglePanel(

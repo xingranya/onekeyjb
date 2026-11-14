@@ -12,11 +12,8 @@ import com.pyb110.onekey.JailbreakController
 import com.pyb110.onekey.ui.components.ListCard
 import com.pyb110.onekey.ui.components.ListRow
 import com.pyb110.onekey.ui.components.SectionTitle
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Help
-import io.github.suqi8.coui.kmp.icon.extended.Info
-import io.github.suqi8.coui.kmp.utils.CouiHapticEffect
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.*
 
 @Composable
 internal fun HomeScreen(

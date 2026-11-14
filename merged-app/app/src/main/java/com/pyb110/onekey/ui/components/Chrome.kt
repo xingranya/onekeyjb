@@ -23,21 +23,12 @@ import androidx.compose.ui.unit.sp
 import com.pyb110.onekey.BuildConfig
 import com.pyb110.onekey.JailbreakController
 import com.pyb110.onekey.ui.oneKeyColors
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.blur.LayerBackdrop
-import io.github.suqi8.coui.kmp.blur.blur
-import io.github.suqi8.coui.kmp.blur.drawBackdrop
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Copy
-import io.github.suqi8.coui.kmp.icon.extended.Delete
-import io.github.suqi8.coui.kmp.icon.extended.Download
-import io.github.suqi8.coui.kmp.icon.extended.Home
-import io.github.suqi8.coui.kmp.icon.extended.Info
-import io.github.suqi8.coui.kmp.icon.extended.Notes
-import io.github.suqi8.coui.kmp.icon.extended.Recent
-import io.github.suqi8.coui.kmp.icon.extended.Refresh
-import io.github.suqi8.coui.kmp.icon.extended.Theme
-import io.github.suqi8.coui.kmp.theme.COUITheme
+import com.pyb110.onekey.ui.theme.LayerBackdrop
+import com.pyb110.onekey.ui.theme.blur
+import com.pyb110.onekey.ui.theme.drawBackdrop
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.COUITheme
+import com.pyb110.onekey.ui.theme.*
 
 internal object BarBlurDefaults {
     const val topRadius = 18f

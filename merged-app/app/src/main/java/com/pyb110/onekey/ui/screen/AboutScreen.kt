@@ -29,24 +29,9 @@ import com.pyb110.onekey.ui.components.SectionTitle
 import com.pyb110.onekey.ui.oneKeyCardColor
 import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.openUrl
-import io.github.suqi8.coui.kmp.basic.*
-import io.github.suqi8.coui.kmp.icon.COUIIcons
-import io.github.suqi8.coui.kmp.icon.extended.Help
-import io.github.suqi8.coui.kmp.icon.extended.Hide
-import io.github.suqi8.coui.kmp.icon.extended.Info
-import io.github.suqi8.coui.kmp.icon.extended.Link
-import io.github.suqi8.coui.kmp.icon.extended.Notes
-import io.github.suqi8.coui.kmp.icon.extended.Ok
-import io.github.suqi8.coui.kmp.icon.extended.Refresh
-import io.github.suqi8.coui.kmp.icon.extended.Replace
-import io.github.suqi8.coui.kmp.icon.extended.Report
-import io.github.suqi8.coui.kmp.icon.extended.Settings
-import io.github.suqi8.coui.kmp.icon.extended.Tasks
-import io.github.suqi8.coui.kmp.icon.extended.Theme
-import io.github.suqi8.coui.kmp.icon.extended.Update
-import io.github.suqi8.coui.kmp.theme.COUITheme
-import io.github.suqi8.coui.kmp.utils.CouiHapticEffect
-import io.github.suqi8.coui.kmp.window.WindowBottomSheet
+import com.pyb110.onekey.ui.theme.COUIIcons
+import com.pyb110.onekey.ui.theme.COUITheme
+import com.pyb110.onekey.ui.theme.*
 
 @Composable
 internal fun AboutScreen(
