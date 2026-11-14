@@ -1,6 +1,6 @@
 # OneKey 知识库（合集）
 
-> 版本 2.19.9 / 207。不含任何密钥、口令或签名文件内容。
+> 版本 2.20.0 / 208。不含任何密钥、口令或签名文件内容。
 
 
 
@@ -91,6 +91,12 @@ OneKey 是给一加手机用的「一键越狱」App：通过漏洞链拿到内�
 - 五阶段进度：准备 / 提权 / 加载 / 验证 / 完成
 - 失败保护：同一阶段连续失败即中止；已写入内核的失败会记 boot_id，要求重启后再试
 - 环境诊断、自检、收集设备诊断（可导出 TXT）
+
+**开机自动越狱**（2.20.0 起，默认关闭）
+- 开关在「拓展功能 → 拓展开关」；`BOOT_COMPLETED` → `BootReceiver` → `AutoJailbreakService`（前台 specialUse）
+- 无头驱动 `JailbreakController`，通知栏播报阶段与百分比；`RunState.headless` 抑制保活通知避免重复
+- 五道闸：默认关闭 / 协议未同意不跑 / 上次失败自动关开关（复用 `failed_boot_id`）/ 等 Stellar 3 分钟 / 已有 root 跳过
+- 前置条件：Stellar 开启「开机启动」+ 系统允许本应用自启动 + 忽略电池优化（App 内有引导按钮）
 
 **运行通道**
 - Root 服务通道用 Stellar（Shizuku 深度分支，包名 `roro.stellar.manager`），shell uid 2000
@@ -949,7 +955,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.19.9）
+# 12 · 版本变更史（2.18.0 → 2.20.0）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -957,7 +963,8 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
-| **2.19.9** | 207 | UI 结构重构（行为不变） | `MainActivity.kt` 3226 → 50 行，只留 Activity 壳；45 个声明搬进 `ui/components`、`ui/screen`、`ui/sheet`、`ui/dialog`、`ui/UiHelpers`；`AppRoot` 独立成 `ui/AppRoot.kt`(390) 并抽出 7 个无状态弹窗；删 7 个零引用死函数(130 行)；`HomeCards` 拆成 188+254。45 个搬迁声明逐字保真、符号守恒零搬漏、APK 字节数不变 |
+| **2.20.0** | 208 | 开机自动越狱 | 新增 `BootReceiver` + `AutoJailbreakService`（前台 specialUse，无头驱动控制器）；开关默认关闭，位于拓展开关；五道安全闸（协议/崩溃守卫/等 Stellar/已 root 跳过/单次不重试）；`RunState.headless` 抑制双通知；Manifest 加 RECEIVE_BOOT_COMPLETED 与电池白名单权限；UI 补三前提说明与两个引导按钮。参照上游 Shark `5011175`，但我方控制器本就无头可用，省掉上游 203 行 Core 抽取 |
+| 2.19.9 | 207 | UI 结构重构（行为不变） | `MainActivity.kt` 3226 → 50 行，只留 Activity 壳；45 个声明搬进 `ui/components`、`ui/screen`、`ui/sheet`、`ui/dialog`、`ui/UiHelpers`；`AppRoot` 独立成 `ui/AppRoot.kt`(390) 并抽出 7 个无状态弹窗；删 7 个零引用死函数(130 行)；`HomeCards` 拆成 188+254。45 个搬迁声明逐字保真、符号守恒零搬漏、APK 字节数不变 |
 | 2.19.8 | 206 | 移除未完成的自研执行器 + 资产瘦身 | `native/executor/main.c:66` 的 plant 阶段标注「尚未实现（M2）」，`onekey-exec run` 不可能成功 → 删除 `NativeExecutor.kt`、回退分支、`onekey-exec` 与两份 6.18 符号表（13.08 MB 未压缩）；`DeviceProfile.symbolsAsset` 字段随之移除；另删重复 `assets/avatar.png`（与 res/drawable-nodpi 字节相同）与零投放的 `su_forward` / `su_path_compat.sh`；执行器成为唯一通道 |
 | 2.19.7 | 205 | 审计问题 1–5 修复 | 残留进程清理改用 root + comm 双路匹配（`pkill` 模式写 `onekey-9826[0]` 避免杀）且先验 root 后清理；`MODULE_LOADED` 即 `markWrote` 使 `wroteKernel` 真实；自研执行器回退分支可达并如实告知 plant 未完成；删死 Java 2249 行（`readAsset` 先内联进 `ShizukuShell`）；删死资产 8,871,727 B（含 grab.sh）；抽出 `MarkdownParser` 并补 4 个 parser 单测 |
 | 2.19.6 | 204 | 彻底移除 MIT 衍生代码 + 全机型换 Shark 执行器 | 删除 ghostkey 原生后端（源码/驱动/profile/产物）与 4 个 onuce 载荷；6.18.21 与 6.12.69 各内置一份 Shark runner（上游 v2.3.2 / `49c3b0e`）；新增 6.12 SUSFS 模块；VFS 仅 6.18 生效；补 `LICENSES/MIT-pc98260.txt` 与历史署名；应用内第三方声明改为 Markdown 渲染 |

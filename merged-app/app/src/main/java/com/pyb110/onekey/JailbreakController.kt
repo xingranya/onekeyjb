@@ -34,6 +34,8 @@ data class ManagerOption(
 
 object RunState {
     @Volatile var active: Boolean = false
+    /** 由开机自动越狱服务驱动时为 true：此时已有前台服务保活，不再另起保活通知。 */
+    @Volatile var headless: Boolean = false
 }
 
 class JailbreakController private constructor(private val context: Context) {
@@ -75,6 +77,8 @@ class JailbreakController private constructor(private val context: Context) {
     var checkingUpdate: Boolean by mutableStateOf(false); private set
     /** 越狱成功后是否软重启（只重启用户态，内核模块保持加载）。默认关闭，关闭时绝不主动重启。 */
     var softRebootAfter: Boolean by mutableStateOf(prefs.getBoolean("soft_reboot_after", false)); private set
+    /** 开机后自动运行一次越狱（需 Stellar 已开启开机自启）。默认关闭。 */
+    var autoJailbreak: Boolean by mutableStateOf(prefs.getBoolean("auto_jailbreak", false)); private set
     /** 越狱后卸载内核安全防护（oplus_secure_guard 等）。默认关闭。 */
     var unloadKernelGuard: Boolean by mutableStateOf(prefs.getBoolean("unload_kernel_guard", false)); private set
     /** SUSFS 隐藏支持（需要执行器侧加载模块）。 */
@@ -624,6 +628,28 @@ class JailbreakController private constructor(private val context: Context) {
         return managers.firstOrNull { it.pkg == status.packageName }?.label.orEmpty()
     }
 
+    fun updateAutoJailbreak(enabled: Boolean) {
+        autoJailbreak = enabled
+        prefs.edit().putBoolean("auto_jailbreak", enabled).apply()
+        addLog(
+            if (enabled) "已开启「开机自动越狱」：需先在 Stellar 里开启开机启动，并在系统设置里允许本应用自启动"
+            else "已关闭「开机自动越狱」：开机后不会自动运行"
+        )
+    }
+
+    /** 供开机服务判断：用户是否已同意协议（未同意时不自动运行）。 */
+    fun termsAccepted(): Boolean = legacyPrefs.getBoolean("terms_accepted_v2", false)
+
+    /** 供开机服务判断：上次开机是否留下了失败标记。 */
+    fun lastBootFailed(): Boolean = prefs.getString("failed_boot_id", "").orEmpty().isNotBlank()
+
+    /** 自动越狱失败后由服务调用，关闭开关避免重启循环。 */
+    fun disableAutoJailbreakAfterFailure() {
+        autoJailbreak = false
+        prefs.edit().putBoolean("auto_jailbreak", false).apply()
+        addLog("上次自动越狱未成功，已自动关闭「开机自动越狱」")
+    }
+
     fun updateSoftRebootAfter(enabled: Boolean) {
         softRebootAfter = enabled
         prefs.edit().putBoolean("soft_reboot_after", enabled).apply()
@@ -778,7 +804,7 @@ class JailbreakController private constructor(private val context: Context) {
         softRebootIssued = false
         val runAdaptive = adaptiveManagerEnabled
         val runKind = selectedManager
-        runCatching { JailbreakRunService.start(context) }
+        if (!RunState.headless) runCatching { JailbreakRunService.start(context) }
         val startBootId = bootNow
         progress = 0.01f
         stage = "检查 Stellar 服务"
@@ -858,13 +884,15 @@ class JailbreakController private constructor(private val context: Context) {
                 ok = false
             } finally {
                 running = false
-                runCatching {
-                    JailbreakRunService.update(context, if (ok) "完成" else "未完成", if (ok) 1f else progress)
-                }
-                if (ok) {
-                    scope.launch { kotlinx.coroutines.delay(3000); runCatching { JailbreakRunService.stop(context) } }
-                } else {
-                    runCatching { JailbreakRunService.stop(context) }
+                if (!RunState.headless) {
+                    runCatching {
+                        JailbreakRunService.update(context, if (ok) "完成" else "未完成", if (ok) 1f else progress)
+                    }
+                    if (ok) {
+                        scope.launch { kotlinx.coroutines.delay(3000); runCatching { JailbreakRunService.stop(context) } }
+                    } else {
+                        runCatching { JailbreakRunService.stop(context) }
+                    }
                 }
                 releaseRunLock()
                 lastResultOk = ok
