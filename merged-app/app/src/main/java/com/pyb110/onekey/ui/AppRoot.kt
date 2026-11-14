@@ -67,6 +67,14 @@ import io.github.suqi8.coui.kmp.window.WindowDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.pyb110.onekey.ui.dialog.ClearHistoryDialog
+import com.pyb110.onekey.ui.dialog.RunDoneDialog
+import com.pyb110.onekey.ui.dialog.RunConfirmDialog
+import com.pyb110.onekey.ui.dialog.TermsDialog
+import com.pyb110.onekey.ui.dialog.ThirdPartyDialog
+import com.pyb110.onekey.ui.dialog.ManualDialog
+import com.pyb110.onekey.ui.dialog.UpdateUi
+import com.pyb110.onekey.ui.dialog.UpdateDialog
 
 @Composable
 internal fun AppRoot(
@@ -307,131 +315,11 @@ internal fun AppRoot(
                 )
             }
 
-            if (showManual) {
-                WindowDialog(title = "使用手册", show = true, onDismissRequest = { showManual = false }) {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 460.dp)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 20.dp)
-                    ) {
-                        ManualSection("一、准备", listOf(
-                            "安装要用的管理器（KernelSU / KernelSU-Next / SukiSU / BakaSU / FinaSU 之一），App 不再内置管理器和模块。",
-                            "启动 Stellar（推荐）或 Shizuku 服务，回到 App 授予权限；首页显示「服务已连接并授权」才能继续。"
-                        ))
-                        ManualSection("二、一键越狱", listOf(
-                            "点「运行 98260 越狱链」，确认后等待日志出现「越狱完成」。",
-                            "失败时日志会写明停在哪一步；只有在真的写入内核后才会提示重启，未写入可直接再试。"
-                        ))
-                        ManualSection("三、拓展功能（5 项）", listOf(
-                            "越狱后禁用安全弹窗：停掉安全守护/安全中心进程并抑制反 root 弹窗，不改包状态、不重启。",
-                            "越狱后软重启：默认关闭。开启后越狱成功会执行一次 setprop ctl.restart zygote；关闭则不重启。",
-                            "越狱后卸载内核安全防护：卸载 oplus_secure_guard 一类内核防护模块。",
-                            "SUSFS 支持：越狱后加载隐藏模块（需要执行器侧配合）。",
-                            "VFS 支持：加载 hybridmount 做路径重定向，仅 6.18 内核生效。"
-                        ))
-                        ManualSection("四、异常处理", listOf(
-                            "提示「未写内核，可直接重试」：直接再点一次即可。",
-                            "提示「已写内核但未拿到 root」：重启手机后再试，并导出日志。",
-                            "管理器未授权：先在管理器里给 OneKey 授权 root，再回到 App 运行。"
-                        ))
-                        DialogActions(
-                            DialogAction("知道了", COUIIcons.Ok, primary = true) { showManual = false }
-                        )
-                    }
-                }
-            }
+            if (showManual) ManualDialog { showManual = false }
 
-            if (showThirdParty) {
-                val ctx = LocalContext.current
-                val noticeText = remember {
-                    runCatching {
-                        ctx.assets.open("THIRD_PARTY_NOTICES.md").bufferedReader().use { it.readText() }
-                    }.getOrDefault("第三方声明加载失败，请查看应用仓库中的 THIRD_PARTY_NOTICES.md")
-                }
-                WindowDialog(title = "第三方组件说明", show = true, onDismissRequest = { showThirdParty = false }) {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 480.dp)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 20.dp)
-                    ) {
-                        MarkdownText(
-                            markdown = noticeText,
-                            onLinkClick = { url -> openUrl(ctx, url) },
-                        )
-                        DialogActions(
-                            DialogAction("复制全文", COUIIcons.Copy) {
-                                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                cm.setPrimaryClip(ClipData.newPlainText("notices", noticeText))
-                            },
-                            DialogAction("知道了", COUIIcons.Ok, primary = true) { showThirdParty = false }
-                        )
-                    }
-                }
-            }
+            if (showThirdParty) ThirdPartyDialog { showThirdParty = false }
 
-            if (showTerms) {
-                val ctx = LocalContext.current
-                val termsText = remember {
-                    runCatching {
-                        ctx.assets.open("TERMS.md").bufferedReader().use { it.readText() }
-                            .replace("**", "").replace("## ", "").replace("# ", "")
-                    }.getOrDefault("协议加载失败")
-                }
-                val scrollState = rememberScrollState()
-                var remain by remember { mutableStateOf(10) }
-                val reachedBottom = remember { derivedStateOf { scrollState.maxValue > 0 && scrollState.value >= scrollState.maxValue - 4 } }
-                LaunchedEffect(Unit) {
-                    while (remain > 0) {
-                        kotlinx.coroutines.delay(1000)
-                        remain -= 1
-                    }
-                }
-                val canAgree = remain <= 0 && (reachedBottom.value || scrollState.maxValue == 0)
-                WindowDialog(title = "用户协议与免责声明", show = true, onDismissRequest = { }) {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 470.dp)
-                            .padding(horizontal = 20.dp)
-                    ) {
-                        Column(
-                            Modifier
-                                .weight(1f, fill = false)
-                                .fillMaxWidth()
-                                .verticalScroll(scrollState)
-                        ) {
-                            Text(
-                                termsText,
-                                style = COUITheme.textStyles.body2,
-                                color = oneKeyColors().muted
-                            )
-                        }
-                        Text(
-                            when {
-                                canAgree -> "已阅读并滚动到底部，可以继续"
-                                scrollState.maxValue > 0 && !reachedBottom.value -> "请向下滚动阅读全文（还需 " + remain + " 秒）"
-                                else -> "请阅读 " + remain + " 秒后继续"
-                            },
-                            style = COUITheme.textStyles.body2,
-                            color = if (canAgree) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurfaceContainerVariant,
-                            modifier = Modifier.padding(top = 10.dp)
-                        )
-                        DialogActions(
-                            DialogAction("退出", COUIIcons.Close) {
-                                (ctx as? android.app.Activity)?.finish()
-                            },
-                            DialogAction("同意并继续", COUIIcons.Ok, primary = true, enabled = canAgree) {
-                                termsPrefs.edit().putBoolean("terms_accepted_v2", true).apply()
-                                showTerms = false
-                            }
-                        )
-                    }
-                }
-            }
+            if (showTerms) TermsDialog { termsPrefs.edit().putBoolean("terms_accepted_v2", true).apply(); showTerms = false }
 
             if (showNotice && !showTerms) {
                 AppreciationDialog(
@@ -449,172 +337,53 @@ internal fun AppRoot(
                 }
             }
 
-            if (show98260Warning) {
-                WindowDialog(title = "98260 运行前确认", show = true, onDismissRequest = { show98260Warning = false }) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-                        Text("失败后可直接再点一次；只有内核状态异常时才需要硬重启。", style = COUITheme.textStyles.body2)
-                        Text(
-                            "执行过程中将短暂提权并向内核装载特权模块。",
-                            style = COUITheme.textStyles.body2,
-                            color = oneKeyColors().muted,
-                            modifier = Modifier.padding(top = 6.dp)
-                        )
-                        DialogActions(
-                            DialogAction("取消", COUIIcons.Close) { show98260Warning = false },
-                            DialogAction("确认开始", COUIIcons.Play, primary = true) {
-                                show98260Warning = false
-                                controller.runJailbreak()
-                                tab = 1
-                            }
-                        )
-                    }
-                }
-            }
+            if (show98260Warning) RunConfirmDialog(
+                onConfirm = { show98260Warning = false; controller.runJailbreak(); tab = 1 },
+                onDismiss = { show98260Warning = false }
+            )
 
-            if (showFolkPrompt) {
-                WindowDialog(title = "98260 越狱完成", show = true, onDismissRequest = { showFolkPrompt = false }) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-                        Text("98260 临时 root 通道已就绪，特权内核模块已加载。本次开机不再允许重复运行。", style = COUITheme.textStyles.body2)
-                        DialogActions(
-                            DialogAction("稍后", COUIIcons.Close) { showFolkPrompt = false },
-                            DialogAction("打开管理器", COUIIcons.Settings, primary = true) {
-                                showFolkPrompt = false
-                                val pkg = controller.managers.firstOrNull { it.kind == controller.selectedManager }?.pkg
-                                runCatching {
-                                    context.startActivity(
-                                        context.packageManager.getLaunchIntentForPackage(pkg ?: "")
-                                            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    )
-                                }
-                            }
-                        )
-                    }
-                }
-            }
+            if (showFolkPrompt) RunDoneDialog(controller) { showFolkPrompt = false }
 
-            if (showClearHistoryConfirm) {
-                WindowDialog(
-                    title = "清空历史记录",
-                    show = true,
-                    onDismissRequest = { showClearHistoryConfirm = false }
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-                        Text(
-                            "确定清空全部越狱历史与诊断日志吗？\n此操作为物理删除且无法恢复。",
-                            style = COUITheme.textStyles.body2
-                        )
-                        DialogActions(
-                            DialogAction("取消", COUIIcons.Close) { showClearHistoryConfirm = false },
-                            DialogAction("确认清空", COUIIcons.Delete, primary = true) {
-                                showClearHistoryConfirm = false
-                                haptic(CouiHapticEffect.Switch)
-                                scope.launch(Dispatchers.IO) {
-                                    HistoryStore.clear(context)
-                                    reloadHistoryTick++
-                                }
-                                scope.launch { snackbarHostState.showSnackbar("历史记录已清空") }
-                            }
-                        )
-                    }
+            if (showClearHistoryConfirm) ClearHistoryDialog(
+                onCancel = { showClearHistoryConfirm = false },
+                onConfirm = {
+                    showClearHistoryConfirm = false
+                    haptic(CouiHapticEffect.Switch)
+                    scope.launch(Dispatchers.IO) { HistoryStore.clear(context); reloadHistoryTick++ }
+                    scope.launch { snackbarHostState.showSnackbar("历史记录已清空") }
                 }
-            }
+            )
 
             updateInfo?.let { info ->
-                WindowDialog(
-                    title = "发现新版本 · v" + info.versionName + " (" + info.versionCode + ")",
-                    show = true,
-                    onDismissRequest = { if (!updateDownloading) updateInfo = null }
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-                        Text(
-                            "更新时间 " + UpdateChecker.formatTime(info.publishedAt) +
-                                (if (info.size > 0) " · 安装包 " + UpdateChecker.formatSize(info.size) else ""),
-                            style = COUITheme.textStyles.body2,
-                            color = oneKeyColors().muted
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        if (info.versions.isEmpty()) {
-                            Text(
-                                info.changelog.ifBlank { "无更新说明" },
-                                style = COUITheme.textStyles.body2,
-                                modifier = Modifier.verticalScroll(rememberScrollState()).heightIn(max = 240.dp)
-                            )
-                        } else {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 240.dp)
-                                    .verticalScroll(rememberScrollState())
-                            ) {
-                                info.versions.forEach { note ->
-                                    VersionNoteRow(
-                                        note = note,
-                                        expanded = updateExpandedVersion == note.versionCode,
-                                        onToggle = {
-                                            haptic(CouiHapticEffect.Switch)
-                                            updateExpandedVersion =
-                                                if (updateExpandedVersion == note.versionCode) -1 else note.versionCode
-                                        }
-                                    )
+                UpdateDialog(
+                    ui = UpdateUi(info, updateDownloading, updateProgress, updateError, updateExpandedVersion),
+                    onToggleVersion = { v ->
+                        haptic(CouiHapticEffect.Switch)
+                        updateExpandedVersion = if (updateExpandedVersion == v) -1 else v
+                    },
+                    onDownload = {
+                        updateDownloading = true
+                        updateError = null
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                updateProgress = UpdateChecker.Progress(0, 0L, info.size, 0L)
+                                val apk = UpdateChecker.download(context, info) { p ->
+                                    scope.launch(Dispatchers.Main) { updateProgress = p }
+                                }
+                                withContext(Dispatchers.Main) {
+                                    updateDownloading = false
+                                    UpdateChecker.install(context, apk)
+                                }
+                            } catch (e: Throwable) {
+                                withContext(Dispatchers.Main) {
+                                    updateDownloading = false
+                                    updateError = "下载失败：" + (e.message ?: "网络错误")
                                 }
                             }
                         }
-                        updateError?.let { err ->
-                            Text(err, color = oneKeyColors().error, style = COUITheme.textStyles.body2, modifier = Modifier.padding(top = 8.dp))
-                        }
-                        if (updateDownloading) {
-                            LinearProgressIndicator(
-                                progress = updateProgress.percent / 100f,
-                                modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
-                            )
-                            Row(
-                                Modifier.fillMaxWidth().padding(top = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    "下载中 " + updateProgress.percent + "%",
-                                    style = COUITheme.textStyles.body2,
-                                    color = COUITheme.colorScheme.primary
-                                )
-                                Text(
-                                    UpdateChecker.formatSpeed(updateProgress.bytesPerSec) +
-                                        " · 剩余 " + UpdateChecker.formatSize(updateProgress.remaining),
-                                    style = COUITheme.textStyles.body2,
-                                    color = oneKeyColors().muted
-                                )
-                            }
-                        }
-                        DialogActions(
-                            DialogAction("稍后", COUIIcons.Close, enabled = !updateDownloading) { updateInfo = null },
-                            DialogAction(
-                                if (updateDownloading) "下载中…" else "下载并安装",
-                                COUIIcons.Download,
-                                primary = true,
-                                enabled = !updateDownloading
-                            ) {
-                                updateDownloading = true
-                                updateError = null
-                                scope.launch(Dispatchers.IO) {
-                                    try {
-                                        updateProgress = UpdateChecker.Progress(0, 0L, info.size, 0L)
-                                        val apk = UpdateChecker.download(context, info) { p ->
-                                            scope.launch(Dispatchers.Main) { updateProgress = p }
-                                        }
-                                        withContext(Dispatchers.Main) {
-                                            updateDownloading = false
-                                            UpdateChecker.install(context, apk)
-                                        }
-                                    } catch (e: Throwable) {
-                                        withContext(Dispatchers.Main) {
-                                            updateDownloading = false
-                                            updateError = "下载失败：" + (e.message ?: "网络错误")
-                                        }
-                                    }
-                                }
-                            }
-                        )
-                    }
-                }
+                    },
+                    onDismiss = { if (!updateDownloading) updateInfo = null }
+                )
             }
         }
     }
