@@ -3,7 +3,7 @@
 本应用内置的部分引导组件来自公开开源项目，遵循其各自的开源许可证：
 - 早期引导组件（take_slide / writer / forker 等，Apache-2.0）已随执行器换代移除，当前版本不再内置
 - KernelSU / KernelSU-Next / SukiSU Ultra / BakaSU 内核与用户态组件：各自项目许可证
-- COUI 组件库：https://github.com/suqi8/coui
+- COUI 组件库（COUI-Kit）：ItosEO，Mozilla Public License 2.0，https://github.com/ItosEO/COUI-Kit
 - Stellar：https://github.com/roro2239/Stellar
 - Shark 98260 执行器（6.18.21 / 6.12.69）与 6.12 SUSFS 模块：Yunnijian，GPL-3.0 / GPL-2.0
 - pc98260 su/rootd（已全部移除）：Copyright (c) 2026 quyicheng03-boop，MIT；

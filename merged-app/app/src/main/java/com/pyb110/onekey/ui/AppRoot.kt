@@ -69,7 +69,9 @@ internal fun AppRoot(
     controller: JailbreakController,
     appearance: AppearanceMode,
     isDark: Boolean,
+    dynamicColor: Boolean,
     onChangeAppearance: (AppearanceMode) -> Unit,
+    onToggleDynamicColor: (Boolean) -> Unit,
 ) {
     val haptic = rememberCouiHaptic()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -206,7 +208,9 @@ internal fun AppRoot(
                         3 -> AboutScreen(
                             controller = controller,
                             appearance = appearance,
+                            dynamicColor = dynamicColor,
                             onChangeAppearance = onChangeAppearance,
+                            onToggleDynamicColor = onToggleDynamicColor,
                             haptic = haptic,
                             onOpenLog = { tab = 1 },
                             onNotice = { showNotice = true },
@@ -254,6 +258,9 @@ internal fun AppRoot(
 
             // 浮层宿主：底部抽屉等 overlay 组件需要它才能挂到窗口层。
             COUIPopupHost()
+
+            // 轻提示：COUI 无 Snackbar 组件，用其配色在底部渲染。
+            SnackbarHost(state = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
 
             // 抽屉的可见状态提到根级：内容里的开关/筛选变化不会重建它，避免整块弹一下。
             if (sheet != 0) {

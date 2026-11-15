@@ -36,7 +36,7 @@ OneKey（下称"本应用"）在运行过程中会调用、加载或以二进制
 | 98260 执行器 · 6.18.21（内置） | Yunnijian / Shark 项目 | GPL-3.0 | `assets/core/exec/onekey-98260`，取自上游 `libk61821.so`，未修改按原样分发（https://github.com/Yunnijian/Shark） |
 | 98260 执行器 · 6.12.69（内置） | Yunnijian / Shark 项目 | GPL-3.0 | `assets/core/exec/onekey-98260-61269`，取自上游 `libk61269.so`，未修改按原样分发（https://github.com/Yunnijian/Shark） |
 | SUSFS Guard LKM · 6.12（内置） | susfs4ksu / Shark 项目 | GPL-2.0 | `assets/core/exec/susfs_guard_lkm_612.ko`，取自上游 `libsusfs_guard_lkm_612.so`（https://github.com/Yunnijian/Shark） |
-| COUI（Compose 组件库、模糊与偏好组件） | suqi8 | Apache-2.0 | https://github.com/suqi8/coui |
+| COUI-Kit（Compose 组件库、渐变模糊、辉光与控件） | ItosEO | MPL-2.0 | https://github.com/ItosEO/COUI-Kit （坐标 io.github.itoseo:coui，按原样以二进制依赖使用，未修改其源码） |
 | Stellar（特权命令服务通道） | roro2239 | 见其仓库 | https://github.com/roro2239/Stellar |
 | AndroidX / Jetpack Compose / Kotlin | Google、JetBrains | Apache-2.0 | https://developer.android.com/jetpack |
 

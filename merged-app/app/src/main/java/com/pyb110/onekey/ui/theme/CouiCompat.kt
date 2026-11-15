@@ -2,6 +2,7 @@ package com.pyb110.onekey.ui.theme
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import com.itos.coui.input.CouiHapticFeedback
 import com.itos.coui.input.performCouiHapticFeedback
 import com.itos.coui.layout.CouiPageDefaults
-import com.itos.coui.layout.Group
 import com.itos.coui.layout.Item
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.rememberCouiTextStyle
@@ -114,14 +114,35 @@ fun Icon(
     )
 }
 
-/** 卡片分组：直接用 COUI Group。 */
+/**
+ * 卡片分组：用 COUI 的卡片形状与卡片底色自装配。
+ *
+ * 不用 [Group] 是因为它自带 16dp 横向外边距，而页面本身已经给了 12dp，
+ * 叠加会变成 28dp、整页变窄。这里只取它的形状与配色，边距交给页面。
+ */
 @Composable
 fun Card(
     modifier: Modifier = Modifier,
     title: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Group(modifier = modifier, title = title, content = content)
+    Column(modifier.fillMaxWidth()) {
+        if (!title.isNullOrBlank()) {
+            Text(
+                title,
+                style = AppTextStyles.body2,
+                color = CouiTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 6.dp),
+            )
+        }
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(CouiPageDefaults.shape)
+                .background(CouiTheme.colorScheme.card),
+            content = content,
+        )
+    }
 }
 
 /** 列表项：直接用 COUI Item，按压反馈由库内置。 */

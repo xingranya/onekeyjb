@@ -37,7 +37,9 @@ import com.pyb110.onekey.ui.theme.*
 internal fun AboutScreen(
     controller: JailbreakController,
     appearance: AppearanceMode,
+    dynamicColor: Boolean,
     onChangeAppearance: (AppearanceMode) -> Unit,
+    onToggleDynamicColor: (Boolean) -> Unit,
     haptic: (CouiHapticEffect) -> Unit,
     onOpenLog: () -> Unit,
     onNotice: () -> Unit,
@@ -143,10 +145,10 @@ internal fun AboutScreen(
                     ),
                     ListRow(
                         title = "COUI 组件库",
-                        summary = "github.com/itoseo/coui",
+                        summary = "github.com/ItosEO/COUI-Kit · MPL-2.0",
                         icon = COUIIcons.Link,
                         arrow = true,
-                        onClick = { openUrl(context, "https://github.com/itoseo/coui") }
+                        onClick = { openUrl(context, "https://github.com/ItosEO/COUI-Kit") }
                     ),
                     ListRow(
                         title = "Stellar",
@@ -187,7 +189,9 @@ internal fun AboutScreen(
         ) {
             AppearanceSheetContent(
                 current = appearance,
-                onPick = { mode -> haptic(CouiHapticEffect.Switch); onChangeAppearance(mode) }
+                onPick = { mode -> haptic(CouiHapticEffect.Switch); onChangeAppearance(mode) },
+                dynamicColor = dynamicColor,
+                onToggleDynamicColor = { haptic(CouiHapticEffect.Switch); onToggleDynamicColor(it) },
             )
         }
     }
@@ -226,9 +230,11 @@ internal fun AppearancePreview(label: String, palette: OneKeyColors, modifier: M
 internal fun AppearanceSheetContent(
     current: AppearanceMode,
     onPick: (AppearanceMode) -> Unit,
+    dynamicColor: Boolean = false,
+    onToggleDynamicColor: (Boolean) -> Unit = {},
 ) {
     val c = oneKeyColors()
-    Column(Modifier.fillMaxWidth().height(420.dp)) {
+    Column(Modifier.fillMaxWidth().height(500.dp)) {
         Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             AppearancePreview("浅色", LightOneKeyColors, Modifier.weight(1f))
             AppearancePreview("深色", DarkOneKeyColors, Modifier.weight(1f))
@@ -293,6 +299,31 @@ internal fun AppearanceSheetContent(
                         color = c.outline
                     )
                 }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        // 动态取色：跟随壁纸调色板。关闭时使用系统原生预设配色。
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(oneKeyCardColor())) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(COUIIcons.Theme, contentDescription = null, tint = c.primary, modifier = Modifier.size(21.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("动态取色", style = COUITheme.textStyles.body1)
+                    Text(
+                        if (dynamicColorSupported()) "跟随壁纸配色；关闭时使用系统原生配色"
+                        else "当前系统版本不支持，需要 Android 12 及以上",
+                        style = COUITheme.textStyles.body2,
+                        color = c.muted
+                    )
+                }
+                Switch(
+                    checked = dynamicColor,
+                    onCheckedChange = { onToggleDynamicColor(it) },
+                    enabled = dynamicColorSupported(),
+                )
             }
         }
         Spacer(Modifier.height(10.dp))
