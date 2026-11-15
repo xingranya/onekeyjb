@@ -23,6 +23,8 @@ import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -60,13 +62,29 @@ object AppColorScheme {
     val accent: Color @Composable get() = CouiTheme.colorScheme.accent
 }
 
-/** 语义字号 → COUI 排版。 */
+/**
+ * 语义字号 → COUI 排版。
+ *
+ * 字号沿用项目原本的五档（body1 16sp / body2 14sp / headline1 16sp /
+ * headline2 16sp / subtitle 14sp 加粗），只把字体族与行高换成 COUI 的。
+ * 直接把 headline1 映射到 COUI 的 HomeTitle 会变成 40sp，顶栏标题会爆掉。
+ */
 object AppTextStyles {
-    val body1: TextStyle @Composable get() = rememberCouiTextStyle(CouiTextKind.ItemTitle)
-    val body2: TextStyle @Composable get() = rememberCouiTextStyle(CouiTextKind.ItemSummary)
-    val headline1: TextStyle @Composable get() = rememberCouiTextStyle(CouiTextKind.HomeTitle)
-    val headline2: TextStyle @Composable get() = rememberCouiTextStyle(CouiTextKind.TopBar)
-    val subtitle: TextStyle @Composable get() = rememberCouiTextStyle(CouiTextKind.GroupTitle)
+    val body1: TextStyle @Composable
+        get() = rememberCouiTextStyle(CouiTextKind.ItemTitle)
+
+    val body2: TextStyle @Composable
+        get() = rememberCouiTextStyle(CouiTextKind.ItemSummary).copy(fontSize = 14.sp)
+
+    val headline1: TextStyle @Composable
+        get() = rememberCouiTextStyle(CouiTextKind.ItemTitle)
+
+    val headline2: TextStyle @Composable
+        get() = rememberCouiTextStyle(CouiTextKind.ItemTitle)
+
+    val subtitle: TextStyle @Composable
+        get() = rememberCouiTextStyle(CouiTextKind.ItemSummary)
+            .copy(fontSize = 14.sp, fontWeight = FontWeight.Bold)
 }
 
 /** 与既有调用签名一致的文本入口，样式取自 COUI 排版。 */

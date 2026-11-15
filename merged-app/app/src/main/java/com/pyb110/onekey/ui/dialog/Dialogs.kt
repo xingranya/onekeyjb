@@ -49,25 +49,25 @@ internal fun DiagnosticsDialog(
             BasicComponent(
                 title = "环境检查",
                 summary = "服务通道、已装管理器与 SU 挂载",
-                startAction = { Icon(COUIIcons.Search, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
+                startAction = { Icon(COUIIcons.Search, contentDescription = null, tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
                 onClick = { controller.selfCheck(); onMessage("正在检查环境"); onDismiss(); onOpenLog() }
             )
             BasicComponent(
                 title = "修复截屏扩展",
                 summary = "启用 exsystemservice 组件",
-                startAction = { Icon(COUIIcons.ScreenCapture, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
+                startAction = { Icon(COUIIcons.ScreenCapture, contentDescription = null, tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
                 onClick = { controller.repairScreenshot(); onMessage("正在修复截屏"); onDismiss(); onOpenLog() }
             )
             BasicComponent(
                 title = "恢复安全组件",
                 summary = "重新启用 securityguard 与 safecenter",
-                startAction = { Icon(COUIIcons.Unlock, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
+                startAction = { Icon(COUIIcons.Unlock, contentDescription = null, tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
                 onClick = { controller.restoreSecurityComponents(); onMessage("正在恢复安全组件"); onDismiss(); onOpenLog() }
             )
             BasicComponent(
                 title = "导出设备诊断",
                 summary = "提取内核与 SELinux 状态至日志",
-                startAction = { Icon(COUIIcons.Report, contentDescription = null, modifier = Modifier.padding(end = 14.dp), tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
+                startAction = { Icon(COUIIcons.Report, contentDescription = null, tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
                 onClick = { controller.collectDiagnostics(); onMessage("已导出诊断信息"); onDismiss(); onOpenLog() }
             )
             Spacer(Modifier.height(8.dp))

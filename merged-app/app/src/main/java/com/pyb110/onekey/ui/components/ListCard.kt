@@ -70,7 +70,7 @@ fun ListCard(
                                 Icon(
                                     row.icon,
                                     contentDescription = null,
-                                    modifier = Modifier.padding(end = 14.dp),
+                                    
                                     tint = row.iconTint ?: COUITheme.colorScheme.primary,
                                 )
                             }
