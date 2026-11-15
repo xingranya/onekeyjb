@@ -35,6 +35,7 @@ import com.itos.coui.layout.Item
 import com.itos.coui.text.CouiTextKind
 import com.itos.coui.text.rememberCouiTextStyle
 import com.itos.coui.theme.CouiTheme
+import com.itos.coui.theme.LocalCouiContentColor
 
 /**
  * COUI 兼容层：把项目里既有的调用名映射到 io.github.itoseo:coui 的真实组件与主题。
@@ -105,7 +106,8 @@ fun Text(
         text = text,
         modifier = modifier,
         style = style.copy(
-            color = color.takeOrElse { CouiTheme.colorScheme.onSurface },
+            // 优先跟随所在 Surface 的前景色（按钮、提示条），否则用正文色。
+            color = color.takeOrElse { LocalCouiContentColor.current.takeOrElse { CouiTheme.colorScheme.onSurface } },
             textAlign = textAlign ?: style.textAlign,
             fontSize = if (fontSize == androidx.compose.ui.unit.TextUnit.Unspecified) style.fontSize else fontSize,
             fontFamily = fontFamily ?: style.fontFamily,
