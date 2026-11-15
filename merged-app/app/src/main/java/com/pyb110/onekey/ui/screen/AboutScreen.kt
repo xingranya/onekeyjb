@@ -143,10 +143,10 @@ internal fun AboutScreen(
                     ),
                     ListRow(
                         title = "COUI 组件库",
-                        summary = "github.com/suqi8/coui",
+                        summary = "github.com/itoseo/coui",
                         icon = COUIIcons.Link,
                         arrow = true,
-                        onClick = { openUrl(context, "https://github.com/suqi8/coui") }
+                        onClick = { openUrl(context, "https://github.com/itoseo/coui") }
                     ),
                     ListRow(
                         title = "Stellar",

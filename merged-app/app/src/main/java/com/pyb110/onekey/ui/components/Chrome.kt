@@ -23,20 +23,19 @@ import androidx.compose.ui.unit.sp
 import com.pyb110.onekey.BuildConfig
 import com.pyb110.onekey.JailbreakController
 import com.pyb110.onekey.ui.oneKeyColors
-import com.pyb110.onekey.ui.theme.LayerBackdrop
-import com.pyb110.onekey.ui.theme.blur
-import com.pyb110.onekey.ui.theme.drawBackdrop
-import com.pyb110.onekey.ui.theme.COUIIcons
-import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.effect.CouiFloatingRenderer
+import com.itos.coui.navigation.CouiNavigationItem
+import com.itos.coui.navigation.NavigationBar as CouiNavigationBar
 
 internal object BarBlurDefaults {
-    const val topRadius = 18f
-    const val bottomRadius = 16f
+    // COUI 的材质观感靠真实离屏模糊，不靠厚遮罩；scrim 只补一点对比度。
+    const val topRadius = 28f
+    const val bottomRadius = 28f
     val topFade = 0.dp          // 顶栏不做淡出，滚动内容彻底被挡住
     val bottomFade = 16.dp
-    const val topScrim = 0.82f  // 磨砂可透视，但下方内容已被模糊，不再出现清晰叠字
-    const val bottomScrim = 0.88f
+    const val topScrim = 0.34f
+    const val bottomScrim = 0.40f
 }
 
 /** 只对调用它的那一层做竖向 alpha 淡出。 */
@@ -257,6 +256,33 @@ internal fun AppBottomBar(
     onHeight: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Android 14+ 用 COUI 原生底栏：渐变模糊、metaball 融合与选中辉光都由库负责。
+    if (android.os.Build.VERSION.SDK_INT >= 34) {
+        val renderer = remember { runCatching { CouiFloatingRenderer() }.getOrNull() }
+        if (renderer != null) {
+            CouiNavigationBar(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
+                    .onSizeChanged { onHeight(it.height) },
+                backdrop = backdrop,
+                renderer = renderer,
+                items = remember {
+                    listOf(
+                        CouiNavigationItem("首页", COUIIcons.Home),
+                        CouiNavigationItem("日志", COUIIcons.Notes),
+                        CouiNavigationItem("历史", COUIIcons.Recent),
+                        CouiNavigationItem("关于", COUIIcons.Info),
+                    )
+                },
+                selectedIndex = selected,
+                onSelection = onSelect,
+            )
+            return
+        }
+    }
+    // Android 13 或着色器不可用：退回自绘栏，功能一致。
     BlurBar(
         backdrop = backdrop,
         shape = RoundedCornerShape(30.dp),
