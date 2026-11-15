@@ -12,6 +12,7 @@ import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.dialog.CouiDialogDefaults
 
 internal data class UpdateUi(
     val info: UpdateChecker.Info,
@@ -42,7 +43,7 @@ internal fun UpdateDialog(
                 ) { onDownload() },
             ),
         ) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = CouiDialogDefaults.contentPadding)) {
                 Text(
                     "更新时间 " + UpdateChecker.formatTime(ui.info.publishedAt) +
                         (if (ui.info.size > 0) " · 安装包 " + UpdateChecker.formatSize(ui.info.size) else ""),

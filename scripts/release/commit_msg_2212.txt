@@ -1,0 +1,15 @@
+ui: fix the bottom bar, dialog padding and button metrics (2.21.2)
+
+- LocalAppBackdrop was declared but never provided, so the bottom bar always
+  took the fallback branch and looked like the old hand-built one. Drop it and
+  rely on the backdrop the COUI Scaffold supplies to its bottomBar slot, which
+  restores the real blur and the metaball merge.
+- dialogs used a 20dp content padding; COUI specifies 24dp. Point all eight at
+  CouiDialogDefaults.contentPadding instead of a literal.
+- PanelButton and DialogActionButton were 46dp tall with body1 text. COUI uses
+  CouiDialogDefaults.buttonHeight (44dp) with the smaller label, so the blue
+  button now matches the library. HistoryScreen no longer overrides the height.
+
+compileReleaseKotlin + JavaWithJavac + testDebugUnitTest + assembleRelease green
+tests 4/0/0; APK 16,337,090 B
+versionCode 211 / versionName 2.21.2

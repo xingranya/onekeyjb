@@ -185,7 +185,7 @@ internal fun HistoryScreen(
                 Spacer(Modifier.height(16.dp))
                 Surface(
                     onClick = { haptic(CouiHapticEffect.Switch); onClearRequest() },
-                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     shape = CouiShape(14.dp, 2f),
                     color = COUITheme.colorScheme.surfaceContainer
                 ) {

@@ -12,6 +12,7 @@ import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.dialog.CouiDialogDefaults
 
 @Composable
 internal fun TermsDialog(onAccept: () -> Unit) {
@@ -47,7 +48,7 @@ internal fun TermsDialog(onAccept: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .heightIn(max = 470.dp)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = CouiDialogDefaults.contentPadding)
         ) {
             Column(
                 Modifier

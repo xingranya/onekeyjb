@@ -10,6 +10,7 @@ import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.components.ManualSection
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.dialog.CouiDialogDefaults
 
 @Composable
 internal fun ManualDialog(onDismiss: () -> Unit) {
@@ -24,7 +25,7 @@ internal fun ManualDialog(onDismiss: () -> Unit) {
                 .fillMaxWidth()
                 .heightIn(max = 460.dp)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = CouiDialogDefaults.contentPadding)
         ) {
             ManualSection("一、准备", listOf(
                 "安装要用的管理器（KernelSU / KernelSU-Next / SukiSU / BakaSU / FinaSU 之一），App 不再内置管理器和模块。",

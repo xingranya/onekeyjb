@@ -8,6 +8,7 @@ import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.dialog.CouiDialogDefaults
 
 @Composable
 internal fun ClearHistoryDialog(onCancel: () -> Unit, onConfirm: () -> Unit) {
@@ -20,7 +21,7 @@ internal fun ClearHistoryDialog(onCancel: () -> Unit, onConfirm: () -> Unit) {
             DialogAction("确认清空", COUIIcons.Delete, primary = true) { onConfirm() },
         ),
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = CouiDialogDefaults.contentPadding)) {
             Text(
                 "确定清空全部越狱历史与诊断日志吗？\n此操作为物理删除且无法恢复。",
                 style = COUITheme.textStyles.body2

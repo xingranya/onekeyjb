@@ -35,6 +35,7 @@ import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
 import com.itos.coui.shape.CouiShape
+import com.itos.coui.dialog.CouiDialogDefaults
 
 @Composable
 internal fun DiagnosticsDialog(
@@ -103,7 +104,7 @@ internal fun AppreciationDialog(onMessage: (String) -> Unit, onDismiss: (Boolean
             DialogAction("知道了", COUIIcons.Ok, primary = true) { close() },
         ),
     ) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = CouiDialogDefaults.contentPadding), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("倒卖必究", style = COUITheme.textStyles.subtitle, color = oneKeyColors().error)
             Text("本工具免费分享，禁止倒卖。QQ群：1121682811。赞赏完全自愿，不影响任何功能。", style = COUITheme.textStyles.body2, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
             Image(painterResource(R.drawable.appreciation), contentDescription = "作者赞赏码", modifier = Modifier.fillMaxWidth().height(220.dp).clip(CouiShape(12.dp, 2f)))

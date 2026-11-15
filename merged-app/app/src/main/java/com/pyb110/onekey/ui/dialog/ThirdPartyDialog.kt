@@ -15,6 +15,7 @@ import com.pyb110.onekey.ui.components.MarkdownText
 import com.pyb110.onekey.ui.openUrl
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.dialog.CouiDialogDefaults
 
 @Composable
 internal fun ThirdPartyDialog(onDismiss: () -> Unit) {
@@ -41,7 +42,7 @@ internal fun ThirdPartyDialog(onDismiss: () -> Unit) {
                 .fillMaxWidth()
                 .heightIn(max = 480.dp)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = CouiDialogDefaults.contentPadding)
         ) {
             MarkdownText(
                 markdown = noticeText,

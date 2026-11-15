@@ -9,6 +9,7 @@ import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.dialog.CouiDialogDefaults
 
 @Composable
 internal fun RunConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
@@ -21,7 +22,7 @@ internal fun RunConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
             DialogAction("确认开始", COUIIcons.Play, primary = true) { onConfirm() },
         ),
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = CouiDialogDefaults.contentPadding)) {
             Text("失败后可直接再点一次；只有内核状态异常时才需要硬重启。", style = COUITheme.textStyles.body2)
             Text(
                 "执行过程中将短暂提权并向内核装载特权模块。",

@@ -18,6 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import com.itos.coui.dialog.CouiDialogDefaults
 import com.itos.coui.effect.SpotlightPreset
 import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.effect.rememberCouiSpotlight
@@ -62,7 +63,7 @@ private fun DialogActionButton(action: DialogAction, modifier: Modifier = Modifi
     val shape = CouiCapsuleShape
     Box(
         modifier
-            .height(46.dp)
+            .height(CouiDialogDefaults.buttonHeight)
             .clip(shape)
             .background(if (action.primary) accent else CouiTheme.colorScheme.container)
             .couiButtonFeedback(dark, interaction, action.enabled)
@@ -133,7 +134,7 @@ internal fun PanelButton(
     val shape = CouiCapsuleShape
     Box(
         modifier
-            .height(46.dp)
+            .height(CouiDialogDefaults.buttonHeight)
             .clip(shape)
             .background(if (primary && enabled) accent else CouiTheme.colorScheme.container)
             .couiButtonFeedback(dark, interaction, enabled)
@@ -144,7 +145,7 @@ internal fun PanelButton(
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text,
-                    style = COUITheme.textStyles.body1,
+                    style = COUITheme.textStyles.body2,
                     color = when {
                         primary && enabled -> CouiTheme.colorScheme.onAccent
                         enabled -> accent

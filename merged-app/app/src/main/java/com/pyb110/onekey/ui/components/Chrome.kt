@@ -221,11 +221,9 @@ internal fun AppBottomBar(
     onHeight: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Android 14+ 用 COUI 原生底栏：渐变模糊、metaball 融合与选中辉光都由库负责。
-    // 它放在 COUI Scaffold 的 bottomBar 槽里，由库为该槽提供与正文同源的采样源；
-    // 自行塞进正文 Box 再手动传 backdrop 会因采样源错位画成黑色块。
-    val backdrop = LocalAppBackdrop.current
-    if (android.os.Build.VERSION.SDK_INT >= 34 && backdrop != null) {
+    // COUI 原生底栏。它位于 Scaffold 的 bottomBar 槽里，库已为该槽提供与正文
+    // 同源的采样源（LocalCouiBackdrop），所以不传 backdrop —— 传了反而错位。
+    if (android.os.Build.VERSION.SDK_INT >= 34) {
         val renderer = remember { runCatching { CouiFloatingRenderer() }.getOrNull() }
         if (renderer != null) {
             CouiNavigationBar(
@@ -233,7 +231,6 @@ internal fun AppBottomBar(
                     .fillMaxWidth()
                     .padding(horizontal = 18.dp, vertical = 10.dp)
                     .onSizeChanged { onHeight(it.height) },
-                backdrop = backdrop,
                 renderer = renderer,
                 items = remember {
                     listOf(
@@ -249,38 +246,18 @@ internal fun AppBottomBar(
             return
         }
     }
-    // Android 13 或采样源未就绪：退回实心栏，功能一致。
-    if (backdrop == null) {
-        Box(
-            modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
-                .height(70.dp)
-                .clip(CouiShape(30.dp, 2f))
-                .background(COUITheme.colorScheme.surfaceContainer)
-                .onSizeChanged { onHeight(it.height) },
-            contentAlignment = Alignment.Center,
-        ) { AppBottomBarContent(selected = selected, onSelect = onSelect) }
-        return
-    }
-    BlurBar(
-        backdrop = backdrop,
-        shape = CouiShape(30.dp, 2f),
-        radius = BarBlurDefaults.bottomRadius,
-        scrim = BarBlurDefaults.bottomScrim,
-        fade = BarBlurDefaults.bottomFade,
-        fromBottom = false,
-        modifier = modifier
+    // Android 13 无浮动材质：用同一套 COUI 配色的平铺栏位。
+    Box(
+        modifier
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
-            .height(70.dp),
-        onHeight = onHeight,
+            .height(70.dp)
+            .clip(CouiShape(30.dp, 2f))
+            .background(COUITheme.colorScheme.surfaceContainer)
+            .onSizeChanged { onHeight(it.height) },
         contentAlignment = Alignment.Center,
-    ) {
-        AppBottomBarContent(selected = selected, onSelect = onSelect)
-    }
+    ) { AppBottomBarContent(selected = selected, onSelect = onSelect) }
 }
 
 @Composable

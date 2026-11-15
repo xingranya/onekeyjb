@@ -11,6 +11,7 @@ import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.dialog.CouiDialogDefaults
 
 @Composable
 internal fun RunDoneDialog(controller: JailbreakController, onDismiss: () -> Unit) {
@@ -33,7 +34,7 @@ internal fun RunDoneDialog(controller: JailbreakController, onDismiss: () -> Uni
             },
         ),
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = CouiDialogDefaults.contentPadding)) {
             Text(
                 "98260 临时 root 通道已就绪，特权内核模块已加载。本次开机不再允许重复运行。",
                 style = COUITheme.textStyles.body2
