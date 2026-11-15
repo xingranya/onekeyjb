@@ -227,9 +227,11 @@ internal fun AppBottomBar(
         val renderer = remember { runCatching { CouiFloatingRenderer() }.getOrNull() }
         if (renderer != null) {
             CouiNavigationBar(
+                // 左右外边距收窄到 8dp：库的栏体是 fillMaxWidth，收窄外边距等于把栏拉宽，
+                // 每项的点击区域随之变大；库内部再按 12dp + 8dp 间隔排布四个项。
                 modifier = modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 10.dp)
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
                     .onSizeChanged { onHeight(it.height) },
                 renderer = renderer,
                 items = remember {
@@ -252,8 +254,8 @@ internal fun AppBottomBar(
         modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
-            .height(70.dp)
+            .padding(start = 8.dp, end = 8.dp, bottom = 10.dp)
+            .height(72.dp)
             .clip(CouiShape(30.dp, 2f))
             .background(COUITheme.colorScheme.surfaceContainer)
             .onSizeChanged { onHeight(it.height) },

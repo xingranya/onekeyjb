@@ -13,22 +13,21 @@ with urllib.request.urlopen("https://cnb.cool/xingranya/onekeyjb/-/releases/down
     doc = json.load(r)
 
 notes = [
-    "所有按钮改为 COUI 弹性按钮：按下有缩放回弹，与环境诊断里的按钮一致",
-    "修复弹窗与抽屉无法上下滑动的问题",
-    "修复抽屉下滑被当成返回手势、以及占满整屏的问题",
-    "弹窗关闭恢复过渡动画，不再瞬间消失",
-    "其余交互与越狱逻辑未改动",
+    "修复开机自动越狱在系统仍繁忙时开跑导致连续失败的问题：现在会等系统真正启动完成再执行",
+    "系统长时间高负载时会跳过本次自动越狱并提示，不再反复冲击内核",
+    "底栏图标改为未选中线稿、选中实心",
+    "其余交互未改动",
 ]
-doc["versionCode"] = 214
-doc["versionName"] = "2.21.5"
-doc["publishedAt"] = "2026-11-15T15:40:00+08:00"
+doc["versionCode"] = 215
+doc["versionName"] = "2.21.6"
+doc["publishedAt"] = "2026-11-15T15:55:00+08:00"
 doc["size"] = size
 doc["sha256"] = sha
-doc["changelog"] = "v2.21.5\n\n" + "\n".join("- " + n for n in notes)
-vs = [v for v in doc.get("versions", []) if v.get("versionCode") != 214]
-vs.insert(0, {"versionName": "2.21.5", "versionCode": 214, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
+doc["changelog"] = "v2.21.6\n\n" + "\n".join("- " + n for n in notes)
+vs = [v for v in doc.get("versions", []) if v.get("versionCode") != 215]
+vs.insert(0, {"versionName": "2.21.6", "versionCode": 215, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
 doc["versions"] = vs
-open("/tmp/upd-2215.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
+open("/tmp/upd-2216.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
 print("versions", len(vs))
 
 def api(url, data=None, method="POST"):
@@ -51,7 +50,7 @@ def upload(name, path):
     print("upload", name, "put", put, "verify", st2, flush=True)
 
 upload("OneKeyJB-latest.apk", APK)
-upload("update.json", "/tmp/upd-2215.json")
+upload("update.json", "/tmp/upd-2216.json")
 upload("OneKey-Knowledge.md", R + "/dist/OneKey-Knowledge.md")
 upload("onekey-kb.json", R + "/knowledge/ai-kb/onekey-kb.json")
 upload("onekey-kb.docs.json", R + "/knowledge/ai-kb/onekey-kb.docs.json")

@@ -1,0 +1,13 @@
+ui: fix the stretched button, widen the bottom bar (2.21.7)
+
+- Button had no height cap. Inside FullPageStatement's fillMaxSize Column the
+  Surface consumed all remaining height and the capsule stretched into a huge
+  oval. Cap it at CouiDialogDefaults.buttonHeight and give the primary action a
+  widthIn(min = 160.dp).
+- the bottom bar is fillMaxWidth inside the library, so its width cannot grow
+  directly; narrow the outer margin from 18dp to 8dp instead, which widens the
+  bar and every item's hit area. The fallback bar follows, 70dp to 72dp.
+
+compileReleaseKotlin + JavaWithJavac + testDebugUnitTest + assembleRelease green
+tests 4/0/0; APK 16,353,478 B
+versionCode 216 / versionName 2.21.7

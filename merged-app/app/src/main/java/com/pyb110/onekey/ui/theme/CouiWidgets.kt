@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -263,12 +264,14 @@ fun Button(
         rememberCouiSpotlight(interactive = enabled, preset = SpotlightPreset.OpaqueMedium1, dark = dark)
     } else Modifier to null
     Surface(
-        modifier = modifier, onClick = onClick, shape = shape,
+        // 必须给高度上限：放进 fillMaxSize 的 Column 时，Surface 会吃掉全部剩余高度，
+        // 胶囊形状被拉成巨大椭圆。COUI 按钮就是 44dp 单行。
+        modifier = modifier.height(CouiDialogDefaults.buttonHeight), onClick = onClick, shape = shape,
         color = CouiTheme.colorScheme.accent, contentColor = CouiTheme.colorScheme.onAccent, enabled = enabled,
     ) {
         Box(Modifier.fillMaxSize()) {
             Row(
-                Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 12.dp),
+                Modifier.fillMaxSize().padding(horizontal = 22.dp),
                 horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
             ) { content() }
             if (drawLight != null) Box(Modifier.fillMaxSize().then(lightModifier).drawBehind(drawLight))
@@ -328,7 +331,9 @@ fun FullPageStatement(
         Box(Modifier.height(10.dp))
         Text(content, style = AppTextStyles.body2, color = CouiTheme.colorScheme.onSurfaceVariant)
         Box(Modifier.height(20.dp))
-        Button(onClick = onPrimaryButtonClick) { Text(primaryButtonText, style = AppTextStyles.body1) }
+        Button(onClick = onPrimaryButtonClick, modifier = Modifier.widthIn(min = 160.dp)) {
+            Text(primaryButtonText, style = AppTextStyles.body1)
+        }
     }
 }
 
