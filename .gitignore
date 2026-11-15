@@ -12,3 +12,7 @@ keystore/
 # 本地备份
 *.bak
 *.p*bak
+
+# 发布产物：APK 只走 GitHub Release 与 CNB，不进仓库
+artifacts/*.apk
+dist/*.apk
