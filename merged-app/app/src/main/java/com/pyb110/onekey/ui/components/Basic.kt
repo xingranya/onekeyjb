@@ -4,7 +4,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,6 +14,15 @@ import androidx.compose.ui.unit.dp
 import com.pyb110.onekey.R
 import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.theme.COUITheme
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import com.itos.coui.effect.SpotlightPreset
+import com.itos.coui.effect.couiButtonFeedback
+import com.itos.coui.effect.rememberCouiSpotlight
+import com.itos.coui.shape.CouiCapsuleShape
+import com.itos.coui.theme.CouiTheme
 import com.pyb110.onekey.ui.theme.*
 
 data class DialogAction(
@@ -33,24 +41,55 @@ internal fun DialogActions(vararg actions: DialogAction) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         actions.forEach { action ->
-            Surface(
-                onClick = action.onClick,
-                enabled = action.enabled,
-                modifier = Modifier.weight(1f).height(46.dp),
-                shape = RoundedCornerShape(14.dp),
-                color = if (action.primary) COUITheme.colorScheme.primary else COUITheme.colorScheme.surfaceContainer,
-                contentColor = if (action.primary) COUITheme.colorScheme.onPrimary else COUITheme.colorScheme.onSurface
+            DialogActionButton(action, Modifier.weight(1f))
+        }
+    }
+}
+
+/** 单个弹窗动作按钮：COUI 胶囊、强调色与跟手辉光。 */
+@Composable
+private fun DialogActionButton(action: DialogAction, modifier: Modifier = Modifier) {
+    val dark = CouiTheme.isDark
+    val accent = CouiTheme.colorScheme.accent
+    val (lightModifier, drawLight) = if (android.os.Build.VERSION.SDK_INT >= 33 && action.enabled) {
+        rememberCouiSpotlight(
+            interactive = true,
+            preset = if (action.primary) SpotlightPreset.OpaqueMedium1 else SpotlightPreset.OpaqueMedium2,
+            dark = dark,
+        )
+    } else Modifier to null
+    val interaction = remember { MutableInteractionSource() }
+    val shape = CouiCapsuleShape
+    Box(
+        modifier
+            .height(46.dp)
+            .clip(shape)
+            .background(if (action.primary) accent else CouiTheme.colorScheme.container)
+            .couiButtonFeedback(dark, interaction, action.enabled)
+            .clickable(interaction, null, action.enabled, onClick = action.onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            Row(
+                Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(action.icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(action.label, style = COUITheme.textStyles.body2)
-                }
+                Icon(
+                    action.icon, contentDescription = null, modifier = Modifier.size(18.dp),
+                    tint = if (action.primary) CouiTheme.colorScheme.onAccent
+                           else if (action.enabled) accent
+                           else CouiTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    action.label, style = COUITheme.textStyles.body2,
+                    color = if (action.primary) CouiTheme.colorScheme.onAccent
+                            else if (action.enabled) accent
+                            else CouiTheme.colorScheme.onSurfaceVariant
+                )
             }
+            if (drawLight != null) Box(Modifier.fillMaxSize().then(lightModifier).drawBehind(drawLight))
         }
     }
 }
@@ -81,23 +120,39 @@ internal fun PanelButton(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier.height(46.dp),
-        shape = RoundedCornerShape(14.dp),
-        enabled = enabled,
-        color = if (primary && enabled) COUITheme.colorScheme.primary else COUITheme.colorScheme.surfaceContainer
+    val dark = CouiTheme.isDark
+    val accent = CouiTheme.colorScheme.accent
+    val (lightModifier, drawLight) = if (android.os.Build.VERSION.SDK_INT >= 33 && enabled) {
+        rememberCouiSpotlight(
+            interactive = true,
+            preset = if (primary) SpotlightPreset.OpaqueMedium1 else SpotlightPreset.OpaqueMedium2,
+            dark = dark,
+        )
+    } else Modifier to null
+    val interaction = remember { MutableInteractionSource() }
+    val shape = CouiCapsuleShape
+    Box(
+        modifier
+            .height(46.dp)
+            .clip(shape)
+            .background(if (primary && enabled) accent else CouiTheme.colorScheme.container)
+            .couiButtonFeedback(dark, interaction, enabled)
+            .clickable(interaction, null, enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text,
-                style = COUITheme.textStyles.body1,
-                color = when {
-                    primary && enabled -> COUITheme.colorScheme.onPrimary
-                    enabled -> COUITheme.colorScheme.primary
-                    else -> COUITheme.colorScheme.onSurfaceContainerVariant
-                }
-            )
+        Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text,
+                    style = COUITheme.textStyles.body1,
+                    color = when {
+                        primary && enabled -> CouiTheme.colorScheme.onAccent
+                        enabled -> accent
+                        else -> CouiTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            }
+            if (drawLight != null) Box(Modifier.fillMaxSize().then(lightModifier).drawBehind(drawLight))
         }
     }
 }

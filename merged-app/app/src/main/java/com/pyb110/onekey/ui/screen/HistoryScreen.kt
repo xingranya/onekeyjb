@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.shape.CouiShape
 
 @Composable
 internal fun HistoryScreen(
@@ -186,7 +186,7 @@ internal fun HistoryScreen(
                 Surface(
                     onClick = { haptic(CouiHapticEffect.Switch); onClearRequest() },
                     modifier = Modifier.fillMaxWidth().height(46.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = CouiShape(14.dp, 2f),
                     color = COUITheme.colorScheme.surfaceContainer
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

@@ -16,7 +16,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,11 +30,11 @@ import com.pyb110.onekey.R
 import com.pyb110.onekey.UpdateChecker
 import com.pyb110.onekey.ui.components.ButtonIconText
 import com.pyb110.onekey.ui.components.DialogAction
-import com.pyb110.onekey.ui.components.DialogActions
 import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.shape.CouiShape
 
 @Composable
 internal fun DiagnosticsDialog(
@@ -44,7 +43,12 @@ internal fun DiagnosticsDialog(
     onOpenLog: () -> Unit,
     onMessage: (String) -> Unit,
 ) {
-    WindowDialog(title = "环境诊断", show = true, onDismissRequest = onDismiss) {
+    WindowDialog(
+        title = "环境诊断",
+        show = true,
+        onDismissRequest = onDismiss,
+        actions = listOf(DialogAction("关闭", COUIIcons.Close, primary = true) { onDismiss() }),
+    ) {
         Column(Modifier.fillMaxWidth()) {
             BasicComponent(
                 title = "环境检查",
@@ -70,13 +74,7 @@ internal fun DiagnosticsDialog(
                 startAction = { Icon(COUIIcons.Report, contentDescription = null, tint = COUITheme.colorScheme.onSurfaceContainerVariant) },
                 onClick = { controller.collectDiagnostics(); onMessage("已导出诊断信息"); onDismiss(); onOpenLog() }
             )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
-            ) {
-                ButtonIconText(COUIIcons.Close, "关闭")
-            }
+            Spacer(Modifier.height(4.dp))
         }
     }
 }
@@ -91,26 +89,28 @@ internal fun AppreciationDialog(onMessage: (String) -> Unit, onDismiss: (Boolean
         dismiss?.invoke()
         onDismiss(s)
     }
-    WindowDialog(title = "免费声明 · 禁止倒卖", show = true, onDismissRequest = { close() }) {
+    WindowDialog(
+        title = "免费声明 · 禁止倒卖",
+        show = true,
+        onDismissRequest = { close() },
+        actions = listOf(
+            DialogAction("复制群号", COUIIcons.Copy) {
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("qq", "1121682811"))
+                onMessage("群号已复制")
+            },
+            DialogAction("保存相册", COUIIcons.Download) { saveAppreciation(context, onMessage) },
+            DialogAction("知道了", COUIIcons.Ok, primary = true) { close() },
+        ),
+    ) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("倒卖必究", style = COUITheme.textStyles.subtitle, color = oneKeyColors().error)
             Text("本工具免费分享，禁止倒卖。QQ群：1121682811。赞赏完全自愿，不影响任何功能。", style = COUITheme.textStyles.body2, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
-            Image(painterResource(R.drawable.appreciation), contentDescription = "作者赞赏码", modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(12.dp)))
+            Image(painterResource(R.drawable.appreciation), contentDescription = "作者赞赏码", modifier = Modifier.fillMaxWidth().height(220.dp).clip(CouiShape(12.dp, 2f)))
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("不再提示", style = COUITheme.textStyles.body2, modifier = Modifier.weight(1f))
                 Switch(checked = dontShow, onCheckedChange = { dontShow = it })
             }
-            DialogActions(
-                DialogAction("复制群号", COUIIcons.Copy) {
-                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    cm.setPrimaryClip(ClipData.newPlainText("qq", "1121682811"))
-                    onMessage("群号已复制")
-                },
-                DialogAction("保存相册", COUIIcons.Download) {
-                    saveAppreciation(context, onMessage)
-                },
-                DialogAction("知道了", COUIIcons.Ok, primary = true) { close() }
-            )
         }
     }
 }
@@ -159,7 +159,7 @@ internal fun VersionNoteRow(
         Modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(CouiShape(12.dp, 2f))
             .background(COUITheme.colorScheme.surfaceContainer)
             .clickable { onToggle() }
             .padding(horizontal = 12.dp, vertical = 10.dp)

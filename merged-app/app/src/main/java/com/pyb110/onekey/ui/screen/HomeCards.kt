@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +28,7 @@ import com.pyb110.onekey.ui.shortKernelVersion
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.shape.CouiShape
 
 @Composable
 internal fun HeroCard(controller: JailbreakController) {
@@ -42,9 +42,9 @@ internal fun HeroCard(controller: JailbreakController) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(CouiShape(20.dp, 2f))
             .background(oneKeyDeviceColor())
-            .border(1.dp, oneKeyCardOutline(), RoundedCornerShape(20.dp))
+            .border(1.dp, oneKeyCardOutline(), CouiShape(20.dp, 2f))
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.Top) {

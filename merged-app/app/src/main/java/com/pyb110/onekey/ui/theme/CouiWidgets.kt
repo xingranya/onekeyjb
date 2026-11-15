@@ -1,5 +1,6 @@
 package com.pyb110.onekey.ui.theme
 
+import android.os.Build
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,7 +21,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -35,13 +35,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import com.itos.coui.backdrop.CouiBackdrop
+import com.itos.coui.dialog.CouiDialogAction
+import com.itos.coui.dialog.CouiDialogActionStyle
 import com.itos.coui.dialog.CouiDialogDefaults
+import com.itos.coui.dialog.CouiDialogPlacement
+import com.itos.coui.dialog.Dialog as CouiDialog
+import com.pyb110.onekey.ui.components.DialogAction
 import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.layout.Scaffold as CouiScaffold
 import com.itos.coui.switch.Switch as CouiSwitch
 import com.itos.coui.theme.CouiTheme
+import androidx.compose.ui.draw.drawBehind
+import com.itos.coui.effect.SpotlightPreset
+import com.itos.coui.effect.rememberCouiSpotlight
+import com.itos.coui.shape.CouiCapsuleShape
+import com.itos.coui.shape.CouiShape
 import com.itos.coui.theme.LocalCouiContentColor
 import kotlinx.coroutines.delay
 
@@ -68,34 +77,62 @@ fun Scaffold(
     containerColor = containerColor, windowInsets = contentWindowInsets, content = content,
 )
 
-/** 弹窗窗口：用 COUI 圆角/配色/内边距，内容交给调用方（库 Dialog 强制按钮，故不用）。 */
+/**
+ * 弹窗窗口：直接委托 COUI 的 [CouiDialog]，外观与窗口行为全部由库负责。
+ *
+ * 两点是必须交给库的：
+ * 1. 窗口压暗强度用 CouiDialogColors.dimAmount（浅色 0.2），自建 Compose Dialog
+ *    会落到系统默认 0.6，整个背景变成死黑；
+ * 2. visible 参数专门用来保留退场窗口。自建方案在 show 变 false 时直接移除组件，
+ *    窗口销毁是异步的，紧接着再次 show 会被上一个尚未销毁的窗口挡住，
+ *    这就是「点一次后第二次点不出来」。
+ *
+ * 因此这里始终留在组合中，只切 visible，绝不用 if (!show) return。
+ */
 @Composable
 fun WindowDialog(
     title: String,
     show: Boolean,
     onDismissRequest: () -> Unit,
+    actions: List<DialogAction> = emptyList(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    if (!show) return
-    val colors = CouiDialogDefaults.themeColors(CouiTheme.isDark)
-    Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        CompositionLocalProvider(LocalDismissState provides onDismissRequest) {
-            Column(
-                Modifier.padding(horizontal = CouiDialogDefaults.horizontalMargin).fillMaxWidth()
-                    .clip(CouiDialogDefaults.shape).background(colors.surface).padding(vertical = 8.dp),
-            ) {
-                if (title.isNotBlank()) {
-                    Text(
-                        title, style = AppTextStyles.headline2, color = colors.title,
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(horizontal = CouiDialogDefaults.contentPadding, vertical = 12.dp),
-                    )
-                }
-                content()
-            }
-        }
+    val dark = CouiTheme.isDark
+    val accent = CouiTheme.colorScheme.accent
+    val backdrop = LocalDialogBackdrop.current
+
+    fun DialogAction.toCoui(isPrimary: Boolean) = CouiDialogAction(
+        text = label,
+        onClick = onClick,
+        enabled = enabled,
+        style = if (isPrimary) CouiDialogActionStyle.Primary else CouiDialogActionStyle.Secondary,
+        colors = if (isPrimary) CouiDialogDefaults.primaryActionColors(accent) else null,
+    )
+
+    // 主操作放 confirmAction；其余按顺序落到 dismiss / neutral，与 COUI 的两三键布局一致。
+    val primary = actions.lastOrNull { it.primary } ?: actions.lastOrNull()
+    val secondary = actions.filter { it !== primary }
+    val material = if (CouiDialogDefaults.isMaterialSupported() && backdrop != null) {
+        CouiDialogDefaults.material(dark)
+    } else null
+
+    CompositionLocalProvider(LocalDismissState provides onDismissRequest) {
+        CouiDialog(
+            onDismissRequest = onDismissRequest,
+            confirmAction = primary?.toCoui(true) ?: CouiDialogAction("关闭", onDismissRequest),
+            dismissAction = secondary.getOrNull(0)?.toCoui(false),
+            neutralAction = secondary.getOrNull(1)?.toCoui(false),
+            dark = dark,
+            title = title.takeIf { it.isNotBlank() },
+            material = material,
+            backdrop = if (material != null) backdrop else null,
+            visible = show,
+        ) { content() }
     }
 }
+
+/** 弹窗材质用的窗口采样源，由 AppRoot 提供；缺省时弹窗退回 COUI 实心表面色。 */
+val LocalDialogBackdrop = androidx.compose.runtime.staticCompositionLocalOf<CouiBackdrop?> { null }
 
 /** 底部抽屉：COUI 无对应组件，用其圆角与配色装配。 */
 @Composable
@@ -106,25 +143,20 @@ fun WindowBottomSheet(
     onDismissFinished: () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    if (!show) return
-    Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f)).clickable(onClick = onDismissRequest))
-            Column(
-                Modifier.padding(horizontal = 8.dp).padding(bottom = 12.dp).fillMaxWidth()
-                    .clip(CouiDialogDefaults.shape).background(CouiTheme.colorScheme.surface).padding(vertical = 12.dp),
-            ) {
-                Box(
-                    Modifier.align(Alignment.CenterHorizontally).padding(bottom = 10.dp)
-                        .heightIn(min = 4.dp).fillMaxWidth(0.12f)
-                        .clip(RoundedCornerShape(2.dp)).background(CouiTheme.colorScheme.outlineVariant)
-                )
-                if (!title.isNullOrBlank()) {
-                    Text(title, style = AppTextStyles.headline2,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp))
-                }
-                content()
-            }
+    // 抽屉用 COUI 的 placement=Bottom 弹窗：圆角、退场动画与压暗强度都由库给，
+    // 背景是 COUI 的 dim 值而不是系统默认的 0.6 死黑。
+    val colors = CouiDialogDefaults.themeColors(CouiTheme.isDark)
+    CouiDialog(
+        onDismissRequest = onDismissRequest,
+        confirmAction = CouiDialogAction("关闭", onDismissRequest),
+        dark = CouiTheme.isDark,
+        title = title?.takeIf { it.isNotBlank() },
+        placement = CouiDialogPlacement.Bottom,
+        colors = colors,
+        visible = show,
+    ) {
+        Box(Modifier.fillMaxWidth().heightIn(max = 620.dp)) {
+            Column(Modifier.fillMaxWidth()) { content() }
         }
     }
 }
@@ -146,7 +178,7 @@ fun SnackbarHost(state: SnackbarHostState, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.BottomCenter) {
         Text(
             text, style = AppTextStyles.body2, color = CouiTheme.colorScheme.onAccent,
-            modifier = Modifier.clip(RoundedCornerShape(22.dp)).background(CouiTheme.colorScheme.accent)
+            modifier = Modifier.clip(CouiCapsuleShape).background(CouiTheme.colorScheme.accent)
                 .padding(horizontal = 18.dp, vertical = 12.dp),
         )
     }
@@ -155,12 +187,17 @@ fun SnackbarHost(state: SnackbarHostState, modifier: Modifier = Modifier) {
 @Composable
 fun COUIPopupHost() = Unit
 
-/** 静态或可点击表面：COUI 配色 + 库按压反馈。 */
+/**
+ * 表面：COUI 的形状、配色与按压反馈。
+ *
+ * 形状统一用 CouiShape（COUI 的平滑圆角，与系统控件同一套曲线），
+ * 不再用 Compose 的 RoundedCornerShape —— 后者圆角曲率与 COUI 不一致，放在一起会显脏。
+ */
 @Composable
 fun Surface(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    shape: Shape = RoundedCornerShape(14.dp),
+    shape: Shape = CouiShape(14.dp, 2f),
     color: Color = CouiTheme.colorScheme.container,
     contentColor: Color = CouiTheme.colorScheme.onSurface,
     enabled: Boolean = true,
@@ -188,19 +225,36 @@ fun IconButton(
     color = Color.Transparent, enabled = enabled, content = content,
 )
 
+/**
+ * 主按钮：COUI 胶囊形状 + 主题强调色 + 跟手辉光。
+ *
+ * 辉光用库的 rememberCouiSpotlight：按下时白点在按钮表面跟手扩散，
+ * 这是 ColorOS 17 原生按钮的观感，自绘无法还原。
+ */
 @Composable
 fun Button(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shape: Shape = RoundedCornerShape(22.dp),
+    shape: Shape = CouiCapsuleShape,
     content: @Composable RowScope.() -> Unit,
-) = Surface(
-    modifier = modifier, onClick = onClick, shape = shape,
-    color = CouiTheme.colorScheme.accent, contentColor = CouiTheme.colorScheme.onAccent, enabled = enabled,
 ) {
-    Row(Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { content() }
+    val dark = CouiTheme.isDark
+    val (lightModifier, drawLight) = if (Build.VERSION.SDK_INT >= 33) {
+        rememberCouiSpotlight(interactive = enabled, preset = SpotlightPreset.OpaqueMedium1, dark = dark)
+    } else Modifier to null
+    Surface(
+        modifier = modifier, onClick = onClick, shape = shape,
+        color = CouiTheme.colorScheme.accent, contentColor = CouiTheme.colorScheme.onAccent, enabled = enabled,
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            Row(
+                Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+            ) { content() }
+            if (drawLight != null) Box(Modifier.fillMaxSize().then(lightModifier).drawBehind(drawLight))
+        }
+    }
 }
 
 @Composable
@@ -210,7 +264,7 @@ fun TextButton(
     enabled: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) = Surface(
-    modifier = modifier, onClick = onClick, shape = RoundedCornerShape(22.dp),
+    modifier = modifier, onClick = onClick, shape = CouiCapsuleShape,
     color = Color.Transparent, contentColor = CouiTheme.colorScheme.accent, enabled = enabled,
 ) {
     Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -235,9 +289,9 @@ fun LinearProgressIndicator(
     color: Color = CouiTheme.colorScheme.accent,
     trackColor: Color = CouiTheme.colorScheme.outlineVariant,
 ) {
-    Box(modifier.height(6.dp).clip(RoundedCornerShape(3.dp)).background(trackColor)) {
+    Box(modifier.height(6.dp).clip(CouiShape(3.dp, 2f)).background(trackColor)) {
         Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(6.dp)
-            .clip(RoundedCornerShape(3.dp)).background(color))
+            .clip(CouiShape(3.dp, 2f)).background(color))
     }
 }
 

@@ -29,7 +29,6 @@ import com.pyb110.onekey.UpdateChecker
 import com.pyb110.onekey.ui.AppearanceMode
 import com.pyb110.onekey.ui.components.AppBottomBar
 import com.pyb110.onekey.ui.components.DialogAction
-import com.pyb110.onekey.ui.components.DialogActions
 import com.pyb110.onekey.ui.components.ManualSection
 import com.pyb110.onekey.ui.components.MarkdownText
 import com.pyb110.onekey.ui.components.TopBar
@@ -136,33 +135,51 @@ internal fun AppRoot(
         }
     }
 
+    // 栏位必须放进 COUI Scaffold 的 topBar / bottomBar 槽：
+    // 库会为该槽提供与正文同源的 backdrop，顶底栏才能采样到真实像素做离屏模糊。
+    // 自行塞进正文 Box 再手动传 backdrop，采样源错位会画成黑色块。
+    var topBarPx by remember { mutableStateOf(0) }
+    var navBarPx by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val screenContentPadding = PaddingValues(
+        start = 12.dp,
+        end = 12.dp,
+        top = statusBarTop + with(density) { topBarPx.toDp() } + 10.dp,
+        bottom = navBarBottom + with(density) { navBarPx.toDp() } + 6.dp
+    )
+
     Scaffold(
         containerColor = oneKeyColors().background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            TopBar(
+                controller = controller,
+                tab = tab,
+                onLogCopy = { onCopy(context, controller, scope, snackbarHostState) },
+                onLogExport = { exportLauncher.launch("onekey-log-" + System.currentTimeMillis() + ".txt") },
+                onLogClear = { controller.clearLogs(); scope.launch { snackbarHostState.showSnackbar("日志已清空") } },
+                onHistoryRefresh = { reloadHistoryTick++; scope.launch { snackbarHostState.showSnackbar("已刷新历史记录") } },
+                onHistoryClear = { showClearHistoryConfirm = true },
+                isDark = isDark,
+                onToggleAppearance = {
+                    haptic(CouiHapticEffect.Switch)
+                    onChangeAppearance(if (isDark) AppearanceMode.LIGHT else AppearanceMode.DARK)
+                },
+                onHeight = { topBarPx = it },
+            )
+        },
+        bottomBar = {
+            AppBottomBar(
+                selected = tab,
+                onSelect = { haptic(CouiHapticEffect.Switch); tab = it },
+                onHeight = { navBarPx = it },
+            )
+        },
     ) { _ ->
-        val backdrop = rememberLayerBackdrop()
-        var topBarPx by remember { mutableStateOf(0) }
-        var navBarPx by remember { mutableStateOf(0) }
-        val density = LocalDensity.current
-        val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val screenContentPadding = PaddingValues(
-            start = 12.dp,
-            end = 12.dp,
-            // topBarPx 是栏体内容高度（不含状态栏内边距），所以这里要再加一次 statusBarTop
-            top = if (topBarPx > 0) statusBarTop + with(density) { topBarPx.toDp() } + 10.dp
-                  else statusBarTop + 92.dp,
-            bottom = if (navBarPx > 0) navBarBottom + with(density) { navBarPx.toDp() } + 6.dp
-                     else navBarBottom + 92.dp
-        )
-
         Box(Modifier.fillMaxSize()) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .layerBackdrop(backdrop)
-            ) {
-                AnimatedContent(
+            AnimatedContent(
                     targetState = tab,
                     transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
                     label = "tab"
@@ -222,45 +239,11 @@ internal fun AppRoot(
                 }
             }
 
-            Box(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(statusBarTop + 1.dp)
-                    .background(COUITheme.colorScheme.background)
-            )
-
-            TopBar(
-                backdrop = backdrop,
-                controller = controller,
-                tab = tab,
-                onLogCopy = { onCopy(context, controller, scope, snackbarHostState) },
-                onLogExport = { exportLauncher.launch("onekey-log-" + System.currentTimeMillis() + ".txt") },
-                onLogClear = { controller.clearLogs(); scope.launch { snackbarHostState.showSnackbar("日志已清空") } },
-                onHistoryRefresh = { reloadHistoryTick++; scope.launch { snackbarHostState.showSnackbar("已刷新历史记录") } },
-                onHistoryClear = { showClearHistoryConfirm = true },
-                isDark = isDark,
-                onToggleAppearance = {
-                    haptic(CouiHapticEffect.Switch)
-                    onChangeAppearance(if (isDark) AppearanceMode.LIGHT else AppearanceMode.DARK)
-                },
-                onHeight = { topBarPx = it },
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
-
-            AppBottomBar(
-                backdrop = backdrop,
-                selected = tab,
-                onSelect = { haptic(CouiHapticEffect.Switch); tab = it },
-                onHeight = { navBarPx = it },
-                modifier = Modifier.align(Alignment.BottomCenter)
-            )
-
             // 浮层宿主：底部抽屉等 overlay 组件需要它才能挂到窗口层。
             COUIPopupHost()
 
             // 轻提示：COUI 无 Snackbar 组件，用其配色在底部渲染。
-            SnackbarHost(state = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+            SnackbarHost(state = snackbarHostState)
 
             // 抽屉的可见状态提到根级：内容里的开关/筛选变化不会重建它，避免整块弹一下。
             if (sheet != 0) {
@@ -381,4 +364,3 @@ internal fun AppRoot(
             }
         }
     }
-}

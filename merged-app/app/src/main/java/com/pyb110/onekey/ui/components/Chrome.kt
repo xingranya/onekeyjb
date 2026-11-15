@@ -7,10 +7,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -24,9 +24,15 @@ import com.pyb110.onekey.BuildConfig
 import com.pyb110.onekey.JailbreakController
 import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.theme.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.itos.coui.effect.CouiFloatingRenderer
+import com.itos.coui.effect.couiButtonFeedback
+import com.itos.coui.theme.CouiTheme
 import com.itos.coui.navigation.CouiNavigationItem
 import com.itos.coui.navigation.NavigationBar as CouiNavigationBar
+import com.itos.coui.topappbar.TopAppBar as CouiTopAppBar
+import com.itos.coui.shape.CouiShape
 
 internal object BarBlurDefaults {
     // COUI 的材质观感靠真实离屏模糊，不靠厚遮罩；scrim 只补一点对比度。
@@ -95,7 +101,6 @@ internal fun BlurBar(
 
 @Composable
 internal fun TopBar(
-    backdrop: LayerBackdrop,
     controller: JailbreakController,
     tab: Int,
     onLogCopy: () -> Unit,
@@ -108,28 +113,24 @@ internal fun TopBar(
     onHeight: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BlurBar(
-        backdrop = backdrop,
-        shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
-        radius = BarBlurDefaults.topRadius,
-        scrim = BarBlurDefaults.topScrim,
-        fade = BarBlurDefaults.topFade,
-        fromBottom = true,
-        modifier = modifier.fillMaxWidth().statusBarsPadding(),
-        onHeight = onHeight,
-    ) {
-        TopBarContent(
-            controller = controller,
-            tab = tab,
-            onLogCopy = onLogCopy,
-            onLogExport = onLogExport,
-            onLogClear = onLogClear,
-            onHistoryRefresh = onHistoryRefresh,
-            onHistoryClear = onHistoryClear,
-            isDark = isDark,
-            onToggleAppearance = onToggleAppearance,
-        )
-    }
+    // COUI 原生顶栏：渐变模糊、圆角与状态栏内边距都由库负责，
+    // 采样源由 Scaffold 的 topBar 槽自动提供，不需要手动传。
+    CouiTopAppBar(
+        modifier = modifier.onSizeChanged { onHeight(it.height) },
+        title = {
+            TopBarContent(
+                controller = controller,
+                tab = tab,
+                onLogCopy = onLogCopy,
+                onLogExport = onLogExport,
+                onLogClear = onLogClear,
+                onHistoryRefresh = onHistoryRefresh,
+                onHistoryClear = onHistoryClear,
+                isDark = isDark,
+                onToggleAppearance = onToggleAppearance,
+            )
+        },
+    )
 }
 
 @Composable
@@ -145,126 +146,92 @@ internal fun TopBarContent(
     onToggleAppearance: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // COUI 顶栏是固定 52dp 单行：左头像、中标题+副标题、右操作，全部一行排布。
     val c = oneKeyColors()
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = 3.dp, bottom = 6.dp)
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            "v" + BuildConfig.VERSION_NAME + " · #" + BuildConfig.VERSION_CODE,
-            style = COUITheme.textStyles.body2,
-            fontSize = 10.sp,
-            color = COUITheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().height(54.dp).padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Avatar(36)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+            Text(
+                when (tab) {
+                    0 -> "OneKey"
+                    1 -> "运行日志"
+                    2 -> "\u8d8a\u72f1\u5386\u53f2"
+                    else -> "关于"
+                },
+                style = COUITheme.textStyles.headline2,
+                maxLines = 1
+            )
+            Text(
+                when (tab) {
+                    0 -> "v" + BuildConfig.VERSION_NAME + " · " + (controller.profile?.displayName ?: "OnePlus")
+                    1 -> controller.logs.size.toString() + " 条记录"
+                    2 -> "\u8017\u65f6\u4e0e\u8bca\u65ad\u5f52\u6863"
+                    else -> "OneKey v" + BuildConfig.VERSION_NAME
+                },
+                style = COUITheme.textStyles.body2,
+                fontSize = 11.sp,
+                color = c.muted,
+                maxLines = 1
+            )
+        }
         when (tab) {
-            0 -> {
-                Avatar(40)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("OneKey", style = COUITheme.textStyles.headline1)
-                    Text(
-                        "v" + BuildConfig.VERSION_NAME + " · " + (controller.profile?.displayName ?: "OnePlus"),
-                        style = COUITheme.textStyles.body2,
-                        color = oneKeyColors().muted
-                    )
-                }
-            }
             1 -> {
-                Avatar(40)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("运行日志", style = COUITheme.textStyles.headline1)
-                    Text(
-                        "${controller.logs.size} 条记录",
-                        style = COUITheme.textStyles.body2,
-                        color = oneKeyColors().muted
-                    )
-                }
-                IconButton(onClick = onLogCopy) {
-                    Icon(COUIIcons.Copy, contentDescription = "复制日志")
-                }
-                IconButton(onClick = onLogExport) {
-                    Icon(COUIIcons.Download, contentDescription = "导出 TXT")
-                }
-                IconButton(onClick = onLogClear) {
-                    Icon(COUIIcons.Delete, contentDescription = "清空日志")
-                }
+                TopIconButton(onLogCopy) { Icon(COUIIcons.Copy, contentDescription = "复制日志") }
+                TopIconButton(onLogExport) { Icon(COUIIcons.Download, contentDescription = "导出 TXT") }
+                TopIconButton(onLogClear) { Icon(COUIIcons.Delete, contentDescription = "清空日志") }
             }
             2 -> {
-                Avatar(40)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("越狱历史", style = COUITheme.textStyles.headline1)
-                    Text(
-                        "提权与诊断归档",
-                        style = COUITheme.textStyles.body2,
-                        color = oneKeyColors().muted
-                    )
-                }
-                IconButton(onClick = onHistoryRefresh) {
-                    Icon(COUIIcons.Refresh, contentDescription = "刷新记录")
-                }
-                IconButton(onClick = onHistoryClear) {
-                    Icon(COUIIcons.Delete, contentDescription = "清空记录")
-                }
-            }
-            else -> {
-                Avatar(40)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("关于", style = COUITheme.textStyles.headline1)
-                    Text(
-                        "OneKey v" + BuildConfig.VERSION_NAME,
-                        style = COUITheme.textStyles.body2,
-                        color = c.muted
-                    )
-                }
+                TopIconButton(onHistoryRefresh) { Icon(COUIIcons.Refresh, contentDescription = "刷新记录") }
+                TopIconButton(onHistoryClear) { Icon(COUIIcons.Delete, contentDescription = "清空记录") }
             }
         }
-            Spacer(Modifier.width(6.dp))
-            Surface(
-                onClick = onToggleAppearance,
-                shape = CircleShape,
-                color = c.primarySoft,
-                border = androidx.compose.foundation.BorderStroke(1.dp, c.cardOutline),
-                modifier = Modifier.size(40.dp)
-            ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(
-                        COUIIcons.Theme,
-                        contentDescription = if (isDark) "切换为浅色外观" else "切换为深色外观",
-                        tint = c.primaryInk,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
+        TopIconButton(onToggleAppearance) {
+            Icon(
+                COUIIcons.Theme,
+                contentDescription = if (isDark) "切换为浅色外观" else "切换为深色外观",
+                tint = c.primary
+            )
         }
     }
 }
 
+/** 顶栏操作按钮：COUI 工具栏的 40dp 圆形热区 + 库的按压反馈。 */
+@Composable
+private fun TopIconButton(onClick: () -> Unit, content: @Composable () -> Unit) {
+    val source = remember { MutableInteractionSource() }
+    Box(
+        Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .couiButtonFeedback(CouiTheme.isDark, source, true)
+            .clickable(source, null, onClick = onClick)
+            .padding(9.dp),
+        contentAlignment = Alignment.Center,
+    ) { content() }
+}
+
 @Composable
 internal fun AppBottomBar(
-    backdrop: LayerBackdrop,
     selected: Int,
     onSelect: (Int) -> Unit,
     onHeight: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Android 14+ 用 COUI 原生底栏：渐变模糊、metaball 融合与选中辉光都由库负责。
-    if (android.os.Build.VERSION.SDK_INT >= 34) {
+    // 它放在 COUI Scaffold 的 bottomBar 槽里，由库为该槽提供与正文同源的采样源；
+    // 自行塞进正文 Box 再手动传 backdrop 会因采样源错位画成黑色块。
+    val backdrop = LocalAppBackdrop.current
+    if (android.os.Build.VERSION.SDK_INT >= 34 && backdrop != null) {
         val renderer = remember { runCatching { CouiFloatingRenderer() }.getOrNull() }
         if (renderer != null) {
             CouiNavigationBar(
                 modifier = modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
                     .onSizeChanged { onHeight(it.height) },
                 backdrop = backdrop,
                 renderer = renderer,
@@ -282,10 +249,24 @@ internal fun AppBottomBar(
             return
         }
     }
-    // Android 13 或着色器不可用：退回自绘栏，功能一致。
+    // Android 13 或采样源未就绪：退回实心栏，功能一致。
+    if (backdrop == null) {
+        Box(
+            modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
+                .height(70.dp)
+                .clip(CouiShape(30.dp, 2f))
+                .background(COUITheme.colorScheme.surfaceContainer)
+                .onSizeChanged { onHeight(it.height) },
+            contentAlignment = Alignment.Center,
+        ) { AppBottomBarContent(selected = selected, onSelect = onSelect) }
+        return
+    }
     BlurBar(
         backdrop = backdrop,
-        shape = RoundedCornerShape(30.dp),
+        shape = CouiShape(30.dp, 2f),
         radius = BarBlurDefaults.bottomRadius,
         scrim = BarBlurDefaults.bottomScrim,
         fade = BarBlurDefaults.bottomFade,
@@ -328,7 +309,7 @@ internal fun AppBottomBarContent(
                 Surface(
                     onClick = { onSelect(index) },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = CouiShape(20.dp, 2f),
                     color = if (active) COUITheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent,
                     contentColor = tint
                 ) {

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +28,7 @@ import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import kotlinx.coroutines.CoroutineScope
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.shape.CouiShape
 
 @Composable
 internal fun LogScreen(
@@ -103,9 +103,9 @@ internal fun LogScreen(
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
+                .clip(CouiShape(20.dp, 2f))
                 .background(oneKeyCardColor())
-                .border(1.dp, oneKeyCardOutline(), RoundedCornerShape(20.dp))
+                .border(1.dp, oneKeyCardOutline(), CouiShape(20.dp, 2f))
                 .padding(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -136,7 +136,7 @@ internal fun LogScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
+                .clip(CouiShape(14.dp, 2f))
                 .background(c.segmentBg)
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -145,7 +145,7 @@ internal fun LogScreen(
                 val selected = filter == index
                 Surface(
                     onClick = { haptic(CouiHapticEffect.Switch); filter = index },
-                    shape = RoundedCornerShape(10.dp),
+                    shape = CouiShape(10.dp, 2f),
                     color = if (selected) c.surface else Color.Transparent,
                     modifier = Modifier.weight(1f)
                 ) {
@@ -184,9 +184,9 @@ internal fun LogScreen(
             Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .clip(RoundedCornerShape(20.dp))
+                .clip(CouiShape(20.dp, 2f))
                 .background(oneKeyCardColor())
-                .border(1.dp, oneKeyCardOutline(), RoundedCornerShape(20.dp))
+                .border(1.dp, oneKeyCardOutline(), CouiShape(20.dp, 2f))
         ) {
             if (filtered.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

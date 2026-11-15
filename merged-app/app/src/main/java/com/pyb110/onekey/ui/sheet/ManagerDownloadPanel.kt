@@ -2,7 +2,6 @@ package com.pyb110.onekey.ui.sheet
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.shape.CouiShape
 
 @Composable
 internal fun ManagerDownloadPanel(
@@ -56,7 +56,7 @@ internal fun ManagerDownloadPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(CouiShape(14.dp, 2f))
                     .clickable { openUrl(downloadContext, item.apkUrl) }
                     .padding(vertical = 10.dp, horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically

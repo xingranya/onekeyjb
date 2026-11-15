@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +31,7 @@ import com.pyb110.onekey.ui.openUrl
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.shape.CouiShape
 
 @Composable
 internal fun AboutScreen(
@@ -202,9 +202,9 @@ internal fun AppearancePreview(label: String, palette: OneKeyColors, modifier: M
     val c = oneKeyColors()
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(CouiShape(20.dp, 2f))
             .background(palette.background)
-            .border(if (c.isDark == palette.isDark) 2.dp else 1.dp, if (c.isDark == palette.isDark) c.primary else c.outline, RoundedCornerShape(20.dp))
+            .border(if (c.isDark == palette.isDark) 2.dp else 1.dp, if (c.isDark == palette.isDark) c.primary else c.outline, CouiShape(20.dp, 2f))
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -212,14 +212,14 @@ internal fun AppearancePreview(label: String, palette: OneKeyColors, modifier: M
             Modifier
                 .fillMaxWidth()
                 .height(40.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(CouiShape(8.dp, 2f))
                 .background(palette.deviceSurface)
-                .border(1.dp, palette.deviceOutline, RoundedCornerShape(8.dp))
+                .border(1.dp, palette.deviceOutline, CouiShape(8.dp, 2f))
         )
         Spacer(Modifier.height(8.dp))
-        Box(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(4.dp)).background(palette.primary))
+        Box(Modifier.fillMaxWidth().height(12.dp).clip(CouiShape(4.dp, 2f)).background(palette.primary))
         Spacer(Modifier.height(8.dp))
-        Box(Modifier.fillMaxWidth().height(20.dp).clip(RoundedCornerShape(4.dp)).background(palette.surface))
+        Box(Modifier.fillMaxWidth().height(20.dp).clip(CouiShape(4.dp, 2f)).background(palette.surface))
         Spacer(Modifier.height(8.dp))
         Text(label, style = COUITheme.textStyles.body2, color = palette.ink)
     }
@@ -239,7 +239,7 @@ internal fun AppearanceSheetContent(
             AppearancePreview("浅色", LightOneKeyColors, Modifier.weight(1f))
             AppearancePreview("深色", DarkOneKeyColors, Modifier.weight(1f))
         }
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(oneKeyCardColor())) {
+        Column(Modifier.fillMaxWidth().clip(CouiShape(20.dp, 2f)).background(oneKeyCardColor())) {
             AppearanceMode.entries.forEachIndexed { index, mode ->
                 val selected = current == mode
                 Row(
@@ -303,7 +303,7 @@ internal fun AppearanceSheetContent(
         }
         Spacer(Modifier.height(10.dp))
         // 动态取色：跟随壁纸调色板。关闭时使用系统原生预设配色。
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(oneKeyCardColor())) {
+        Column(Modifier.fillMaxWidth().clip(CouiShape(20.dp, 2f)).background(oneKeyCardColor())) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically

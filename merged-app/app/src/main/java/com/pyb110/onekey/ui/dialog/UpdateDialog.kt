@@ -8,7 +8,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.pyb110.onekey.UpdateChecker
 import com.pyb110.onekey.ui.components.DialogAction
-import com.pyb110.onekey.ui.components.DialogActions
 import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
@@ -32,7 +31,16 @@ internal fun UpdateDialog(
         WindowDialog(
             title = "发现新版本 · v" + ui.info.versionName + " (" + ui.info.versionCode + ")",
             show = true,
-            onDismissRequest = { if (!ui.downloading) onDismiss() }
+            onDismissRequest = { if (!ui.downloading) onDismiss() },
+            actions = listOf(
+                DialogAction("稍后", COUIIcons.Close, enabled = !ui.downloading) { onDismiss() },
+                DialogAction(
+                    if (ui.downloading) "下载中…" else "下载并安装",
+                    COUIIcons.Download,
+                    primary = true,
+                    enabled = !ui.downloading
+                ) { onDownload() },
+            ),
         ) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
                 Text(
@@ -89,15 +97,6 @@ internal fun UpdateDialog(
                         )
                     }
                 }
-                DialogActions(
-                    DialogAction("稍后", COUIIcons.Close, enabled = !ui.downloading) { onDismiss() },
-                    DialogAction(
-                        if (ui.downloading) "下载中…" else "下载并安装",
-                        COUIIcons.Download,
-                        primary = true,
-                        enabled = !ui.downloading
-                    ) { onDownload() }
-                )
             }
         }
 }

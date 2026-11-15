@@ -3,7 +3,6 @@ package com.pyb110.onekey.ui.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -14,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
+import com.itos.coui.shape.CouiShape
 
 /** 读取已安装管理器的真实图标；读不到时退回字母标记。 */
 @Composable
@@ -34,7 +34,7 @@ internal fun ManagerMark(pkg: String, label: String, size: Int = 36) {
         modifier = Modifier
             .padding(end = 12.dp)
             .size(size.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(CouiShape(10.dp, 2f))
             .background(c.primarySoft),
         contentAlignment = Alignment.Center
     ) {
@@ -42,7 +42,7 @@ internal fun ManagerMark(pkg: String, label: String, size: Int = 36) {
             Image(
                 bitmap = bitmap,
                 contentDescription = null,
-                modifier = Modifier.size((size - 8).dp).clip(RoundedCornerShape(8.dp))
+                modifier = Modifier.size((size - 8).dp).clip(CouiShape(8.dp, 2f))
             )
         } else {
             Text(
