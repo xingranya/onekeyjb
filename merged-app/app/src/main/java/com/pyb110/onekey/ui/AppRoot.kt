@@ -254,7 +254,7 @@ internal fun AppRoot(
                     onDismissFinished = { sheet = 0; sheetVisible = false }
                 ) {
                     when (sheet) {
-                        1 -> Column(Modifier.fillMaxWidth().height(520.dp).verticalScroll(rememberScrollState())) {
+                        1 -> Column(Modifier.fillMaxWidth()) {
                             HotSwitchPanel(
                                 controller = controller,
                                 haptic = haptic,
@@ -262,13 +262,13 @@ internal fun AppRoot(
                                 onPickTarget = { sheet = 4 }
                             )
                         }
-                        2 -> Column(Modifier.fillMaxWidth().height(460.dp).verticalScroll(rememberScrollState())) {
+                        2 -> Column(Modifier.fillMaxWidth()) {
                             ManagerDownloadPanel()
                         }
-                        3 -> Column(Modifier.fillMaxWidth().height(420.dp).verticalScroll(rememberScrollState())) {
+                        3 -> Column(Modifier.fillMaxWidth()) {
                             FeatureTogglePanel(controller, haptic)
                         }
-                        4 -> Column(Modifier.fillMaxWidth().height(400.dp).verticalScroll(rememberScrollState())) {
+                        4 -> Column(Modifier.fillMaxWidth()) {
                             TargetPickerPanel(
                                 controller = controller,
                                 selected = hwTarget,
@@ -276,7 +276,7 @@ internal fun AppRoot(
                                 onPick = { hwTarget = it; sheet = 1 }
                             )
                         }
-                        5 -> Column(Modifier.fillMaxWidth().height(400.dp).verticalScroll(rememberScrollState())) {
+                        5 -> Column(Modifier.fillMaxWidth()) {
                             JailManagerPanel(controller, haptic)
                         }
                     }

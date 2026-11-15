@@ -13,21 +13,22 @@ with urllib.request.urlopen("https://cnb.cool/xingranya/onekeyjb/-/releases/down
     doc = json.load(r)
 
 notes = [
-    "底栏恢复 COUI 样式：真实背景模糊与 metaball 融合生效，不再是普通色块",
-    "弹窗内边距改为 COUI 规范的 24dp，八个弹窗统一，内容不再贴边",
-    "按钮按 COUI 规范：高度 44dp、字号 14sp，蓝色主按钮与系统一致",
-    "其余交互与越狱逻辑未改动",
+    "修复抽屉用返回键关闭后无法再次打开的问题",
+    "修复点击免责声明闪退的问题",
+    "抽屉内容边距统一为 COUI 规范的 24dp，使用前提改为卡片样式",
+    "次级按钮改为 COUI 实色按钮，不再显示为纯文字链接",
+    "确认「越狱后软重启」开关有效：关闭时不会下发任何重启命令，开机自动越狱同样受该开关控制",
 ]
-doc["versionCode"] = 211
-doc["versionName"] = "2.21.2"
-doc["publishedAt"] = "2026-11-15T14:50:00+08:00"
+doc["versionCode"] = 212
+doc["versionName"] = "2.21.3"
+doc["publishedAt"] = "2026-11-15T15:10:00+08:00"
 doc["size"] = size
 doc["sha256"] = sha
-doc["changelog"] = "v2.21.2\n\n" + "\n".join("- " + n for n in notes)
-vs = [v for v in doc.get("versions", []) if v.get("versionCode") != 211]
-vs.insert(0, {"versionName": "2.21.2", "versionCode": 211, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
+doc["changelog"] = "v2.21.3\n\n" + "\n".join("- " + n for n in notes)
+vs = [v for v in doc.get("versions", []) if v.get("versionCode") != 212]
+vs.insert(0, {"versionName": "2.21.3", "versionCode": 212, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
 doc["versions"] = vs
-open("/tmp/upd-2212.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
+open("/tmp/upd-2213.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
 print("versions", len(vs), "head", vs[0]["versionName"], vs[0]["versionCode"])
 
 def api(url, data=None, method="POST"):
@@ -50,7 +51,7 @@ def upload(name, path):
     print("upload", name, "put", put, "verify", st2, flush=True)
 
 upload("OneKeyJB-latest.apk", APK)
-upload("update.json", "/tmp/upd-2212.json")
+upload("update.json", "/tmp/upd-2213.json")
 upload("OneKey-Knowledge.md", R + "/dist/OneKey-Knowledge.md")
 upload("onekey-kb.json", R + "/knowledge/ai-kb/onekey-kb.json")
 upload("onekey-kb.docs.json", R + "/knowledge/ai-kb/onekey-kb.docs.json")

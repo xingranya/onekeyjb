@@ -178,11 +178,18 @@ fun BasicComponent(
     enabled: Boolean = true,
 ) {
     Item(
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
         icon = startAction,
         trailing = {
-            if (endActions != null) Row(verticalAlignment = Alignment.CenterVertically) { endActions() }
-            else endAction?.invoke()
+            // Item 的 trailing 槽按内容宽度测量，不给权重时整行会被挤到中间；
+            // 这里显式靠右并留出与 COUI 一致的右内边距。
+            Box(Modifier.padding(start = 12.dp), contentAlignment = Alignment.CenterEnd) {
+                if (endActions != null) Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                ) { endActions() }
+                else endAction?.invoke()
+            }
         },
         onClick = onClick,
         enabled = enabled,

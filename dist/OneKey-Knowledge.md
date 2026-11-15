@@ -955,7 +955,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.21.3）
+# 12 · 版本变更史（2.18.0 → 2.21.4）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -963,6 +963,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
+| **2.21.4** | 213 | 抽屉高度、开关对齐、按钮对齐、免责声明闪退 | ① 抽屉不再用 COUI 的 placement=Bottom 弹窗（其内容槽是 weight(1f)，会把抽屉一律撑到 maxHeight 600dp，内容少时下方大片空白），改普通窗口 + 内容自适应 + 手动套用 COUI 圆角/表面色/dimAmount(0.2)；② BasicComponent 的 Item 补 fillMaxWidth，trailing 加 CenterEnd，开关不再被挤到中间；③ 两个次级按钮加 buttonEdgePadding 与弹窗「关闭」按钮对齐；④ 免责声明等弹窗的闪退根因是**嵌套滚动**：COUI 弹窗内容槽本身已是 verticalScroll，内层再套一层会抛无限高度约束异常，五个弹窗的内层滚动全部移除 |
 | **2.21.3** | 212 | 修抽屉返回键失效、边距、按钮形态、闪退 | ① 抽屉按返回键只置 visible=false，sheet 未复位，再点同一项时 LaunchedEffect(sheet) 值未变不重跑 → 抽屉永久打不开；改为关闭时同时回调 onDismissFinished；② 抽屉内容补 CouiDialogDefaults.contentPadding（24dp），说明区改 COUI Group/Item 与其他分组同宽；③ PanelButton 次级按钮底色改 COUI 实色（浅 0xFFEBEBEB / 深 0xFF353535）、文字改 onSurface，不再像纯文字链接；④ 免责声明闪退根因是 LocalDismissState 指向 onDismissRequest，AppreciationDialog.close() 调 dismiss() 绕回自身无限递归，改为提供 null |
 | **2.21.2** | 211 | 修正三处接入偏差 | ① 底栏：删掉自建的 LocalAppBackdrop（全项目无人提供，导致一直走降级分支），直接依赖 Scaffold bottomBar 槽的库采样源，模糊与 metaball 融合恢复；② 弹窗内边距由 20dp 改为 COUI 规范的 CouiDialogDefaults.contentPadding（24dp），八个弹窗统一；③ 按钮按 COUI 规范：高度用 CouiDialogDefaults.buttonHeight（44dp）、字号 body2（14sp），替换原先的 46dp + body1 |
 | **2.21.1** | 210 | 修正 COUI 接入方式 | 四处必须由库接管的点：① 顶底栏移进 COUI Scaffold 的 topBar/bottomBar 槽（库为槽位提供与正文同源的 backdrop，手动传采样源会画成黑块）；② 弹窗改用库 Dialog 的 visible 参数常驻组合，不再 if(!show) return（窗口销毁异步，连续开关会被上一个未销毁窗口挡住）；③ 弹窗 dim 用 CouiDialogColors.dimAmount（浅色 0.2），系统默认 0.6 会死黑；④ 全部按钮与圆角换 COUI 原语 CouiShape/CouiCapsuleShape + couiButtonFeedback + rememberCouiSpotlight 辉光，RoundedCornerShape 归零。顶栏压成库的 52dp 单行规范 |

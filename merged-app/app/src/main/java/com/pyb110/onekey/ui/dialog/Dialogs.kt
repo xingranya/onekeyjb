@@ -16,7 +16,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,7 +103,8 @@ internal fun AppreciationDialog(onMessage: (String) -> Unit, onDismiss: (Boolean
             DialogAction("知道了", COUIIcons.Ok, primary = true) { close() },
         ),
     ) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = CouiDialogDefaults.contentPadding), horizontalAlignment = Alignment.CenterHorizontally) {
+        // COUI 弹窗的内容槽本身就是 verticalScroll，再套一层会抛无限高度约束异常直接崩。
+        Column(Modifier.fillMaxWidth().padding(horizontal = CouiDialogDefaults.contentPadding), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("倒卖必究", style = COUITheme.textStyles.subtitle, color = oneKeyColors().error)
             Text("本工具免费分享，禁止倒卖。QQ群：1121682811。赞赏完全自愿，不影响任何功能。", style = COUITheme.textStyles.body2, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
             Image(painterResource(R.drawable.appreciation), contentDescription = "作者赞赏码", modifier = Modifier.fillMaxWidth().height(220.dp).clip(CouiShape(12.dp, 2f)))

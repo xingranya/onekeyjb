@@ -39,7 +39,6 @@ import com.itos.coui.backdrop.CouiBackdrop
 import com.itos.coui.dialog.CouiDialogAction
 import com.itos.coui.dialog.CouiDialogActionStyle
 import com.itos.coui.dialog.CouiDialogDefaults
-import com.itos.coui.dialog.CouiDialogPlacement
 import com.itos.coui.dialog.Dialog as CouiDialog
 import com.pyb110.onekey.ui.components.DialogAction
 import com.itos.coui.effect.couiButtonFeedback
@@ -53,6 +52,13 @@ import com.itos.coui.shape.CouiCapsuleShape
 import com.itos.coui.shape.CouiShape
 import com.itos.coui.theme.LocalCouiContentColor
 import kotlinx.coroutines.delay
+import android.view.WindowManager
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 
 /** 开关：直接用 COUI Switch，自带拖动与触感。 */
 @Composable
@@ -136,7 +142,14 @@ fun WindowDialog(
 /** 弹窗材质用的窗口采样源，由 AppRoot 提供；缺省时弹窗退回 COUI 实心表面色。 */
 val LocalDialogBackdrop = androidx.compose.runtime.staticCompositionLocalOf<CouiBackdrop?> { null }
 
-/** 底部抽屉：COUI 无对应组件，用其圆角与配色装配。 */
+/**
+ * 底部抽屉。
+ *
+ * 不用 COUI 的 placement=Bottom 弹窗：它内部的内容槽是 weight(1f)，
+ * 会把抽屉一律撑到 maxHeight（600dp），内容少时下方留一大片空白。
+ * 这里改用普通窗口 + 内容自适应高度，同时手动套用 COUI 的圆角、表面色
+ * 与 dimAmount（浅色 0.2），观感与库一致但高度跟着内容走。
+ */
 @Composable
 fun WindowBottomSheet(
     show: Boolean,
@@ -145,28 +158,76 @@ fun WindowBottomSheet(
     onDismissFinished: () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    // 抽屉用 COUI 的 placement=Bottom 弹窗：圆角、退场动画与压暗强度都由库给，
-    // 背景是 COUI 的 dim 值而不是系统默认的 0.6 死黑。
-    val colors = CouiDialogDefaults.themeColors(CouiTheme.isDark)
-    // 关闭时同时通知宿主复位「当前是哪个抽屉」。
-    // 否则按返回键只把 visible 置 false，sheet 仍留在原值，
-    // 再点同一项时 LaunchedEffect(sheet) 因值未变不会重跑，抽屉再也打不开。
+    if (!show) return
+    val dark = CouiTheme.isDark
+    val colors = CouiDialogDefaults.themeColors(dark)
+    val view = LocalView.current
     val close = {
         onDismissRequest()
         onDismissFinished()
     }
-    CouiDialog(
+    Dialog(
         onDismissRequest = close,
-        confirmAction = CouiDialogAction("关闭", close),
-        dark = CouiTheme.isDark,
-        title = title?.takeIf { it.isNotBlank() },
-        placement = CouiDialogPlacement.Bottom,
-        colors = colors,
-        visible = show,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        // 抽屉内容统一左右内边距，与 COUI 弹窗的 24dp 对齐。
-        Box(Modifier.fillMaxWidth().heightIn(max = 620.dp).padding(horizontal = CouiDialogDefaults.contentPadding)) {
-            Column(Modifier.fillMaxWidth()) { content() }
+        // 把窗口压暗降到 COUI 的值，系统默认 0.6 会让背景死黑。
+        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+        LaunchedEffect(dialogWindow) {
+            runCatching {
+                dialogWindow?.setDimAmount(colors.dimAmount)
+                dialogWindow?.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            }
+        }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            // 点击遮罩关闭
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(onClick = close)
+            )
+            Column(
+                Modifier
+                    .padding(horizontal = CouiDialogDefaults.horizontalMargin)
+                    .padding(bottom = CouiDialogDefaults.bottomMargin)
+                    .fillMaxWidth()
+                    .clip(CouiShape(CouiDialogDefaults.cornerRadius, 3f))
+                    .background(colors.surface)
+                    .padding(vertical = 18.dp),
+            ) {
+                if (!title.isNullOrBlank()) {
+                    Text(
+                        title,
+                        style = AppTextStyles.headline2,
+                        color = colors.title,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = CouiDialogDefaults.contentPadding, vertical = 6.dp),
+                    )
+                }
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = CouiDialogDefaults.contentPadding),
+                    content = content,
+                )
+                Spacer(Modifier.height(14.dp))
+                // 关闭按钮：与 COUI 弹窗按钮面板同宽同高
+                val accent = CouiTheme.colorScheme.accent
+                val interaction = remember { MutableInteractionSource() }
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = CouiDialogDefaults.buttonEdgePadding)
+                        .height(CouiDialogDefaults.buttonHeight)
+                        .clip(CouiCapsuleShape)
+                        .background(if (dark) Color(0xFF353535) else Color(0xFFEBEBEB))
+                        .couiButtonFeedback(dark, interaction, true)
+                        .clickable(interaction, null, onClick = close),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("关闭", style = AppTextStyles.body2, color = CouiTheme.colorScheme.onSurface)
+                }
+            }
         }
     }
 }

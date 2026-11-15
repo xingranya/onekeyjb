@@ -1,0 +1,17 @@
+ui: sheet height, switch alignment, button alignment, scroll crash (2.21.4)
+
+- the sheet no longer uses the COUI Bottom placement dialog. Its content slot is
+  weight(1f), so every sheet was stretched to maxHeight (600dp) and left a large
+  empty area under short content. Use a plain window with a wrap-content card and
+  apply COUI corner radius, surface colour and dimAmount (0.2) by hand.
+- BasicComponent's Item now fills the width and its trailing slot aligns to the
+  end, so switches sit at the right edge instead of drifting toward the centre.
+- the two secondary buttons in the toggle sheet get buttonEdgePadding so they
+  line up with the dialog's own close button.
+- the disclaimer crash was nested scrolling: the COUI dialog content slot is
+  already a verticalScroll, and wrapping it again throws an infinite-height
+  constraint exception. Remove the inner scroll from all five dialogs.
+
+compileReleaseKotlin + JavaWithJavac + testDebugUnitTest + assembleRelease green
+tests 4/0/0; APK 16,353,478 B
+versionCode 213 / versionName 2.21.4

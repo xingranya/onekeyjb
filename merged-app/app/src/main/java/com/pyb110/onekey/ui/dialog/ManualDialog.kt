@@ -2,7 +2,6 @@ package com.pyb110.onekey.ui.dialog
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -24,7 +23,7 @@ internal fun ManualDialog(onDismiss: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .heightIn(max = 460.dp)
-                .verticalScroll(rememberScrollState())
+                
                 .padding(horizontal = CouiDialogDefaults.contentPadding)
         ) {
             ManualSection("一、准备", listOf(

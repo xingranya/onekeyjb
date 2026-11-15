@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import com.pyb110.onekey.JailbreakController
 import com.pyb110.onekey.ui.components.PanelButton
 import com.pyb110.onekey.ui.oneKeyColors
+import com.itos.coui.dialog.CouiDialogDefaults
 import com.itos.coui.layout.Group
 import com.itos.coui.layout.Item
 import com.pyb110.onekey.ui.components.ListCard
@@ -120,7 +121,11 @@ internal fun FeatureTogglePanel(
             )
         }
         Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 与 COUI 弹窗按钮面板对齐：左右各留 buttonEdgePadding。
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = CouiDialogDefaults.buttonEdgePadding),
+            horizontalArrangement = Arrangement.spacedBy(CouiDialogDefaults.buttonInsidePadding),
+        ) {
             PanelButton("忽略电池优化", Modifier.weight(1f)) {
                 runCatching {
                     context.startActivity(

@@ -2,7 +2,6 @@ package com.pyb110.onekey.ui.dialog
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -50,12 +49,7 @@ internal fun TermsDialog(onAccept: () -> Unit) {
                 .heightIn(max = 470.dp)
                 .padding(horizontal = CouiDialogDefaults.contentPadding)
         ) {
-            Column(
-                Modifier
-                    .weight(1f, fill = false)
-                    .fillMaxWidth()
-                    .verticalScroll(scrollState)
-            ) {
+            Column(Modifier.fillMaxWidth()) {
                 Text(
                     termsText,
                     style = COUITheme.textStyles.body2,

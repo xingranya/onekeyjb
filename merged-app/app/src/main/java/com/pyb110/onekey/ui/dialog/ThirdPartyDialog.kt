@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -41,7 +40,7 @@ internal fun ThirdPartyDialog(onDismiss: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .heightIn(max = 480.dp)
-                .verticalScroll(rememberScrollState())
+                
                 .padding(horizontal = CouiDialogDefaults.contentPadding)
         ) {
             MarkdownText(

@@ -2,7 +2,6 @@ package com.pyb110.onekey.ui.dialog
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -55,14 +54,13 @@ internal fun UpdateDialog(
                     Text(
                         ui.info.changelog.ifBlank { "无更新说明" },
                         style = COUITheme.textStyles.body2,
-                        modifier = Modifier.verticalScroll(rememberScrollState()).heightIn(max = 240.dp)
+                        modifier = Modifier.heightIn(max = 240.dp)
                     )
                 } else {
                     Column(
                         Modifier
                             .fillMaxWidth()
                             .heightIn(max = 240.dp)
-                            .verticalScroll(rememberScrollState())
                     ) {
                         ui.info.versions.forEach { note ->
                             VersionNoteRow(
