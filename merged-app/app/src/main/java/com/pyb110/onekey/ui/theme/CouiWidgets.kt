@@ -116,7 +116,9 @@ fun WindowDialog(
         CouiDialogDefaults.material(dark)
     } else null
 
-    CompositionLocalProvider(LocalDismissState provides onDismissRequest) {
+    // 不能把 onDismissRequest 塞进 LocalDismissState：调用方的 close() 内部会调 dismiss()，
+    // 若它等于 onDismissRequest 就绕回自身，形成无限递归 StackOverflow 闪退。
+    CompositionLocalProvider(LocalDismissState provides null) {
         CouiDialog(
             onDismissRequest = onDismissRequest,
             confirmAction = primary?.toCoui(true) ?: CouiDialogAction("关闭", onDismissRequest),
@@ -146,16 +148,24 @@ fun WindowBottomSheet(
     // 抽屉用 COUI 的 placement=Bottom 弹窗：圆角、退场动画与压暗强度都由库给，
     // 背景是 COUI 的 dim 值而不是系统默认的 0.6 死黑。
     val colors = CouiDialogDefaults.themeColors(CouiTheme.isDark)
+    // 关闭时同时通知宿主复位「当前是哪个抽屉」。
+    // 否则按返回键只把 visible 置 false，sheet 仍留在原值，
+    // 再点同一项时 LaunchedEffect(sheet) 因值未变不会重跑，抽屉再也打不开。
+    val close = {
+        onDismissRequest()
+        onDismissFinished()
+    }
     CouiDialog(
-        onDismissRequest = onDismissRequest,
-        confirmAction = CouiDialogAction("关闭", onDismissRequest),
+        onDismissRequest = close,
+        confirmAction = CouiDialogAction("关闭", close),
         dark = CouiTheme.isDark,
         title = title?.takeIf { it.isNotBlank() },
         placement = CouiDialogPlacement.Bottom,
         colors = colors,
         visible = show,
     ) {
-        Box(Modifier.fillMaxWidth().heightIn(max = 620.dp)) {
+        // 抽屉内容统一左右内边距，与 COUI 弹窗的 24dp 对齐。
+        Box(Modifier.fillMaxWidth().heightIn(max = 620.dp).padding(horizontal = CouiDialogDefaults.contentPadding)) {
             Column(Modifier.fillMaxWidth()) { content() }
         }
     }

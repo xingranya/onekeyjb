@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
@@ -136,7 +137,14 @@ internal fun PanelButton(
         modifier
             .height(CouiDialogDefaults.buttonHeight)
             .clip(shape)
-            .background(if (primary && enabled) accent else CouiTheme.colorScheme.container)
+            .background(
+                when {
+                    primary && enabled -> accent
+                    // COUI 次级按钮的实色表面：浅色 0xFFEBEBEB / 深色 0xFF353535
+                    enabled -> if (CouiTheme.isDark) Color(0xFF353535) else Color(0xFFEBEBEB)
+                    else -> CouiTheme.colorScheme.container
+                }
+            )
             .couiButtonFeedback(dark, interaction, enabled)
             .clickable(interaction, null, enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -148,7 +156,7 @@ internal fun PanelButton(
                     style = COUITheme.textStyles.body2,
                     color = when {
                         primary && enabled -> CouiTheme.colorScheme.onAccent
-                        enabled -> accent
+                        enabled -> CouiTheme.colorScheme.onSurface
                         else -> CouiTheme.colorScheme.onSurfaceVariant
                     }
                 )

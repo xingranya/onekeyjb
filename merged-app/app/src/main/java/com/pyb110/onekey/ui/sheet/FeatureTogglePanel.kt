@@ -11,6 +11,8 @@ import androidx.compose.ui.unit.dp
 import com.pyb110.onekey.JailbreakController
 import com.pyb110.onekey.ui.components.PanelButton
 import com.pyb110.onekey.ui.oneKeyColors
+import com.itos.coui.layout.Group
+import com.itos.coui.layout.Item
 import com.pyb110.onekey.ui.components.ListCard
 import com.pyb110.onekey.ui.components.ListRow
 import com.pyb110.onekey.ui.theme.COUIIcons
@@ -103,14 +105,22 @@ internal fun FeatureTogglePanel(
             )
         )
     )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            "开机自动越狱需要三个前提：① 在 Stellar 里开启「开机启动」；② 在系统设置里允许本应用自启动；③ 忽略电池优化。上次自动运行失败会自动关闭该开关，避免反复重启。",
-            style = COUITheme.textStyles.body2,
-            color = c.muted
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(Modifier.height(12.dp))
+        // 说明放进 COUI 的 Group 卡片，与上面的开关分组同宽、同圆角、同内边距。
+        Group(footer = "上次自动运行失败会自动关闭该开关，避免反复重启。") {
+            Item(
+                title = { Text("使用前提", style = COUITheme.textStyles.body1) },
+                summary = {
+                    Text(
+                        "① 在 Stellar 里开启「开机启动」\n② 在系统设置里允许本应用自启动\n③ 忽略电池优化",
+                        style = COUITheme.textStyles.body2,
+                        color = c.muted
+                    )
+                },
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PanelButton("忽略电池优化", Modifier.weight(1f)) {
                 runCatching {
                     context.startActivity(

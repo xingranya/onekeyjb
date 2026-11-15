@@ -1,0 +1,22 @@
+ui: fix the sheet reopen bug, padding, buttons and a crash (2.21.3)
+
+- closing a sheet with the back key only set visible=false and left the sheet
+  index alone, so LaunchedEffect(sheet) saw the same value and never ran again:
+  the same entry could not be reopened. Fire onDismissFinished from the close
+  path so the host resets the index.
+- sheet content gets CouiDialogDefaults.contentPadding, and the prerequisites
+  block becomes a COUI Group/Item so it lines up with the switch groups above.
+- PanelButton secondary used colorScheme.container, which is nearly invisible on
+  a white dialog, leaving what looked like plain text. Use the COUI secondary
+  surface (0xFFEBEBEB light / 0xFF353535 dark) with onSurface text.
+- the disclaimer dialog crashed with a StackOverflow: LocalDismissState was
+  bound to onDismissRequest, and AppreciationDialog.close() calls dismiss(),
+  which looped back into close(). Provide null instead.
+
+Soft-reboot switch verified unchanged: with it off the success branch only logs
+and never issues setprop ctl.restart zygote; the auto-jailbreak service goes
+through the same controller path, so the switch governs it too.
+
+compileReleaseKotlin + JavaWithJavac + testDebugUnitTest + assembleRelease green
+tests 4/0/0; APK 16,353,478 B
+versionCode 212 / versionName 2.21.3
