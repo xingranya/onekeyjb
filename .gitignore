@@ -16,3 +16,7 @@ keystore/
 # 发布产物：APK 只走 GitHub Release 与 CNB，不进仓库
 artifacts/*.apk
 dist/*.apk
+
+# 脚本编译缓存
+__pycache__/
+*.pyc
