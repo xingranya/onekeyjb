@@ -46,7 +46,6 @@ internal fun TermsDialog(onAccept: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .heightIn(max = 470.dp)
                 .padding(horizontal = CouiDialogDefaults.contentPadding)
         ) {
             Column(Modifier.fillMaxWidth()) {

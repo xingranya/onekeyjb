@@ -13,23 +13,23 @@ with urllib.request.urlopen("https://cnb.cool/xingranya/onekeyjb/-/releases/down
     doc = json.load(r)
 
 notes = [
-    "修复抽屉用返回键关闭后无法再次打开的问题",
-    "修复点击免责声明闪退的问题",
-    "抽屉内容边距统一为 COUI 规范的 24dp，使用前提改为卡片样式",
-    "次级按钮改为 COUI 实色按钮，不再显示为纯文字链接",
-    "确认「越狱后软重启」开关有效：关闭时不会下发任何重启命令，开机自动越狱同样受该开关控制",
+    "抽屉高度改为跟随内容，不再一律撑满整屏，热切换等短内容不再下方留白",
+    "拓展开关的开关靠右对齐，不再被挤到中间",
+    "「忽略电池优化」「打开 Stellar」与「关闭」按钮左右对齐",
+    "修复点击免责声明闪退的问题（弹窗内重复滚动导致）",
+    "其余交互与越狱逻辑未改动",
 ]
-doc["versionCode"] = 212
-doc["versionName"] = "2.21.3"
-doc["publishedAt"] = "2026-11-15T15:10:00+08:00"
+doc["versionCode"] = 213
+doc["versionName"] = "2.21.4"
+doc["publishedAt"] = "2026-11-15T15:25:00+08:00"
 doc["size"] = size
 doc["sha256"] = sha
-doc["changelog"] = "v2.21.3\n\n" + "\n".join("- " + n for n in notes)
-vs = [v for v in doc.get("versions", []) if v.get("versionCode") != 212]
-vs.insert(0, {"versionName": "2.21.3", "versionCode": 212, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
+doc["changelog"] = "v2.21.4\n\n" + "\n".join("- " + n for n in notes)
+vs = [v for v in doc.get("versions", []) if v.get("versionCode") != 213]
+vs.insert(0, {"versionName": "2.21.4", "versionCode": 213, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
 doc["versions"] = vs
-open("/tmp/upd-2213.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
-print("versions", len(vs), "head", vs[0]["versionName"], vs[0]["versionCode"])
+open("/tmp/upd-2214.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
+print("versions", len(vs))
 
 def api(url, data=None, method="POST"):
     h = {"Authorization": "Bearer " + TOK, "Accept": "application/vnd.cnb.api+json"}
@@ -51,7 +51,7 @@ def upload(name, path):
     print("upload", name, "put", put, "verify", st2, flush=True)
 
 upload("OneKeyJB-latest.apk", APK)
-upload("update.json", "/tmp/upd-2213.json")
+upload("update.json", "/tmp/upd-2214.json")
 upload("OneKey-Knowledge.md", R + "/dist/OneKey-Knowledge.md")
 upload("onekey-kb.json", R + "/knowledge/ai-kb/onekey-kb.json")
 upload("onekey-kb.docs.json", R + "/knowledge/ai-kb/onekey-kb.docs.json")

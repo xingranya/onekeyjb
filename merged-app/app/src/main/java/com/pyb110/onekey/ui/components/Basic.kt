@@ -20,7 +20,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import com.itos.coui.dialog.CouiDialogDefaults
+import androidx.compose.ui.graphics.graphicsLayer
 import com.itos.coui.effect.SpotlightPreset
+import com.itos.coui.motion.rememberCouiPressMotion
+import com.itos.coui.motion.rememberCouiTouchMotion
 import com.itos.coui.effect.couiButtonFeedback
 import com.itos.coui.effect.rememberCouiSpotlight
 import com.itos.coui.shape.CouiCapsuleShape
@@ -62,9 +65,17 @@ private fun DialogActionButton(action: DialogAction, modifier: Modifier = Modifi
     } else Modifier to null
     val interaction = remember { MutableInteractionSource() }
     val shape = CouiCapsuleShape
+    val motion = rememberCouiTouchMotion(action.enabled)
+    val press = rememberCouiPressMotion()
     Box(
         modifier
             .height(CouiDialogDefaults.buttonHeight)
+            .graphicsLayer {
+                scaleX = motion.scaleX.value + press.scale.value - 1f
+                scaleY = motion.scaleY.value + press.scale.value - 1f
+                translationX = motion.translationX.value
+                translationY = motion.translationY.value
+            }
             .clip(shape)
             .background(if (action.primary) accent else CouiTheme.colorScheme.container)
             .couiButtonFeedback(dark, interaction, action.enabled)
@@ -133,9 +144,18 @@ internal fun PanelButton(
     } else Modifier to null
     val interaction = remember { MutableInteractionSource() }
     val shape = CouiCapsuleShape
+    // COUI 按钮的弹性：按压缩放 + 释放回弹，与库内 DialogButton 同一套实现。
+    val motion = rememberCouiTouchMotion(enabled)
+    val press = rememberCouiPressMotion()
     Box(
         modifier
             .height(CouiDialogDefaults.buttonHeight)
+            .graphicsLayer {
+                scaleX = motion.scaleX.value + press.scale.value - 1f
+                scaleY = motion.scaleY.value + press.scale.value - 1f
+                translationX = motion.translationX.value
+                translationY = motion.translationY.value
+            }
             .clip(shape)
             .background(
                 when {

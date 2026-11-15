@@ -54,14 +54,10 @@ internal fun UpdateDialog(
                     Text(
                         ui.info.changelog.ifBlank { "无更新说明" },
                         style = COUITheme.textStyles.body2,
-                        modifier = Modifier.heightIn(max = 240.dp)
+                        modifier = Modifier
                     )
                 } else {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 240.dp)
-                    ) {
+                    Column(Modifier.fillMaxWidth()) {
                         ui.info.versions.forEach { note ->
                             VersionNoteRow(
                                 note = note,

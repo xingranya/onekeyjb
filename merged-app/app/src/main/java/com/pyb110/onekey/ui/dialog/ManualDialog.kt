@@ -22,8 +22,6 @@ internal fun ManualDialog(onDismiss: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .heightIn(max = 460.dp)
-                
                 .padding(horizontal = CouiDialogDefaults.contentPadding)
         ) {
             ManualSection("一、准备", listOf(

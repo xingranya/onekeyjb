@@ -39,6 +39,7 @@ import com.itos.coui.backdrop.CouiBackdrop
 import com.itos.coui.dialog.CouiDialogAction
 import com.itos.coui.dialog.CouiDialogActionStyle
 import com.itos.coui.dialog.CouiDialogDefaults
+import com.itos.coui.dialog.CouiDialogPlacement
 import com.itos.coui.dialog.Dialog as CouiDialog
 import com.pyb110.onekey.ui.components.DialogAction
 import com.itos.coui.effect.couiButtonFeedback
@@ -143,12 +144,12 @@ fun WindowDialog(
 val LocalDialogBackdrop = androidx.compose.runtime.staticCompositionLocalOf<CouiBackdrop?> { null }
 
 /**
- * 底部抽屉。
+ * 底部抽屉：直接用 COUI 的 placement = Bottom 弹窗。
  *
- * 不用 COUI 的 placement=Bottom 弹窗：它内部的内容槽是 weight(1f)，
- * 会把抽屉一律撑到 maxHeight（600dp），内容少时下方留一大片空白。
- * 这里改用普通窗口 + 内容自适应高度，同时手动套用 COUI 的圆角、表面色
- * 与 dimAmount（浅色 0.2），观感与库一致但高度跟着内容走。
+ * 之前手搓过一版普通窗口，结果是：内容不能滑动（库的内容槽才是 verticalScroll）、
+ * 没有进出场动画、遮罩铺满导致下滑被系统当成返回手势。
+ * 唯一要处理的是高度 —— 库的内容槽是 weight(1f)，短内容会被撑满，
+ * 所以这里把面板内容包进 heightIn(max) 并让外层按内容测量。
  */
 @Composable
 fun WindowBottomSheet(
@@ -158,77 +159,24 @@ fun WindowBottomSheet(
     onDismissFinished: () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    if (!show) return
     val dark = CouiTheme.isDark
     val colors = CouiDialogDefaults.themeColors(dark)
-    val view = LocalView.current
     val close = {
         onDismissRequest()
         onDismissFinished()
     }
-    Dialog(
+    CouiDialog(
         onDismissRequest = close,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        confirmAction = CouiDialogAction("关闭", close),
+        dark = dark,
+        title = title?.takeIf { it.isNotBlank() },
+        placement = CouiDialogPlacement.Bottom,
+        colors = colors,
+        visible = show,
     ) {
-        // 把窗口压暗降到 COUI 的值，系统默认 0.6 会让背景死黑。
-        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
-        LaunchedEffect(dialogWindow) {
-            runCatching {
-                dialogWindow?.setDimAmount(colors.dimAmount)
-                dialogWindow?.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            }
-        }
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            // 点击遮罩关闭
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clickable(onClick = close)
-            )
-            Column(
-                Modifier
-                    .padding(horizontal = CouiDialogDefaults.horizontalMargin)
-                    .padding(bottom = CouiDialogDefaults.bottomMargin)
-                    .fillMaxWidth()
-                    .clip(CouiShape(CouiDialogDefaults.cornerRadius, 3f))
-                    .background(colors.surface)
-                    .padding(vertical = 18.dp),
-            ) {
-                if (!title.isNullOrBlank()) {
-                    Text(
-                        title,
-                        style = AppTextStyles.headline2,
-                        color = colors.title,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = CouiDialogDefaults.contentPadding, vertical = 6.dp),
-                    )
-                }
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = CouiDialogDefaults.contentPadding),
-                    content = content,
-                )
-                Spacer(Modifier.height(14.dp))
-                // 关闭按钮：与 COUI 弹窗按钮面板同宽同高
-                val accent = CouiTheme.colorScheme.accent
-                val interaction = remember { MutableInteractionSource() }
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = CouiDialogDefaults.buttonEdgePadding)
-                        .height(CouiDialogDefaults.buttonHeight)
-                        .clip(CouiCapsuleShape)
-                        .background(if (dark) Color(0xFF353535) else Color(0xFFEBEBEB))
-                        .couiButtonFeedback(dark, interaction, true)
-                        .clickable(interaction, null, onClick = close),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("关闭", style = AppTextStyles.body2, color = CouiTheme.colorScheme.onSurface)
-                }
-            }
-        }
+        // 不要在库的滚动槽里再套 heightIn：heightIn 是裁剪不是滚动，
+        // 内容超过它就会被截断且无法下滑。高度与滚动全部交给库。
+        Column(Modifier.fillMaxWidth()) { content() }
     }
 }
 

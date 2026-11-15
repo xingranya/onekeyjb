@@ -39,8 +39,6 @@ internal fun ThirdPartyDialog(onDismiss: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .heightIn(max = 480.dp)
-                
                 .padding(horizontal = CouiDialogDefaults.contentPadding)
         ) {
             MarkdownText(

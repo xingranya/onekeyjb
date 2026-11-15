@@ -7,7 +7,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 KNOWLEDGE = os.path.dirname(HERE)
-VERSION = '2.21.4'
+VERSION = '2.21.5'
 NAME = 'OneKey 越狱工具知识库'
 SKIP = {'README.md'}
 

@@ -1,0 +1,16 @@
+ui: elastic buttons and working dialog scroll (2.21.5)
+
+- PanelButton and DialogActionButton only had the spotlight glow; the press
+  scale was missing, so they did not feel like COUI buttons. Add
+  rememberCouiTouchMotion plus rememberCouiPressMotion driving graphicsLayer
+  scale and translation, the same pair the library DialogButton uses.
+- the sheet goes back to the COUI Bottom placement dialog. The hand-rolled
+  window could not scroll, had no enter/exit animation, and its full-screen
+  scrim turned a downward drag into a back gesture.
+- drop every heightIn on dialog content. heightIn clips rather than scrolls, so
+  it truncated long content and left it unable to move; height and scrolling
+  belong to the library's content slot.
+
+compileReleaseKotlin + JavaWithJavac + testDebugUnitTest + assembleRelease green
+tests 4/0/0; APK 16,353,474 B
+versionCode 214 / versionName 2.21.5
