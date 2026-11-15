@@ -1,7 +1,6 @@
 package com.pyb110.onekey.ui.dialog
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -22,18 +21,16 @@ internal fun TermsDialog(onAccept: () -> Unit) {
                 .replace("**", "").replace("## ", "").replace("# ", "")
         }.getOrDefault("协议加载失败")
     }
-    val scrollState = rememberScrollState()
-    var remain by remember { mutableStateOf(10) }
-    val reachedBottom = remember {
-        derivedStateOf { scrollState.maxValue > 0 && scrollState.value >= scrollState.maxValue - 4 }
-    }
+    // 滚动由 COUI 弹窗的 content 槽负责，外部拿不到它的 ScrollState，
+    // 所以这里只按阅读时长放行：倒计时结束即可同意。
+    var remain by remember { mutableIntStateOf(10) }
     LaunchedEffect(Unit) {
         while (remain > 0) {
             kotlinx.coroutines.delay(1000)
             remain -= 1
         }
     }
-    val canAgree = remain <= 0 && (reachedBottom.value || scrollState.maxValue == 0)
+    val canAgree = remain <= 0
     WindowDialog(
         title = "用户协议与免责声明",
         show = true,
@@ -56,11 +53,7 @@ internal fun TermsDialog(onAccept: () -> Unit) {
                 )
             }
             Text(
-                when {
-                    canAgree -> "已阅读并滚动到底部，可以继续"
-                    scrollState.maxValue > 0 && !reachedBottom.value -> "请向下滚动阅读全文（还需 " + remain + " 秒）"
-                    else -> "请阅读 " + remain + " 秒后继续"
-                },
+                if (canAgree) "已阅读，可以继续" else "请阅读 " + remain + " 秒后继续",
                 style = COUITheme.textStyles.body2,
                 color = if (canAgree) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurfaceContainerVariant,
                 modifier = Modifier.padding(top = 10.dp, bottom = 8.dp)

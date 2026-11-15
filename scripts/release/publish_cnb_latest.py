@@ -13,20 +13,19 @@ with urllib.request.urlopen("https://cnb.cool/xingranya/onekeyjb/-/releases/down
     doc = json.load(r)
 
 notes = [
-    "修复历史页「前往首页」按钮被拉伸成巨大椭圆的问题",
-    "底栏左右边距收窄，栏体更宽、每项点击区域更大，更容易点中",
+    "修复抽屉里文字贴边的问题，恢复 24dp 左右内边距",
     "其余交互与越狱逻辑未改动",
 ]
-doc["versionCode"] = 216
-doc["versionName"] = "2.21.7"
-doc["publishedAt"] = "2026-11-15T16:10:00+08:00"
+doc["versionCode"] = 217
+doc["versionName"] = "2.21.8"
+doc["publishedAt"] = "2026-11-15T16:25:00+08:00"
 doc["size"] = size
 doc["sha256"] = sha
-doc["changelog"] = "v2.21.7\n\n" + "\n".join("- " + n for n in notes)
-vs = [v for v in doc.get("versions", []) if v.get("versionCode") != 216]
-vs.insert(0, {"versionName": "2.21.7", "versionCode": 216, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
+doc["changelog"] = "v2.21.8\n\n" + "\n".join("- " + n for n in notes)
+vs = [v for v in doc.get("versions", []) if v.get("versionCode") != 217]
+vs.insert(0, {"versionName": "2.21.8", "versionCode": 217, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
 doc["versions"] = vs
-open("/tmp/upd-2217.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
+open("/tmp/upd-2218.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
 print("versions", len(vs))
 
 def api(url, data=None, method="POST"):
@@ -49,7 +48,7 @@ def upload(name, path):
     print("upload", name, "put", put, "verify", st2, flush=True)
 
 upload("OneKeyJB-latest.apk", APK)
-upload("update.json", "/tmp/upd-2217.json")
+upload("update.json", "/tmp/upd-2218.json")
 upload("OneKey-Knowledge.md", R + "/dist/OneKey-Knowledge.md")
 upload("onekey-kb.json", R + "/knowledge/ai-kb/onekey-kb.json")
 upload("onekey-kb.docs.json", R + "/knowledge/ai-kb/onekey-kb.docs.json")

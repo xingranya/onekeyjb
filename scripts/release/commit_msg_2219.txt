@@ -1,0 +1,14 @@
+fix: the terms accept button could never enable (2.21.9)
+
+2.21.4 removed TermsDialog's own verticalScroll to stop nested scrolling, but
+the "scrolled to the bottom" gate still read that ScrollState. With no scrolling
+happening, maxValue stayed 0 and value never moved, so reachedBottom was always
+false and the accept button stayed disabled forever.
+
+Scrolling now belongs to the COUI content slot and its ScrollState is not
+reachable from outside, so gate on the 10s reading countdown alone. The status
+line follows: "please read N more seconds" until it expires.
+
+compileReleaseKotlin + JavaWithJavac + testDebugUnitTest + assembleRelease green
+tests 4/0/0; APK 16,353,478 B
+versionCode 218 / versionName 2.21.9
