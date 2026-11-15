@@ -955,7 +955,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.21.5）
+# 12 · 版本变更史（2.18.0 → 2.21.6）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -963,6 +963,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
+| **2.21.6** | 215 | 修复开机自动越狱失败 + 底栏线稿图标 | ① **关键修复**：SystemReadinessGate 一直是零调用点的死代码，开机后系统仍处启动高负载期就开始跑漏洞链，日志表现为 UAF mode=tile ms=538 rc=-1 并连续失败 4 次自行中止。现在自动越狱在等 Stellar 之后、执行之前插入该门（sys.boot_completed=1 + 屏幕亮起 + runnable≤64 连续 3 次采样，最长 120 秒），超时则跳过并通知，不再在系统繁忙时硬跑；② 底栏图标改为未选中线稿（Outlined）、选中实心（Rounded），用 COUI 的 CouiNavigationItem.selectedIcon 槽 |
 | **2.21.5** | 214 | 弹性按钮与弹窗滚动 | ① PanelButton / DialogActionButton 补 COUI 弹性动画：rememberCouiTouchMotion + rememberCouiPressMotion 驱动 graphicsLayer 缩放，与库内 DialogButton 同一套；② 抽屉改回 COUI 原生 placement=Bottom 弹窗（手搓普通窗口导致内容不能滑、无进出场动画、遮罩铺满使下滑被当成返回手势）；③ 移除所有弹窗内容层的 heightIn 裁剪 —— heightIn 是裁剪不是滚动，会把内容截断且无法下滑，高度与滚动全部交回库的滚动槽 |
 | **2.21.4** | 213 | 抽屉高度、开关对齐、按钮对齐、免责声明闪退 | ① 抽屉不再用 COUI 的 placement=Bottom 弹窗（其内容槽是 weight(1f)，会把抽屉一律撑到 maxHeight 600dp，内容少时下方大片空白），改普通窗口 + 内容自适应 + 手动套用 COUI 圆角/表面色/dimAmount(0.2)；② BasicComponent 的 Item 补 fillMaxWidth，trailing 加 CenterEnd，开关不再被挤到中间；③ 两个次级按钮加 buttonEdgePadding 与弹窗「关闭」按钮对齐；④ 免责声明等弹窗的闪退根因是**嵌套滚动**：COUI 弹窗内容槽本身已是 verticalScroll，内层再套一层会抛无限高度约束异常，五个弹窗的内层滚动全部移除 |
 | **2.21.3** | 212 | 修抽屉返回键失效、边距、按钮形态、闪退 | ① 抽屉按返回键只置 visible=false，sheet 未复位，再点同一项时 LaunchedEffect(sheet) 值未变不重跑 → 抽屉永久打不开；改为关闭时同时回调 onDismissFinished；② 抽屉内容补 CouiDialogDefaults.contentPadding（24dp），说明区改 COUI Group/Item 与其他分组同宽；③ PanelButton 次级按钮底色改 COUI 实色（浅 0xFFEBEBEB / 深 0xFF353535）、文字改 onSurface，不再像纯文字链接；④ 免责声明闪退根因是 LocalDismissState 指向 onDismissRequest，AppreciationDialog.close() 调 dismiss() 绕回自身无限递归，改为提供 null |

@@ -1,0 +1,17 @@
+fix: gate boot auto-jailbreak on system readiness, outline nav icons (2.21.6)
+
+The last automatic run failed with UAF mode=tile rc=-1 and four consecutive
+attempts, then aborted. Cause: SystemReadinessGate existed but had no caller at
+all, so the service started the exploit while the system was still booting and
+under load.
+
+- AutoJailbreakService now waits on SystemReadinessGate after Stellar comes up
+  and before running: sys.boot_completed=1, screen awake, and procs_running at
+  or below 64 for three consecutive samples, up to 120s. On timeout it skips the
+  run and says so instead of hammering a busy kernel.
+- nav icons: unselected uses the Outlined variant, selected uses Rounded, via
+  CouiNavigationItem.selectedIcon.
+
+compileReleaseKotlin + JavaWithJavac + testDebugUnitTest + assembleRelease green
+tests 4/0/0; APK 16,353,478 B
+versionCode 215 / versionName 2.21.6

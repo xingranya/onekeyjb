@@ -29,6 +29,9 @@ class AutoJailbreakService : Service() {
 
     @Volatile private var lastNotified = 0L
 
+    /** 就绪门内的提示，用于通知栏播报。 */
+    @Volatile private var lastGateLine = ""
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -94,6 +97,18 @@ class AutoJailbreakService : Service() {
 
         if (alreadyRooted()) {
             finishNotify("本次开机已越狱，跳过")
+            return
+        }
+
+        // 开机后系统仍在启动与高负载期，此时跑漏洞链会因内存回收时机不对而失败
+        // （日志里表现为 UAF mode=tile rc=-1 并连续失败）。
+        // 等 sys.boot_completed=1、屏幕亮起且 runnable 回落后再开始。
+        updateNotification("等待系统进入可操作状态…")
+        val systemReady = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            SystemReadinessGate.await({ line -> lastGateLine = line }, maxWaitSec = 120)
+        }
+        if (!systemReady) {
+            finishNotify("系统长时间处于高负载，已跳过本次自动越狱；请手动运行")
             return
         }
 

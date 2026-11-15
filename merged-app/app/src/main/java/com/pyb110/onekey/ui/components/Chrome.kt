@@ -233,11 +233,12 @@ internal fun AppBottomBar(
                     .onSizeChanged { onHeight(it.height) },
                 renderer = renderer,
                 items = remember {
+                    // 未选中用线稿图标，选中换成实心：靠库的 selectedIcon 槽实现。
                     listOf(
-                        CouiNavigationItem("首页", COUIIcons.Home),
-                        CouiNavigationItem("日志", COUIIcons.Notes),
-                        CouiNavigationItem("历史", COUIIcons.Recent),
-                        CouiNavigationItem("关于", COUIIcons.Info),
+                        CouiNavigationItem("首页", COUIIcons.HomeOutline, COUIIcons.Home),
+                        CouiNavigationItem("日志", COUIIcons.NotesOutline, COUIIcons.Notes),
+                        CouiNavigationItem("历史", COUIIcons.RecentOutline, COUIIcons.Recent),
+                        CouiNavigationItem("关于", COUIIcons.InfoOutline, COUIIcons.Info),
                     )
                 },
                 selectedIndex = selected,

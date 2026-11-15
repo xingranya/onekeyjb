@@ -1,6 +1,10 @@
 package com.pyb110.onekey.ui.theme
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Checklist
@@ -62,4 +66,10 @@ object COUIIcons {
     val Tune: ImageVector get() = Icons.Rounded.Tune
     val Unlock: ImageVector get() = Icons.Rounded.LockOpen
     val Update: ImageVector get() = Icons.Rounded.SystemUpdate
+
+    // 底栏专用：未选中用线稿，选中用实心。
+    val HomeOutline: ImageVector get() = Icons.Outlined.Home
+    val NotesOutline: ImageVector get() = Icons.Outlined.Menu
+    val RecentOutline: ImageVector get() = Icons.Outlined.History
+    val InfoOutline: ImageVector get() = Icons.Outlined.Info
 }
