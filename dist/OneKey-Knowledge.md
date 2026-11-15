@@ -955,7 +955,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.21.7）
+# 12 · 版本变更史（2.18.0 → 2.21.8）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -963,6 +963,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
+| **2.21.8** | 217 | 抽屉文字贴边 | COUI 的 Dialog 只给 title/message 加 contentPadding，**content 槽本身没有内边距**。八个弹窗各自加了 24dp，但 WindowBottomSheet 的 content 漏加，抽屉里文字直接顶到卡片边缘。补 padding(horizontal = CouiDialogDefaults.contentPadding)。经验：给 COUI Dialog 塞内容时，内边距要自己加，库只管标题与正文 |
 | **2.21.7** | 216 | 修按钮拉伸 + 底栏拉宽 | ① Button 缺高度上限，放进 FullPageStatement 的 fillMaxSize Column 时会吃掉全部剩余高度，胶囊被拉成巨大椭圆；补 height(CouiDialogDefaults.buttonHeight) 并给主按钮 widthIn(min=160dp)；② 底栏左右外边距 18dp→8dp（库的栏体是 fillMaxWidth，收窄外边距等于拉宽栏体、扩大每项点击区），降级栏同步 18→8dp、高 70→72dp |
 | **2.21.6** | 215 | 修复开机自动越狱失败 + 底栏线稿图标 | ① **关键修复**：SystemReadinessGate 一直是零调用点的死代码，开机后系统仍处启动高负载期就开始跑漏洞链，日志表现为 UAF mode=tile ms=538 rc=-1 并连续失败 4 次自行中止。现在自动越狱在等 Stellar 之后、执行之前插入该门（sys.boot_completed=1 + 屏幕亮起 + runnable≤64 连续 3 次采样，最长 120 秒），超时则跳过并通知，不再在系统繁忙时硬跑；② 底栏图标改为未选中线稿（Outlined）、选中实心（Rounded），用 COUI 的 CouiNavigationItem.selectedIcon 槽 |
 | **2.21.5** | 214 | 弹性按钮与弹窗滚动 | ① PanelButton / DialogActionButton 补 COUI 弹性动画：rememberCouiTouchMotion + rememberCouiPressMotion 驱动 graphicsLayer 缩放，与库内 DialogButton 同一套；② 抽屉改回 COUI 原生 placement=Bottom 弹窗（手搓普通窗口导致内容不能滑、无进出场动画、遮罩铺满使下滑被当成返回手势）；③ 移除所有弹窗内容层的 heightIn 裁剪 —— heightIn 是裁剪不是滚动，会把内容截断且无法下滑，高度与滚动全部交回库的滚动槽 |

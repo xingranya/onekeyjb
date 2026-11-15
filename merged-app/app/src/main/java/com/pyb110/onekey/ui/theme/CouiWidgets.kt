@@ -176,8 +176,14 @@ fun WindowBottomSheet(
         visible = show,
     ) {
         // 不要在库的滚动槽里再套 heightIn：heightIn 是裁剪不是滚动，
-        // 内容超过它就会被截断且无法下滑。高度与滚动全部交给库。
-        Column(Modifier.fillMaxWidth()) { content() }
+        // 内容超过它就会被截断且无法下滑。高度与滚动交给库。
+        // 但库只给 title/message 加内边距，content 槽本身没有，这里必须自己补，
+        // 否则文字会直接顶到卡片边缘。
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = CouiDialogDefaults.contentPadding)
+        ) { content() }
     }
 }
 

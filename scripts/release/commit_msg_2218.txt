@@ -1,0 +1,12 @@
+ui: give the sheet content its own padding (2.21.8)
+
+COUI's Dialog only pads title and message; the content slot has no padding of
+its own. The eight dialogs each added CouiDialogDefaults.contentPadding, but
+WindowBottomSheet passed content straight through, so sheet text ran to the card
+edge.
+
+Add the same 24dp horizontal padding to the sheet content slot.
+
+compileReleaseKotlin + JavaWithJavac + testDebugUnitTest + assembleRelease green
+tests 4/0/0; APK 16,353,478 B
+versionCode 217 / versionName 2.21.8
