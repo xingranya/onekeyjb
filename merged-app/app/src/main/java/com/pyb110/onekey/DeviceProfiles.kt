@@ -57,7 +57,60 @@ object DeviceProfiles {
         susfsAsset = "core/exec/susfs_guard_lkm_612.ko",
     )
 
-    val all = listOf(PYB110, PYB110_201, PMS110)
+    /** 一加 16 · ColorOS 17 后续构建（内核 commit 284297031c53）。 */
+    val PYB110_PLANT = DeviceProfile(
+        id = "pyb110",
+        displayName = "OnePlus 16",
+        model = "PYB110",
+        device = "OP64E1L1",
+        kernelRelease = "6.18.21-android17-5-g284297031c53-abogki555938958-4k",
+        kmi = "android17-6.18",
+        runnerAsset = "core/exec/onekey-98260",
+        susfsAsset = "core/exec/susfs_guard_lkm.ko",
+        vfsSupported = true,
+    )
+
+    /** 一加 16 · ColorOS 17 后续构建（内核 commit 3977fbeb3462，需 gate 路径）。 */
+    val PYB110_GATE = DeviceProfile(
+        id = "pyb110",
+        displayName = "OnePlus 16",
+        model = "PYB110",
+        device = "OP64E1L1",
+        kernelRelease = "6.18.21-android17-5-g3977fbeb3462-abogki563184321-4k",
+        kmi = "android17-6.18",
+        runnerAsset = "core/exec/onekey-98260",
+        susfsAsset = "core/exec/susfs_guard_lkm.ko",
+        vfsSupported = true,
+    )
+
+    /** 一加 Ace 7 Pro · 6.12.69 后续构建（内核 commit 5fd39602326e）。 */
+    val PMS110_1637 = DeviceProfile(
+        id = "pms110",
+        displayName = "OnePlus Ace 7 Pro",
+        model = "PMS110",
+        device = null,
+        kernelRelease = "6.12.69-android16-6-g5fd39602326e-ab16372235-4k",
+        kmi = "android16-6.12",
+        runnerAsset = "core/exec/onekey-98260-61269",
+        susfsAsset = "core/exec/susfs_guard_lkm_612.ko",
+    )
+
+    /** 一加 Ace 7 Pro · 6.12.69 后续构建（内核 commit 586bfab1b9c5）。 */
+    val PMS110_586 = DeviceProfile(
+        id = "pms110",
+        displayName = "OnePlus Ace 7 Pro",
+        model = "PMS110",
+        device = null,
+        kernelRelease = "6.12.69-android16-6-g586bfab1b9c5-abogki536749445-4k",
+        kmi = "android16-6.12",
+        runnerAsset = "core/exec/onekey-98260-61269",
+        susfsAsset = "core/exec/susfs_guard_lkm_612.ko",
+    )
+
+    val all = listOf(
+        PYB110, PYB110_201, PYB110_PLANT, PYB110_GATE,
+        PMS110, PMS110_1637, PMS110_586,
+    )
 
     fun current(): DeviceProfile? {
         val model = Build.MODEL.trim().uppercase()

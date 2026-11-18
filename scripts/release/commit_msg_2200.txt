@@ -1,0 +1,29 @@
+runtime: adopt the Shark 2.5 runners (2.22.0)
+
+Shark 2.5 moved its exploit binaries from assets to jniLibs and shipped new
+builds. Compare against what we ship:
+
+- libk61821.so  451,536 -> 467,120 B  (sha 3f6d407d...)
+- libk61269.so  449,544 -> 478,880 B  (sha d51f65f6...)
+
+Both of our kernels stay on the plain runner: neither 6.18 release
+(gf957accaf563, g7fcbffcad3e1) appears in isPlantCore61821, so the p/x
+variants do not apply.
+
+What changed on our side:
+- replace both runner binaries; the APK now carries the new sizes
+- 6.18 gained FAIL=plantresultmodule and 6.12 gained contract/mem/probe/
+  profile/tracefs/uname; match FAIL= and give each kind an actionable hint
+  instead of dumping the raw line
+- add four kernel releases to DeviceProfiles: PYB110 284297031c53 and
+  3977fbeb3462, PMS110 5fd39602326e and 586bfab1b9c5
+- document the protocol: PYB110_GATE/PYB110_CHASE are host-side extensions the
+  runner never reads, PYB110_CARRIER is runner-internal
+
+Unchanged on purpose: the assets staging path, the sh -c "env ... run" launch
+form, and the human-readable log markers ([n/4], MODULE_LOADED, DONE,
+PLANT_CRED_OK) which the new builds still emit alongside EV|v=1|phase=.
+
+compileReleaseKotlin + JavaWithJavac + testDebugUnitTest + assembleRelease green
+tests 4/0/0; APK 16,377,358 B
+versionCode 219 / versionName 2.22.0

@@ -7,6 +7,10 @@ import dev.onekey.jb.ShizukuShell
  * 98260 执行引擎桥：当 APK 内提供 core/exec/onekey-98260 时，按实测 env 协议驱动它。
  * 协议：PYB110_DIR / PYB110_MANAGER(短名) / PYB110_LATE_LOAD / PYB110_SUSFS /
  *       PYB110_VFS / PYB110_UNLOAD_GUARD / PYB110_DISABLE_ANTIROOT。
+ *
+ * 与 Shark 2.5 runner 对齐（2026-11）：runner 从 assets 可执行改为 jniLibs 的 .so，
+ * 但 env 协议主体不变。PYB110_GATE / PYB110_CHASE 是 Shark 宿主侧的扩展，runner 不读；
+ * PYB110_CARRIER 由 runner 内部自用，宿主也不设置。
  */
 object OneKeyEngine {
     private const val ROOT = "/data/local/tmp/pyb110-onekey"
@@ -150,7 +154,21 @@ object OneKeyEngine {
                         RunReport.stop("执行器", "管理器 APK 里没有 libksud.so")
                         log("该管理器把加载器改了名；完成一次越狱后本应用会自动归一化，或改用其他管理器先越狱")
                     }
-                    line.contains("FAIL") -> RunReport.stop("执行器", line.take(120))
+                    line.contains("FAIL=") -> {
+                        // Shark 2.5 新增若干失败类型，按语义给出可操作的提示，而不是只贴原文。
+                        val kind = line.substringAfter("FAIL=").substringBefore(" ").substringBefore("\t")
+                        val hint = when (kind) {
+                            "plantresultmodule" -> "提权原语已执行但模块未能加载；重启后重试"
+                            "cred" -> "未拿到 root 凭证；确认管理器已授权本应用"
+                            "contract", "profile" -> "该内核的漏洞契约与预期不符；请确认机型档案"
+                            "tracefs" -> "tracefs 不可用或被占用；重启后重试"
+                            "mem", "probe" -> "内存回收时机不匹配；等系统空闲后重试"
+                            "uname" -> "内核版本不在支持列表"
+                            else -> null
+                        }
+                        RunReport.stop("执行器", line.take(120))
+                        if (hint != null) log(hint)
+                    }
                     else -> if (line.length in 3..200) log("  " + line)
                 }
             }
