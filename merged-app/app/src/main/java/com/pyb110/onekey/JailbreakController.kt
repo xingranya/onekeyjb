@@ -60,6 +60,10 @@ class JailbreakController private constructor(private val context: Context) {
         "sukisu" to "947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef",
         "bakasu" to "d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64",
         "finasu" to "2d89b50aaf1db013c2b6738f973f48b62ea21a3a8d7216bfec3521065d448458",
+        // YukiSU v1.9.0（org.rouyashiki.yukisu）
+        "yukisu" to "45bd30fe301b6a6ff798e0ae930606d5f443c16f078a95ec9d82d326498ed1c3",
+        // SukiSU Nova v3.0.0（com.sukisu.nova）；与 SukiSU Ultra 共用同一签名证书。
+        "sukisu_nova" to "947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef",
     )
 
 
@@ -312,12 +316,18 @@ class JailbreakController private constructor(private val context: Context) {
             Triple("sukisu", "SukiSU Ultra", "com.sukisu.ultra"),
             Triple("bakasu", "BakaSU", "com.resukisu.resukisu"),
             Triple("finasu", "FinaSU", "me.yuki.fina"),
+            Triple("yukisu", "YukiSU", "org.rouyashiki.yukisu"),
+            Triple("sukisu_nova", "SukiSU Nova", "com.sukisu.nova"),
         ).map { it to (ManagerDownloads.latest(it.first)?.versionCode ?: 0) }
         return defs.map { (triple, expected) ->
             val (kind, label, staticPkg) = triple
             val cert = expectedCert[kind]
+            // SukiSU Ultra 与 SukiSU Nova 共用同一签名证书，只按证书分组会把两者混为一谈，
+            // 进而按版本号挑错管理器。所以先按包名精确命中，再退回证书候选。
+            val exact = entries.firstOrNull { it.pkg == staticPkg && it.cert == cert }
             val candidates = if (cert == null) emptyList() else byCert[cert].orEmpty()
             val chosen = when {
+                exact != null -> exact
                 adaptiveManagerEnabled -> candidates.maxByOrNull { it.code }
                 else -> candidates.firstOrNull { it.code == expected } ?: candidates.maxByOrNull { it.code }
             }

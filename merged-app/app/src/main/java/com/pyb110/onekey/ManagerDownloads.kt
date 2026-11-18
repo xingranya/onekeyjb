@@ -43,6 +43,8 @@ object ManagerDownloads {
         Repo("sukisu", "SukiSU Ultra", "SukiSU-Ultra/SukiSU-Ultra"),
         Repo("bakasu", "BakaSU", "Baka-SU/BakaSU", abi = "arm64-v8a"),
         Repo("finasu", "FinaSU", "LyraVoid/FinaSU"),
+        Repo("yukisu", "YukiSU", "Rouyashiki/YukiSU", abi = "arm64-v8a"),
+        Repo("sukisu_nova", "SukiSU Nova", "SukiSU-Nova/SukiSU-Nova", abi = "arm64-v8a"),
     )
 
     @Volatile

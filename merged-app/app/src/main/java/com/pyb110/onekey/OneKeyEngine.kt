@@ -94,11 +94,15 @@ object OneKeyEngine {
         val universal = useUniversalModule &&
             ShizukuShell.stageAsset(context, "core/exec/ksud-universal", ws + "/ksud-universal", 755).code == 0
         if (useUniversalModule && !universal) log("通用加载器投放失败，回退到管理器自带模块")
+        // 短名要与执行器内部的 manager_pkg 表一致：
+        // yukisu -> org.rouyashiki.yukisu，sukisu_nova -> com.sukisu.nova。
         val k = when (managerKind) {
             "kernelsu" -> "kernelsu"
             "next" -> "next"
             "sukisu" -> "sukisu"
             "bakasu" -> "bakasu"
+            "yukisu" -> "yukisu"
+            "sukisu_nova" -> "sukisu_nova"
             else -> "finasu"
         }
         val env = "PYB110_DIR=" + ws + " PYB110_MANAGER=" + k + " PYB110_LATE_LOAD=1" +

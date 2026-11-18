@@ -5,29 +5,35 @@ BASE = "https://api.cnb.cool/xingranya/onekeyjb/-/releases/2115388998399250432"
 TOK = os.environ["CNB_TOKEN"]
 R = "/Users/xingranya/Downloads/onekeyjb-private"
 
+VERSION_CODE = 219
+VERSION_NAME = "2.22.0"
+
 size = os.path.getsize(APK)
 sha = hashlib.sha256(open(APK, "rb").read()).hexdigest()
 print("size", size, "sha", sha)
 
 with urllib.request.urlopen("https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/update.json", timeout=60) as r:
     doc = json.load(r)
+print("remote before:", doc.get("versionCode"), doc.get("versionName"))
 
 notes = [
-    "修复用户协议「同意并继续」按钮一直点不了的问题",
-    "协议改为阅读 10 秒后即可同意，不再要求滚动到底",
-    "其余交互与越狱逻辑未改动",
+    "执行器更新到当前效果最好的一版，一加 16 与 Ace 7 Pro 均已适配",
+    "失败提示更具体：能区分模块未加载、未拿到 root、内核契约不符、tracefs 占用、内存时机等",
+    "设备档案新增 4 个内核版本，覆盖更多系统更新",
+    "其余交互与越狱流程未改动",
 ]
-doc["versionCode"] = 218
-doc["versionName"] = "2.21.9"
-doc["publishedAt"] = "2026-11-15T17:10:00+08:00"
+doc["versionCode"] = VERSION_CODE
+doc["versionName"] = VERSION_NAME
+doc["publishedAt"] = "2026-11-18T12:00:00+08:00"
 doc["size"] = size
 doc["sha256"] = sha
-doc["changelog"] = "v2.21.9\n\n" + "\n".join("- " + n for n in notes)
-vs = [v for v in doc.get("versions", []) if v.get("versionCode") != 218]
-vs.insert(0, {"versionName": "2.21.9", "versionCode": 218, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
+doc["changelog"] = "v" + VERSION_NAME + "\n\n" + "\n".join("- " + n for n in notes)
+vs = [v for v in doc.get("versions", []) if v.get("versionCode") != VERSION_CODE]
+vs.insert(0, {"versionName": VERSION_NAME, "versionCode": VERSION_CODE,
+              "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
 doc["versions"] = vs
-open("/tmp/upd-2219.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
-print("versions", len(vs))
+open("/tmp/upd-new.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
+print("prepared:", doc["versionCode"], doc["versionName"], "versions", len(vs))
 
 def api(url, data=None, method="POST"):
     h = {"Authorization": "Bearer " + TOK, "Accept": "application/vnd.cnb.api+json"}
@@ -49,7 +55,7 @@ def upload(name, path):
     print("upload", name, "put", put, "verify", st2, flush=True)
 
 upload("OneKeyJB-latest.apk", APK)
-upload("update.json", "/tmp/upd-2219.json")
+upload("update.json", "/tmp/upd-new.json")
 upload("OneKey-Knowledge.md", R + "/dist/OneKey-Knowledge.md")
 upload("onekey-kb.json", R + "/knowledge/ai-kb/onekey-kb.json")
 upload("onekey-kb.docs.json", R + "/knowledge/ai-kb/onekey-kb.docs.json")

@@ -1,0 +1,19 @@
+manager: add YukiSU and SukiSU Nova (2.22.1)
+
+Both managers are now selectable, downloadable and switchable.
+
+- manager list 5 -> 7: yukisu (org.rouyashiki.yukisu) and sukisu_nova
+  (com.sukisu.nova)
+- certificates taken from the shipped APKs: YukiSU v1.9.0 = 45bd30fe...,
+  SukiSU Nova v3.0.0 = 947ae944...
+- fix a collision the new entry exposed: Nova signs with the same certificate as
+  SukiSU Ultra, so grouping by certificate and taking maxByOrNull could pick the
+  wrong package. Match the expected package name first, fall back to the
+  certificate candidates only when it is absent.
+- download sources: Rouyashiki/YukiSU and SukiSU-Nova/SukiSU-Nova, arm64-v8a
+- the runner already maps both short names in its manager_pkg table, so the
+  engine passes yukisu / sukisu_nova straight through
+
+compileReleaseKotlin + JavaWithJavac + testDebugUnitTest + assembleRelease green
+tests 4/0/0; APK 16,377,358 B
+versionCode 220 / versionName 2.22.1
