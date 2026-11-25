@@ -14,8 +14,10 @@ plugins {
 android {
     namespace = "com.pyb110.onekey"
     compileSdk {
+        // COUI alpha17 与 Compose 1.13.0 的 aar-metadata 要求 minCompileSdk=37、minCompileMinorSdk=1，
+        // 只到 37.0 会在 checkReleaseAarMetadata 阶段直接失败，所以钉到 37.2。
         version = release(37) {
-            minorApiLevel = 0
+            minorApiLevel = 2
         }
     }
     buildToolsVersion = "37.0.0"
@@ -24,8 +26,8 @@ android {
         applicationId = "dev.onekey.jb"
         minSdk = 33
         targetSdk = 37
-        versionCode = 220
-        versionName = "2.22.1"
+        versionCode = 221
+        versionName = "2.23.0"
     }
     buildFeatures {
         compose = true
@@ -75,7 +77,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.17.0")
 
     // COUI —— ColorOS 17 原生观感组件库（io.github.itoseo:coui，与 Shark / LuckyTool 同源）
-    implementation("io.github.itoseo:coui:0.0.1-alpha11")
+    implementation("io.github.itoseo:coui:0.0.1-alpha17")
     // 图标：COUI alpha11 起不再自带图标包，改用 Google 官方 Material 图标
     implementation("androidx.compose.material:material-icons-extended")
 

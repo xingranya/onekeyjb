@@ -1,6 +1,6 @@
 # OneKey 知识库（合集）
 
-> 版本 2.21.1 / 210。不含任何密钥、口令或签名文件内容。
+> 版本 2.23.0 / 221。不含任何密钥、口令或签名文件内容。
 
 
 
@@ -955,7 +955,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.22.1）
+# 12 · 版本变更史（2.18.0 → 2.23.0）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -963,6 +963,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
+| **2.23.0** | 221 | 日志分级 + 成功率 + COUI alpha17 | ① **日志全面重写**：新增 RunLog，四档中文等级（信息/成功/警告/失败），一行一条，落盘格式 `HH:mm:ss  [标签] 标题 · 详情 · 1.2s`，解析旧格式靠关键字兜底；Runner 的 `EV|v=1|phase=` 结构化行首次被解析成中文阶段；② **阶段墓碑 RunTrace**：软重启会连根拔掉进程，finally 里的归因代码一行都跑不到，因此每进一个阶段就往 `files/onekey-run-trace.json` 写墓碑（stage/boot/ts/intent）并 fsync，下次启动比对 boot_id 指出重启发生在哪一步之后；intent 位区分「用户开的软重启」与「异常重启」；③ **历史页幽灵记录根治**：`HistoryStore.append` 原本在无 activeId 时 凭空 start 一条 unknown 记录，导致每次开 App、每次拨开关都多一条「未完成 0.00s」；改为直接 return，并新增 `abandon()` 把残留 running 标成异常中断、`stats()` 只统计跑完的记录；④ **成功率 SuccessRate**：读 `/proc/slabinfo` 的 posix_timers_cache、`/proc/loadavg`、`thermal_zone0/temp` 三路采样，按 slab/温度/负载三因子乘积给分，上限 **92%**（永不承诺 100%），建议线 55%；首页参数区三格实时显示，低于阈值时开始前弹窗拦一次并指出瓶颈；⑤ **BootWatch 归因**：在每个可能触发重启的动作前后快照 boot_id / system_server pid / zygote 状态，命中就把重启点名到具体动作；⑥ **COUI 升级 alpha11→alpha17**：抽屉换用库原生 BottomSheet（`com.itos.coui.sheet`），获得拖拽手柄与原生回弹；alpha17 要求 `minCompileSdk=37 + minCompileMinorSdk=1`，compileSdk 提到 **37.2**；⑦ 构建链路改走阿里云镜像前置 + 本地 `libs/coui-repo` 离线镜像（Google Maven 直连 reset）；⑧ 新增 20 个单元测试（RunLogTest），覆盖日志格式往返、真实日志行归类回归、成功率因子单调性与边界 |
 | **2.22.1** | 220 | 适配 YukiSU 与 SukiSU Nova | ① 管理器清单 5→**7 家**：yukisu(org.rouyashiki.yukisu) 与 sukisu_nova(com.sukisu.nova)；② 证书从官方 APK 实测提取：YukiSU v1.9.0 = 45bd30fe...，Nova v3.0.0 = 947ae944...；③ **关键修复**：Nova 与 SukiSU Ultra 共用同一签名证书，原按证书分组 + maxByOrNull 会挑错管理器，改为优先按包名精确命中再退回证书候选；④ 下载源 Rouyashiki/YukiSU 与 SukiSU-Nova/SukiSU-Nova（abi=arm64-v8a）；⑤ 执行器侧短名 yukisu / sukisu_nova 与内部 manager_pkg 表一致，无需改 runner |
 | **2.22.0** | 219 | 适配 Shark 2.5 运行时 | ① runner 换新：6.18 451,536→**467,120 B**、6.12 449,544→**478,880 B**（sha 3f6d407d / d51f65f6）；② 上游资产从 assets 迁到 jniLibs，我方仍走 assets 投放，env 协议主体兼容；③ 新增 EV|v=1|phase= 结构化诊断通道，人读日志（[n/4]/MODULE_LOADED/DONE/PLANT_CRED_OK）全部保留，解析不受影响；④ 失败类型从 1 种扩到 2 种（6.18）与 7 种（6.12：contract/mem/probe/profile/tracefs/uname），判定改为 FAIL= 并逐类给可操作提示；⑤ 设备档案补 4 个新内核串（PYB110 284297031c53 / 3977fbeb3462，PMS110 5fd39602326e / 586bfab1b9c5）。未采用 plant_core 变体（libk61821p/x）：我方两台 6.18 的 release 都不在 isPlantCore61821 名单里 |
 | **2.21.9** | 218 | 修协议同意按钮点不了 | 2.21.4 为消除嵌套滚动删掉了 TermsDialog 的 verticalScroll，但「必须滚到底」的判断还依赖那个 ScrollState —— 滚动不再发生，maxValue 永远是 0、value 永远不动，reachedBottom 恒为 false，同意按钮永久置灰。现在滚动交给 COUI content 槽后外部拿不到 ScrollState，改为只按 10 秒阅读倒计时放行，文案同步改为「请阅读 N 秒后继续」 |
@@ -1241,6 +1242,174 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 **处理**：重试即可（网络问题，不是仓库状态问题）；长命令用后台任务，避免前台超时把任务打断。
 
+### 27. 中文日志分级：否定式和肯定式共用词根，顺序写错就把失败显示成成功
+
+**症状**：日志分级上线后，「连续 4 次尝试未成功」被标成**成功**（绿色）。
+比不分类更误导——用户以为跑通了。
+
+**根因**：`classify()` 里先判 `line.contains("成功")` 再判否定式，
+而「未成功」本身包含「成功」两个字。同理「未完成」含「完成」、
+「未找到」含「找到」、「未发现已知冲突」含「发现」。
+
+**修法**：判序固定为 ①特例白名单 ②特例黑名单 ③否定式/故障词 ④未完成类 ⑤肯定式。
+
+```kotlin
+if (line.contains("未发现")) return LogLevel.SUCCESS                       // 结论良好
+if (line.contains("发现已知冲突") || line.contains("发现冲突")) return LogLevel.ERROR  // 词序反转就是坏消息
+return when {
+    // ③ 否定式与故障词
+    line.contains("未成功") || line.contains("没有成功") || line.contains("不成功") ||
+        line.contains("失败") || line.contains("中止") || line.contains("错误") ||
+        line.contains("未安装") || line.contains("未运行") || line.contains("没有可") ||
+        line.contains("不在列表") || line.contains("已不在") ||
+        line.contains("找不到") || line.contains("未找到") ||
+        (line.contains("未") && line.contains("找到")) ||   // 兜「未在…里找到 ksud」这种语序
+        line.contains("rc=-1") || line.contains("FAIL=") || line.contains("MISSING") -> LogLevel.ERROR
+    // ④ 未完成 / 被拦下 / 需要用户操作
+    line.contains("未完成") || line.contains("警告") || line.contains("提示：") ||
+        line.contains("跳过") || line.contains("未开启") || line.contains("不可用") ||
+        line.contains("超时") || line.contains("未获得") || line.contains("暂不") ||
+        line.contains("未命中") || line.contains("已断开") || line.contains("不能") ||
+        line.contains("请先") || line.contains("正在切换") || line.contains("运行中") -> LogLevel.WARN
+    // ⑤ 肯定式
+    line.contains("成功") || line.contains("完成") || line.contains("已加载") ||
+        line.contains("已用") || line.contains("补齐") || line.contains("已接管") ||
+        line.contains("已归一化") || line.contains("已授予") ||
+        line.contains("DONE") || line.contains("MODULE_LOADED") -> LogLevel.SUCCESS
+    else -> LogLevel.INFO
+}
+```
+
+**教训**：
+1. 中文否定式**不换词**，只在前面加「未/没有/不」，所以子串匹配一定会撞车。
+   凡是用 `contains` 做中文语义判断，必须先枚举否定式再判肯定式；
+2. 语序会骗人：「未找到 ksud」能匹配「未找到」，
+   但「未在管理器 APK 里找到 ksud」不能——要 `contains("未") && contains("找到")` 双条件兜；
+3. 重试提示（「第 2 次尝试未命中，继续重试」）不是终态失败，归 WARN 不归 ERROR；
+4. 这类规则必须配**真实日志行回归测试**（`classifyRealLogLines`），
+   把项目里每一条 `addLog("...")` 的原文抄进断言，否则改一个字就静默回归。
+
+### 28. 历史页满屏「未完成 0.00s」：append 在无 activeId 时凭空建记录
+
+**症状**：历史页每开一次 App、每拨一次开关，就多一条
+「98260 运行链 · - · 未完成 0.00s」，用户以为程序一直在失败。
+
+**根因**：`HistoryStore.append(line)` 开头写着
+`if (activeId == null && line.isNotBlank()) { start(ctx, "unknown", "-", false, "") }`。
+设计意图是「只要有日志就该有记录」，实际效果是**任何一句 addLog 都会新开一条记录**，
+而记录只有在 `finish()` 被调用时才会离开 running 状态。
+开关操作、退出 App、软重启打断——都不会走 finish，于是全部沉淀成「未完成」。
+
+**修法**：
+1. `append()` 改为 `val id = activeId ?: return`——没有进行中的运行就不记账；
+2. 新增 `abandon(context, reason)`：启动时把残留的 running 记录标成 `interrupted`（异常中断），
+   这样历史页显示的是「异常中断」而不是「未完成」；
+3. 新增 `stats(context, recent)`：只把 `ok` / `failed` 计入分母，
+   `interrupted` 不入分母（被打断的样本不该拉低成功率）；
+4. `RunLog` 侧给 `addLog` 加 `toHistory: Boolean = HistoryStore.hasActive()` 默认值，
+   让「写日志」和「记账」彻底解耦。
+
+**教训**：日志存储里任何「自动补建父记录」的兜底都是危险的——
+它把「写日志」这个高频无害动作变成了「创建业务实体」。
+兜底要往**收敛**方向写（没有就丢弃），不要往**扩张**方向写（没有就新建）。
+
+### 29. 软重启把进程连根拔掉，finally 一行都跑不到——只能靠墓碑
+
+**症状**：越狱后系统重启，日志里完全没有归因信息，
+只能靠下次启动看 `boot_id` 变了，知道「重启过」，但不知道「重启发生在哪一步之后」。
+
+**根因**：`ksud soft-reboot` / `setprop ctl.restart zygote` 直接重建用户态，
+Java 进程被 SIGKILL，`finally`、`catch`、`onDestroy` 全部不执行。
+任何「事后归因」的代码都注定跑不到。
+
+**修法**：`RunTrace.mark(context, stage, intentional)` ——
+每进入一个阶段就往 `filesDir/onekey-run-trace.json` 写一份墓碑
+（stage / boot_id / 时间戳 / intent 位），`FileOutputStream` 写完 `flush()` + `fd.sync()`。
+下次启动 `RunTrace.settle(context)` 读墓碑：
+- boot_id 变了且 `intent=false` → WARN「上次运行在「X」之后系统重启」+ 该阶段的可操作建议；
+- boot_id 变了且 `intent=true` → INFO「按设置软重启，属正常收尾」；
+- boot_id 未变 → 返回 null，交给 `HistoryStore.abandon` 处理。
+
+`intent` 位是必须的：用户自己开的软重启不该被报成异常重启，否则归因自相矛盾。
+
+**教训**：**能活过进程死亡的只有文件**。
+要做「崩溃/重启归因」，别指望 try-finally，
+在**每个阶段边界**主动落盘一个带 `fsync` 的小文件，成本几毫秒，收益是唯一证据链。
+落盘后记得在正常收尾路径 `clear()`，否则下次启动误报。
+
+### 30. COUI alpha17 要求 compileSdk 37.1+，`disableCompileSdkChecks` 是绕过不是修复
+
+**症状**：升到 `io.github.itoseo:coui:0.0.1-alpha17` 后
+`:app:checkReleaseAarMetadata FAILED`，报 5 条
+`requires compile against version 37.1 or later`，而项目是 `android-37.0`。
+
+**根因**：读 aar 内的 `META-INF/com/android/build/gradle/aar-metadata.properties`：
+COUI alpha17 是 `minCompileSdk=37` + `minCompileMinorSdk=1`；
+compose 1.13.0 是 `minCompileSdk=37` + `minCompileMinorSdk=0`。
+项目当时 `compileSdk { version = release(37) { minorApiLevel = 0 } }`。
+
+**走过的死路**（都别再用）：
+1. `android.experimental.disableCompileSdkChecks=true` 加进 gradle.properties
+   确实能让 checkReleaseAarMetadata 过、assembleRelease 也成功，
+   但这是关掉体检，不是治病；
+2. `sdkmanager --list` 在 channel 0/1/2/3 下都只有 `platforms;android-37.0`，官方源不提供 37.1；
+3. `curl https://dl.google.com/android/repository/repository2-3.xml` 本机直接不通。
+
+**修法**：
+1. 本机 `~/Library/Android/sdk/platforms/` 里已装 `android-37.2`，直接用它；
+2. 新建 `merged-app/local.properties`（此前不存在，且已在 .gitignore）写
+   `sdk.dir=/Users/xingranya/Library/Android/sdk`；
+3. `compileSdk { version = release(37) { minorApiLevel = 2 } }`；
+4. 删掉 gradle.properties 里的 `disableCompileSdkChecks`；
+5. 构建时 `unset ANDROID_HOME ANDROID_SDK_ROOT`，只 export `JAVA_HOME=/opt/homebrew/opt/openjdk@21`，
+   否则会走 `/opt/homebrew/share/android-commandlinetools`（那里只有 37.0）。
+
+**教训**：AAR 元数据的报错文案只给「37.1 or later」，
+但**真正要比的是 (minCompileSdk, minCompileMinorSdk) 二元组**。
+报错不说 minor，容易让人以为要装 37.1 而实际上 37.2 也行。
+
+### 31. 查 APK 里有没有中文串，`strings` 和 `grep -a` 都查不到
+
+**症状**：`strings classes.dex | grep 成功率` 返回空，
+差点误判「R8 把资源删了 / 中文没打进去」。
+
+**根因**：`strings` 默认只输出可打印 ASCII，
+UTF-8 中文是多字节非 ASCII，整串被跳过；`grep -a` 同样按行匹配，
+而 dex 里字符串区没有换行分隔，整块被当成一行，超长行会被 grep 截断/放弃。
+
+**修法**：用 Python 直接读字节做子串计数：
+
+```python
+import zipfile
+z = zipfile.ZipFile(apk)
+blob = b''.join(z.read(n) for n in z.namelist() if n.endswith('.dex'))
+for s in ["本次成功率", "内存占用", "关于成功率的说明"]:
+    print(s, blob.count(s.encode('utf-8')))
+```
+
+注意用 `/opt/homebrew/Caskroom/miniforge/base/bin/python3`
+（本机 `/opt/homebrew/bin/python3` 不存在）。
+
+### 32. R8 混淆后按类名查 APK 内容必然为 0，要查 mapping.txt
+
+**症状**：`unzip -l app-release.apk | grep -c com/itos/coui` 返回 0，
+`strings classes.dex | grep itos/coui` 也是 0，怀疑 COUI 没打进去。
+
+**根因**：release 开了 R8，`com.itos.coui.sheet.BottomSheetKt` 被重命名成 `pe:` 这类短名，
+原始包路径只留在 `mapping.txt` 里。
+
+**修法**：查 `app/build/outputs/mapping/release/mapping.txt`：
+
+```bash
+grep -c "^com.itos.coui.sheet" app/build/outputs/mapping/release/mapping.txt
+# 50
+```
+
+50 行命中即证明 BottomSheet 相关类全部进包。
+
+**教训**：release 包的内容校验分两类——
+**字符串**用字节计数（见 31），**类/符号**用 mapping.txt。
+两者都不能拿 debug 包的经验套。
 ## 踩过的"以为坏了其实正常"
 
 | 现象 | 结论 |

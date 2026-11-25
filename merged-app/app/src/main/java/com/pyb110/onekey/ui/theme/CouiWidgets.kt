@@ -27,6 +27,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,6 +38,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.itos.coui.backdrop.CouiBackdrop
+import com.itos.coui.sheet.BottomSheet as CouiBottomSheet
+import com.itos.coui.sheet.CouiSheetDefaults
 import com.itos.coui.dialog.CouiDialogAction
 import com.itos.coui.dialog.CouiDialogActionStyle
 import com.itos.coui.dialog.CouiDialogDefaults
@@ -145,12 +148,14 @@ fun WindowDialog(
 val LocalDialogBackdrop = androidx.compose.runtime.staticCompositionLocalOf<CouiBackdrop?> { null }
 
 /**
- * 底部抽屉：直接用 COUI 的 placement = Bottom 弹窗。
+ * 底部抽屉：COUI alpha17 起自带 [com.itos.coui.sheet.BottomSheet]，不再用 placement = Bottom 的弹窗冒充。
  *
- * 之前手搓过一版普通窗口，结果是：内容不能滑动（库的内容槽才是 verticalScroll）、
- * 没有进出场动画、遮罩铺满导致下滑被系统当成返回手势。
- * 唯一要处理的是高度 —— 库的内容槽是 weight(1f)，短内容会被撑满，
- * 所以这里把面板内容包进 heightIn(max) 并让外层按内容测量。
+ * 之前用 Bottom 弹窗时踩过一串坑：内容槽是 weight(1f) 会把短内容撑满整屏、
+ * 弹窗自己的滚动槽与内层滚动冲突、遮罩铺满导致下滑被系统当成返回手势。
+ * 原生抽屉把这些都做对了：拖拽手柄、吸附高度、内容区独立滚动、下滑关闭。
+ *
+ * 唯一保留的兼容点是 [visible] 需要是 MutableState —— 库自己驱动进出场动画，
+ * 不能每次重组重新传一个常量，否则关闭动画会被打断。
  */
 @Composable
 fun WindowBottomSheet(
@@ -162,31 +167,38 @@ fun WindowBottomSheet(
 ) {
     val dark = CouiTheme.isDark
     val colors = CouiDialogDefaults.themeColors(dark)
-    val close = {
-        onDismissRequest()
-        onDismissFinished()
-    }
-    CouiDialog(
-        onDismissRequest = close,
-        confirmAction = CouiDialogAction("关闭", close),
+    // 库自己驱动进出场动画，visible 必须是稳定的 MutableState；
+    // 每次重组传新常量会打断关闭动画，看起来像闪一下。
+    val visible = remember { mutableStateOf(show) }
+    LaunchedEffect(show) { visible.value = show }
+    // 关闭流程分两步：先让库跑完收起动画（visible 由库置 false），
+    // 动画结束后再回调 onDismissFinished 让外部复位状态。
+    // 一步做完会把子树提前拆掉，动画被掐断，看起来像"啪一下消失"。
+    CouiBottomSheet(
+        visible = visible,
+        onDismissRequest = { onDismissRequest() },
         dark = dark,
-        title = title?.takeIf { it.isNotBlank() },
-        placement = CouiDialogPlacement.Bottom,
         colors = colors,
-        visible = show,
+        showDragHandle = true,
+        titleContent = title?.takeIf { it.isNotBlank() }?.let { t ->
+            { Text(t, style = COUITheme.textStyles.headline2) }
+        },
+        backdrop = LocalDialogBackdrop.current,
     ) {
-        // 不要在库的滚动槽里再套 heightIn：heightIn 是裁剪不是滚动，
-        // 内容超过它就会被截断且无法下滑。高度与滚动交给库。
-        // 但库只给 title/message 加内边距，content 槽本身没有，这里必须自己补，
-        // 否则文字会直接顶到卡片边缘。
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = CouiDialogDefaults.contentPadding)
+                .padding(horizontal = CouiSheetDefaults.toolbarHorizontalPadding)
         ) { content() }
+    }
+    // 库把 visible 置回 false 即代表收起完成，此时才通知外部复位状态；
+    // 提前拆子树会掐断收起动画。
+    LaunchedEffect(visible.value) {
+        if (!visible.value) onDismissFinished()
     }
 }
 
+/** 轻提示状态：COUI 无 Snackbar，这里只保留文本与自动消失。 */
 class SnackbarHostState {
     var message by mutableStateOf<String?>(null)
         private set

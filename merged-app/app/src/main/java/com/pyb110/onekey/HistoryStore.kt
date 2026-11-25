@@ -77,12 +77,17 @@ object HistoryStore {
         }
     }
 
+    /**
+     * 追加一行日志。
+     *
+     * 只有当 [RunState.active] 为 true（真正在跑一次越狱）时才允许凭空建记录。
+     * 以前这里无条件兜底，导致「启动 App」「拨开关」这类普通日志都会各造一条
+     * exploit=unknown 的记录，永远停在 running，历史页因此堆满「未完成 0.00s」。
+     */
     fun append(line: String) {
         val ctx = appContext ?: return
-        if (activeId == null && line.isNotBlank()) {
-            // Safety net: even if a run path forgot start(), keep the log.
-            start(ctx, "unknown", "-", false, "")
-        }
+        // 没有活动记录就不写：以前这里会凭空 start 一条 exploit=unknown 的记录，
+        // 结果是启动 App、拨开关、看提示都会各留一条永远 running 的幽灵记录。
         val id = activeId ?: return
         synchronized(lock) {
             runCatching {
@@ -91,6 +96,61 @@ object HistoryStore {
             }
         }
     }
+
+    /**
+     * 把仍在 running 的记录标成 interrupted。
+     *
+     * 进程被系统杀掉、用户强退、软重启都会留下 running 记录；
+     * 没人收尾的话它们会一直显示「未完成」，还会污染成功率统计。
+     */
+    fun abandon(context: Context, reason: String = "未执行完就退出") {
+        val ctx = context.applicationContext
+        synchronized(lock) {
+            val files = dir(ctx).listFiles { f -> f.isFile && f.name.endsWith(".json") } ?: return
+            for (f in files) {
+                val id = f.name.removeSuffix(".json")
+                runCatching {
+                    val j = readMeta(ctx, id) ?: return@runCatching
+                    if (j.optString("status") != "running") return@runCatching
+                    j.put("status", "interrupted")
+                    j.put("stage", reason)
+                    j.put("endedAt", System.currentTimeMillis())
+                    writeMeta(ctx, id, j)
+                }
+            }
+            activeId = null
+        }
+    }
+
+    /**
+     * 统计口径：只算真正跑完的（ok / failed）。
+     * interrupted 与 unknown 不计入分母，否则强退一次就永久拉低成功率。
+     */
+    fun stats(context: Context, recent: Int = 10): Stats {
+        val all = list(context).filter { it.status == "ok" || it.status == "failed" }
+        val ok = all.count { it.status == "ok" }
+        val recentList = all.take(recent)
+        return Stats(
+            total = all.size,
+            ok = ok,
+            recentTotal = recentList.size,
+            recentOk = recentList.count { it.status == "ok" },
+        )
+    }
+
+    data class Stats(
+        val total: Int,
+        val ok: Int,
+        val recentTotal: Int,
+        val recentOk: Int,
+    ) {
+        val rate: Double get() = if (total == 0) -1.0 else ok * 100.0 / total
+        val recentRate: Double get() = if (recentTotal == 0) -1.0 else recentOk * 100.0 / recentTotal
+        val hasData: Boolean get() = total > 0
+    }
+
+    /** 当前是否有一次运行记录处于打开状态（start 之后、finish 之前）。 */
+    fun hasActive(): Boolean = activeId != null
 
     fun updateStage(stage: String) {
         val ctx = appContext ?: return

@@ -5,35 +5,35 @@ BASE = "https://api.cnb.cool/xingranya/onekeyjb/-/releases/2115388998399250432"
 TOK = os.environ["CNB_TOKEN"]
 R = "/Users/xingranya/Downloads/onekeyjb-private"
 
-VERSION_CODE = 219
-VERSION_NAME = "2.22.0"
-
+VC, VN = 221, "2.23.0"
 size = os.path.getsize(APK)
 sha = hashlib.sha256(open(APK, "rb").read()).hexdigest()
 print("size", size, "sha", sha)
 
 with urllib.request.urlopen("https://cnb.cool/xingranya/onekeyjb/-/releases/download/update/update.json", timeout=60) as r:
     doc = json.load(r)
-print("remote before:", doc.get("versionCode"), doc.get("versionName"))
 
 notes = [
-    "执行器更新到当前效果最好的一版，一加 16 与 Ace 7 Pro 均已适配",
-    "失败提示更具体：能区分模块未加载、未拿到 root、内核契约不符、tracefs 占用、内存时机等",
-    "设备档案新增 4 个内核版本，覆盖更多系统更新",
-    "其余交互与越狱流程未改动",
+    "日志改为分级显示：信息 / 成功 / 警告 / 失败，一行一条，中文标签带色条",
+    "日志新增阶段墓碑：进程被重启打断后，下次启动能指出重启发生在哪一步之后",
+    "开关操作与退出不再被记成失败，历史页不再凭空产生「未完成」记录",
+    "首页参数区新增成功率：内存占用、CPU 温度、系统负载三格实时采样",
+    "成功率偏低时开始前弹窗提醒，并给出瓶颈与建议",
+    "许可证说明补充成功率的计算方式与边界",
+    "升级 COUI 到 0.0.1-alpha17，抽屉换用库原生 BottomSheet",
+    "compileSdk 提到 37.2，解决新依赖的 AAR 元数据要求"
 ]
-doc["versionCode"] = VERSION_CODE
-doc["versionName"] = VERSION_NAME
-doc["publishedAt"] = "2026-11-18T12:00:00+08:00"
+doc["versionCode"] = VC
+doc["versionName"] = VN
+doc["publishedAt"] = "2026-11-25T14:00:00+08:00"
 doc["size"] = size
 doc["sha256"] = sha
-doc["changelog"] = "v" + VERSION_NAME + "\n\n" + "\n".join("- " + n for n in notes)
-vs = [v for v in doc.get("versions", []) if v.get("versionCode") != VERSION_CODE]
-vs.insert(0, {"versionName": VERSION_NAME, "versionCode": VERSION_CODE,
-              "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
+doc["changelog"] = "v" + VN + "\n\n" + "\n".join("- " + n for n in notes)
+vs = [v for v in doc.get("versions", []) if v.get("versionCode") != VC]
+vs.insert(0, {"versionName": VN, "versionCode": VC, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
 doc["versions"] = vs
-open("/tmp/upd-new.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
-print("prepared:", doc["versionCode"], doc["versionName"], "versions", len(vs))
+open("/tmp/upd-2300.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
+print("prepared", doc["versionCode"], doc["versionName"], "versions", len(vs))
 
 def api(url, data=None, method="POST"):
     h = {"Authorization": "Bearer " + TOK, "Accept": "application/vnd.cnb.api+json"}
@@ -55,7 +55,7 @@ def upload(name, path):
     print("upload", name, "put", put, "verify", st2, flush=True)
 
 upload("OneKeyJB-latest.apk", APK)
-upload("update.json", "/tmp/upd-new.json")
+upload("update.json", "/tmp/upd-2300.json")
 upload("OneKey-Knowledge.md", R + "/dist/OneKey-Knowledge.md")
 upload("onekey-kb.json", R + "/knowledge/ai-kb/onekey-kb.json")
 upload("onekey-kb.docs.json", R + "/knowledge/ai-kb/onekey-kb.docs.json")

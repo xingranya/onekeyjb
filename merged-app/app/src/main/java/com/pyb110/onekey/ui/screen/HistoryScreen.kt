@@ -153,14 +153,22 @@ internal fun HistoryScreen(
                         ListCard(
                             rows = groupRows.map { rec ->
                                 val isOk = rec.status == "ok"
+                                // 状态文案走 HistoryRecord.stateText：成功/失败/异常中断/未完成
+                                // 四态各有含义，全部压成「未完成」会让用户以为每次都没跑。
+                                val stateColor = when (rec.status) {
+                                    "ok" -> oneKeyColors().success
+                                    "failed" -> oneKeyColors().error
+                                    "interrupted" -> oneKeyColors().warning
+                                    else -> oneKeyColors().muted
+                                }
                                 ListRow(
-                                    title = "98260 运行链",
+                                    title = rec.title,
                                     summary = rec.manager + " · " +
                                         HistoryStore.formatTime(rec.startedAt) + " · " +
-                                        (if (isOk) "运行成功" else "未完成") + " " +
+                                        rec.stateText + " " +
                                         String.format(java.util.Locale.US, "%.2fs", rec.durationSec.toDouble()),
                                     icon = if (isOk) COUIIcons.Ok else COUIIcons.Close,
-                                    iconTint = if (isOk) oneKeyColors().success else oneKeyColors().error,
+                                    iconTint = stateColor,
                                     arrow = true,
                                     onClick = { haptic(CouiHapticEffect.Switch); selected = rec }
                                 )

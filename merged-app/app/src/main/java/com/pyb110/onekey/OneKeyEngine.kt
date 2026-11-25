@@ -146,11 +146,13 @@ object OneKeyEngine {
                     line.startsWith("[2/4]") -> { stage("加载内核模块"); progress(65) }
                     line.startsWith("[3/4]") -> { stage("等待 su"); progress(80) }
                     line.startsWith("[4/4]") -> { stage("管理器收尾"); progress(90) }
-                    line == "MODULE_LOADED" -> { RunReport.markWrote("加载内核模块"); markRootedNow(context); log("内核模块已加载") }
-                    line.startsWith("SU_ID_RC=0") -> { markRootedNow(context); log("su 校验：" + line) }
-                    line.startsWith("SU_ID_RC=") -> log("su 校验：" + line)
+                    line == "MODULE_LOADED" -> {
+                        RunReport.markWrote("加载内核模块"); markRootedNow(context); log("内核模块已加载")
+                    }
+                    line.startsWith("SU_ID_RC=0") -> { markRootedNow(context); log("root 校验通过") }
+                    line.startsWith("SU_ID_RC=") -> log("root 校验未通过，返回码 " + line.substringAfter("=").trim())
                     line.startsWith("UNIVERSAL_LOADER=") -> log("通用加载器已接管模块加载")
-                    line.startsWith("MANAGER_SWITCH_RC=") -> log("管理器切换：" + line)
+                    line.startsWith("MANAGER_SWITCH_RC=") -> log("管理器切换完成")
                     line.startsWith("MANAGER_SWITCH_NO_APK") -> log("管理器切换失败：找不到 APK")
                     line.startsWith("MANAGER_SWITCH_NO_UID") -> log("管理器切换失败：找不到应用数据目录")
                     line == "DONE" -> { ok = true; progress(100) }
@@ -159,21 +161,12 @@ object OneKeyEngine {
                         log("该管理器把加载器改了名；完成一次越狱后本应用会自动归一化，或改用其他管理器先越狱")
                     }
                     line.contains("FAIL=") -> {
-                        // Shark 2.5 新增若干失败类型，按语义给出可操作的提示，而不是只贴原文。
-                        val kind = line.substringAfter("FAIL=").substringBefore(" ").substringBefore("\t")
-                        val hint = when (kind) {
-                            "plantresultmodule" -> "提权原语已执行但模块未能加载；重启后重试"
-                            "cred" -> "未拿到 root 凭证；确认管理器已授权本应用"
-                            "contract", "profile" -> "该内核的漏洞契约与预期不符；请确认机型档案"
-                            "tracefs" -> "tracefs 不可用或被占用；重启后重试"
-                            "mem", "probe" -> "内存回收时机不匹配；等系统空闲后重试"
-                            "uname" -> "内核版本不在支持列表"
-                            else -> null
-                        }
+                        // 具体的中文归因交给 RunLog.fromEngine 统一处理，这里只负责记录停止点。
                         RunReport.stop("执行器", line.take(120))
-                        if (hint != null) log(hint)
+                        log(line)
                     }
-                    else -> if (line.length in 3..200) log("  " + line)
+                    // 其余原始行（含 EV| 结构化事件）原样上抛，由 RunLog 解析成中文标签。
+                    else -> if (line.length in 3..300) log(line)
                 }
             }
             // 首次失败就停：引擎自身的 attempt 重试会把内核越打越乱。

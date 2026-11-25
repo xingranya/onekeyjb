@@ -1,0 +1,180 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "io.github.itoseo",
+    "module": "coui",
+    "version": "0.0.1-alpha17",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.6.0"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.compose.ui",
+          "module": "ui",
+          "version": {
+            "requires": "1.13.0"
+          }
+        },
+        {
+          "group": "androidx.compose.animation",
+          "module": "animation",
+          "version": {
+            "requires": "1.13.0"
+          }
+        },
+        {
+          "group": "androidx.compose.foundation",
+          "module": "foundation",
+          "version": {
+            "requires": "1.13.0"
+          }
+        },
+        {
+          "group": "androidx.navigation3",
+          "module": "navigation3-ui",
+          "version": {
+            "requires": "1.2.1"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.4.20"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "coui-0.0.1-alpha17.aar",
+          "url": "coui-0.0.1-alpha17.aar",
+          "size": 2183602,
+          "sha512": "c9a011e6c232e112292a2e8e99c632c8203ecb7d92926c266cfbdc42e5b481dd93e0b47555dbd2d40a263e534b5e4f0e4c1bd3dd1035fbc9821ea8f15dc895e7",
+          "sha256": "6fba4b7e82d5373380a4e07c2de618e6254fca2547514b125c1ef9ca0238419c",
+          "sha1": "e23b9a95a7d84b23b92fcbb3916d6ed146cb35e0",
+          "md5": "56d346c8150efa86f819033347e2055d"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.lifecycle",
+          "module": "lifecycle-runtime-compose",
+          "version": {
+            "requires": "2.10.0"
+          }
+        },
+        {
+          "group": "androidx.compose.runtime",
+          "module": "runtime",
+          "version": {
+            "requires": "1.13.0"
+          }
+        },
+        {
+          "group": "androidx.dynamicanimation",
+          "module": "dynamicanimation",
+          "version": {
+            "requires": "1.1.0"
+          }
+        },
+        {
+          "group": "androidx.core",
+          "module": "core-ktx",
+          "version": {
+            "requires": "1.19.1"
+          }
+        },
+        {
+          "group": "androidx.compose.ui",
+          "module": "ui",
+          "version": {
+            "requires": "1.13.0"
+          }
+        },
+        {
+          "group": "androidx.compose.animation",
+          "module": "animation",
+          "version": {
+            "requires": "1.13.0"
+          }
+        },
+        {
+          "group": "androidx.compose.foundation",
+          "module": "foundation",
+          "version": {
+            "requires": "1.13.0"
+          }
+        },
+        {
+          "group": "androidx.navigation3",
+          "module": "navigation3-ui",
+          "version": {
+            "requires": "1.2.1"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.4.20"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "coui-0.0.1-alpha17.aar",
+          "url": "coui-0.0.1-alpha17.aar",
+          "size": 2183602,
+          "sha512": "c9a011e6c232e112292a2e8e99c632c8203ecb7d92926c266cfbdc42e5b481dd93e0b47555dbd2d40a263e534b5e4f0e4c1bd3dd1035fbc9821ea8f15dc895e7",
+          "sha256": "6fba4b7e82d5373380a4e07c2de618e6254fca2547514b125c1ef9ca0238419c",
+          "sha1": "e23b9a95a7d84b23b92fcbb3916d6ed146cb35e0",
+          "md5": "56d346c8150efa86f819033347e2055d"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseSourcePublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "coui-0.0.1-alpha17-sources.jar",
+          "url": "coui-0.0.1-alpha17-sources.jar",
+          "size": 371675,
+          "sha512": "2b5db2043556e522b4fc0c34505d84bcb001dcb02da1a0d182c143f12e5bf78ceb382ff8c6d21587c7b1f40c7745a9bdc5b681cef22c602ffb7a25205d6c093a",
+          "sha256": "b31e1af8a07ace4bb3bb4260bf284d314c7bbd7d304826ba8f5eeee75e4d24f0",
+          "sha1": "4124434128f34abb4de5beb74504c1bb8d800709",
+          "md5": "3ddaf891389dae7eb19be5d05e00b84a"
+        }
+      ]
+    }
+  ]
+}

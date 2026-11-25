@@ -120,6 +120,10 @@ class JailbreakController private constructor(private val context: Context) {
     var hotSwitchWanted: Boolean by mutableStateOf(prefs.getBoolean("hot_switch_wanted", false)); private set
     /** 本次开机是否已成功越狱（与 boot_id 绑定，重启后自动失效）。 */
     var rootedThisBoot: Boolean by mutableStateOf(false); private set
+    /** 当前成功率评估（每秒刷新一次）。 */
+    var successRate: RateResult by mutableStateOf(SuccessRate.evaluate(-1, -1, -1.0)); private set
+    /** 历史成功率统计。 */
+    var historyStats: HistoryStore.Stats by mutableStateOf(HistoryStore.Stats(0, 0, 0, 0)); private set
 
     private var autoRepairTried = false
 
@@ -143,6 +147,21 @@ class JailbreakController private constructor(private val context: Context) {
         File("/proc/sys/kernel/random/boot_id").readText().trim()
     }.getOrDefault("")
 
+    /** 每秒采一次样，界面上的成功率跟着动。 */
+    private fun startRateSampler() {
+        scope.launch {
+            while (true) {
+                val r = SuccessRate.sample()
+                successRate = r
+                delay(SuccessRate.SAMPLE_MS)
+            }
+        }
+    }
+
+    fun refreshStats() {
+        historyStats = runCatching { HistoryStore.stats(context) }.getOrDefault(HistoryStore.Stats(0, 0, 0, 0))
+    }
+
     private fun refreshRootedFlag() {
         val saved = prefs.getString("success_boot_id", "").orEmpty()
         rootedThisBoot = saved.isNotBlank() && saved == localBootId()
@@ -150,7 +169,12 @@ class JailbreakController private constructor(private val context: Context) {
 
     init {
         HistoryStore.attach(context)
+        // 进程被杀、强退、软重启都会留下 running 记录；启动时统一收尾成「异常中断」，
+        // 否则历史页会永远挂着「未完成」，还会把成功率算错。
+        runCatching { HistoryStore.abandon(context) }
         refreshRootedFlag()
+        refreshStats()
+        startRateSampler()
         runCatching {
             Stellar.addBinderReceivedListenerSticky(binderListener, null)
             Stellar.addBinderDeadListener(deadListener, null)
@@ -172,12 +196,17 @@ class JailbreakController private constructor(private val context: Context) {
         runCatching {
             val f = File(context.filesDir, "onekey-live.log")
             if (f.isFile) {
-                val tail = f.readLines().takeLast(400)
+                val tail = f.readLines().takeLast(400).filter { it.isNotBlank() }
                 if (tail.isNotEmpty()) {
-                    logs = tail + "—— 以上为上次运行记录（可能被软重启中断）——"
+                    // 分隔行必须自己也符合落盘格式，否则它会被 parse 当成正文，
+                    // 标题里带着一对方括号出现在日志页第一行。
+                    logs = tail + RunLog.info("以上为上次运行记录", "可能被软重启中断").format()
                 }
             }
         }
+        // 墓碑结算必须排在日志恢复之后：前面那句 logs = tail + ... 是整体赋值，
+        // 先写结论会被它覆盖掉。进程已死，磁盘墓碑是唯一还活着的证据。
+        runCatching { RunTrace.settle(context) }.getOrNull()?.let { logs = logs + it.format() }
     }
 
     private fun loadSelectedManager(): String {
@@ -411,13 +440,16 @@ class JailbreakController private constructor(private val context: Context) {
     fun updateAntiRootGuard(enabled: Boolean) {
         antiRootGuard = enabled
         prefs.edit().putBoolean("antiroot", enabled).apply()
-        addLog(if (enabled) "已开启：越狱后临时禁用 ColorOS 安全弹窗" else "已关闭安全弹窗处理")
+        addUiLog(
+            if (enabled) RunLog.info("已开启安全弹窗处理", "越狱后临时停用 ColorOS 安全守护")
+            else RunLog.info("已关闭安全弹窗处理")
+        )
     }
 
     fun updateCloudAuto(enabled: Boolean) {
         cloudAuto = enabled
         prefs.edit().putBoolean("cloud_auto", enabled).apply()
-        addLog(if (enabled) "已开启自动匹配云端组件" else "已关闭自动匹配云端组件")
+        addUiLog(if (enabled) RunLog.info("已开启云端组件匹配") else RunLog.info("已关闭云端组件匹配"))
     }
 
     fun checkUpdates() {
@@ -443,13 +475,19 @@ class JailbreakController private constructor(private val context: Context) {
     fun updateUnloadKernelGuard(enabled: Boolean) {
         unloadKernelGuard = enabled
         prefs.edit().putBoolean("unload_kernel_guard", enabled).apply()
-        addLog(if (enabled) "已开启：越狱后卸载内核安全防护" else "已关闭内核安全防护卸载")
+        addUiLog(
+            if (enabled) RunLog.warn("已开启内核防护卸载", "成功后卸载内核安全防护模块，可能引起系统重建")
+            else RunLog.info("已关闭内核防护卸载")
+        )
     }
 
     fun updateSusfs(enabled: Boolean) {
         susfsEnabled = enabled
         prefs.edit().putBoolean("susfs_enabled", enabled).apply()
-        addLog(if (enabled) "已开启 SUSFS 支持（执行器加载模块后生效）" else "已关闭 SUSFS 支持")
+        addUiLog(
+            if (enabled) RunLog.info("已开启 SUSFS 支持", "加载模块后生效")
+            else RunLog.info("已关闭 SUSFS 支持")
+        )
     }
 
     private fun selectedPkg(): String? = managers.firstOrNull { it.kind == selectedManager }?.pkg
@@ -564,7 +602,10 @@ class JailbreakController private constructor(private val context: Context) {
     fun updateVfs(enabled: Boolean) {
         vfsEnabled = enabled
         prefs.edit().putBoolean("vfs_enabled", enabled).apply()
-        addLog(if (enabled) "已开启 VFS 支持（仅 6.18 内核生效）" else "已关闭 VFS 支持")
+        addUiLog(
+            if (enabled) RunLog.info("已开启 VFS 支持", "仅 6.18 内核生效")
+            else RunLog.info("已关闭 VFS 支持")
+        )
     }
 
     fun executeHotSwitch(targetKind: String, onDone: (Boolean, String) -> Unit) {
@@ -641,9 +682,9 @@ class JailbreakController private constructor(private val context: Context) {
     fun updateAutoJailbreak(enabled: Boolean) {
         autoJailbreak = enabled
         prefs.edit().putBoolean("auto_jailbreak", enabled).apply()
-        addLog(
-            if (enabled) "已开启「开机自动越狱」：需先在 Stellar 里开启开机启动，并在系统设置里允许本应用自启动"
-            else "已关闭「开机自动越狱」：开机后不会自动运行"
+        addUiLog(
+            if (enabled) RunLog.info("已开启开机自动越狱", "需在 Stellar 里开启开机启动，并允许本应用自启动")
+            else RunLog.info("已关闭开机自动越狱")
         )
     }
 
@@ -657,15 +698,18 @@ class JailbreakController private constructor(private val context: Context) {
     fun disableAutoJailbreakAfterFailure() {
         autoJailbreak = false
         prefs.edit().putBoolean("auto_jailbreak", false).apply()
-        addLog("上次自动越狱未成功，已自动关闭「开机自动越狱」")
+        addLog(RunLog.warn("自动越狱未成功", "已关闭开机自动越狱，避免重启循环"))
     }
+
+    /** 实时读落盘值：软重启这种不可逆动作只认 prefs，不认内存态。 */
+    private fun softRebootWanted(): Boolean = prefs.getBoolean("soft_reboot_after", false)
 
     fun updateSoftRebootAfter(enabled: Boolean) {
         softRebootAfter = enabled
         prefs.edit().putBoolean("soft_reboot_after", enabled).apply()
-        addLog(
-            if (enabled) "已开启「越狱后软重启」：成功后执行一次 setprop ctl.restart zygote"
-            else "已关闭「越狱后软重启」：越狱成功后保持当前会话，不重启"
+        addUiLog(
+            if (enabled) RunLog.info("已开启越狱后软重启", "成功后重启一次用户态，内核模块保持加载")
+            else RunLog.info("已关闭越狱后软重启", "成功后保持当前会话")
         )
     }
 
@@ -700,8 +744,14 @@ class JailbreakController private constructor(private val context: Context) {
         }
     }
 
-    fun addLog(line: String) {
-        val stamped = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date()) + "  " + line
+    /**
+     * 写一条结构化日志。
+     *
+     * @param toHistory 是否同时写进当前运行记录。开关操作、界面提示这类
+     *   与越狱结果无关的事件传 false，避免污染历史与成功率统计。
+     */
+    fun addLog(entry: LogEntry, toHistory: Boolean = HistoryStore.hasActive()) {
+        val stamped = entry.format()
         synchronized(logLock) {
             val next = logs + stamped
             logs = if (next.size > 3000) next.takeLast(3000) else next
@@ -712,9 +762,20 @@ class JailbreakController private constructor(private val context: Context) {
                     out.fd.sync()
                 }
             }
-            HistoryStore.append(stamped)
+            if (toHistory) HistoryStore.append(stamped)
         }
     }
+
+    /** 兼容旧调用点：纯文本按关键字自动归类成 信息/成功/警告/失败。 */
+    fun addLog(line: String) = addLog(RunLog.plain(line))
+
+    /**
+     * 界面事件日志：拨开关、点按钮、页面提示。
+     *
+     * 这些与「一次越狱的结果」无关，写进历史只会让历史页出现
+     * 一堆「未完成 0.00s」的记录，还会把成功率的分母撑大。所以固定 toHistory=false。
+     */
+    fun addUiLog(entry: LogEntry) = addLog(entry, toHistory = false)
 
     fun clearLogs() = synchronized(logLock) { logs = emptyList() }
 
@@ -823,7 +884,26 @@ class JailbreakController private constructor(private val context: Context) {
         logs = emptyList()
         runCatching { File(context.filesDir, "onekey-live.log").delete() }
         HistoryStore.start(context, "cve98260", runKind, runAdaptive, BuildConfig.VERSION_NAME)
-        addLog("========== OneKey · " + (profile?.displayName ?: "OnePlus") + " · 98260 ==========")
+        addLog(RunLog.info("开始越狱", (profile?.displayName ?: "OnePlus") + " · " + BuildConfig.VERSION_NAME))
+        // 开跑前拍一份环境快照：日志里能对上"跑之前的系统状态"，成功率也能复盘。
+        val startSnap = BootWatch.snapshot()
+        if (startSnap.valid) {
+            addLog(
+                RunLog.info(
+                    "系统状态",
+                    "boot_id " + startSnap.bootId.take(8) + " · system_server " +
+                        startSnap.systemServerPid.ifBlank { "?" } + " · 已开机 " + startSnap.uptimeSec + "s"
+                )
+            )
+        }
+        val preRate = SuccessRate.sample()
+        successRate = preRate
+        addLog(
+            RunLog.info(
+                "开跑前成功率预估",
+                "约 " + String.format(Locale.US, "%.0f%%", preRate.score) + "（" + preRate.advice() + "）"
+            )
+        )
         val t0 = System.currentTimeMillis()
         scope.launch { while (running) { elapsedSeconds = (System.currentTimeMillis() - t0) / 1000L; delay(1000L) } }
         scope.launch {
@@ -875,8 +955,14 @@ class JailbreakController private constructor(private val context: Context) {
                         progress = 0.05f
                         ok = OneKeyEngine.run(
                             context, runner, chosen.kind,
-                            { addLog(it) },
-                            { stage = it; HistoryStore.updateStage(it) },
+                            { addLog(RunLog.fromEngine(it)) },
+                            {
+                                stage = it
+                                HistoryStore.updateStage(it)
+                                // 每进入一个阶段就落墓碑：进程若在此之后被重启拔掉，
+                                // 下次启动能直接说出"停在哪一步之后"，不用靠时间戳猜。
+                                RunTrace.mark(context, it)
+                            },
                             { progress = it / 100f },
                             susfsEnabled, vfsEnabled, unloadKernelGuard, antiRootGuard,
                             universalModuleEnabled
@@ -907,13 +993,15 @@ class JailbreakController private constructor(private val context: Context) {
                 releaseRunLock()
                 lastResultOk = ok
                 lastResultExploitKind = "cve98260"
-                if (ok) hardenAfterSuccess()
-                // 本 App 不主动软重启（避免与引擎/系统行为混淆）；
-                // 只做归因：若 boot_id 变了，说明发生了用户态重启
+                // 收尾阶段逐段归因：开关全关却仍然重启时，靠这两次快照点名到底是谁干的。
                 if (ok) {
+                    RunTrace.mark(context, "停用安全守护")
+                    val beforeHarden = BootWatch.snapshot()
+                    hardenAfterSuccess()
+                    BootWatch.check(beforeHarden, "停用安全守护")?.let { addLog(RunLog.warn(it, "不是本应用发起的重启")) }
                     val nowBoot = ShizukuShell.run("cat /proc/sys/kernel/random/boot_id 2>/dev/null", 8).output.trim()
                     if (startBootId.isNotBlank() && nowBoot.isNotBlank() && nowBoot != startBootId) {
-                        addLog("提示：检测到用户态重启（boot_id 变化），这不是 App 主动触发的软重启")
+                        addLog(RunLog.warn("检测到用户态重启", "boot_id 变化，不是本应用发起"))
                     }
                 }
                 val wrote = RunReport.wroteKernel
@@ -944,23 +1032,42 @@ class JailbreakController private constructor(private val context: Context) {
                     rootedThisBoot = startBootId.isNotBlank() && startBootId == localBootId()
                     // 管理器升级会重建 lib 目录，加载器被还原；此时自动补装，避免下次开机又变回单管理器。
                     if (hotSwitchWanted && !hotSwitchLoaderInstalled) {
-                        addLog("检测到通用加载器缺失（可能管理器已升级），正在自动重装")
+                        addLog(RunLog.info("通用加载器缺失", "管理器可能已升级，正在自动重装"))
                         installHotSwitchLoader { _, _ -> }
                     }
                     // 软重启只由本应用按开关显式执行；关闭时保持当前会话，绝不自动重启。
-                    if (softRebootAfter && !softRebootIssued) {
+                    // 这里刻意重新读一次 prefs，而不是用内存里的 softRebootAfter：
+                    // 内存态可能被组合快照、进程重建、旧版本残留值带偏，只有落盘值才是用户当下真正选的。
+                    val rebootWanted = softRebootWanted()
+                    if (rebootWanted != softRebootAfter) {
+                        addLog(RunLog.warn("软重启开关状态已校正", "内存 " + softRebootAfter + " · 落盘 " + rebootWanted))
+                        softRebootAfter = rebootWanted
+                    }
+                    if (rebootWanted && !softRebootIssued) {
                         softRebootIssued = true
-                        addLog("按设置执行越狱后软重启（只重启用户态，内核模块保持加载）")
+                        // 墓碑必须在下发前落盘：setprop 之后进程可能立刻没了。
+                        // intentional=true：这是用户开的开关，下次启动别报成异常重启。
+                        RunTrace.mark(context, "软重启下发", intentional = true)
+                        addLog(RunLog.info("按设置执行软重启", "只重启用户态，内核模块保持加载"))
+                        val before = BootWatch.snapshot()
                         val rc = StellarShell.run("su -c 'setprop ctl.restart zygote' 2>&1", 20).code
-                        addLog(if (rc == 0) "软重启已下发：zygote 将重启一次" else "软重启下发失败 rc=" + rc)
-                    } else if (!softRebootAfter) {
-                        addLog("未开启「越狱后软重启」，保持当前会话不重启")
+                        addLog(
+                            if (rc == 0) RunLog.success("软重启已下发", "zygote 将重启一次")
+                            else RunLog.error("软重启下发失败", "返回码 " + rc)
+                        )
+                        BootWatch.check(before, "软重启下发")?.let { addLog(RunLog.info("重启结果", it)) }
+                    } else if (!rebootWanted) {
+                        addLog(RunLog.info("保持当前会话", "未开启越狱后软重启，本次不下发任何重启命令"))
                     }
                 } else if (RunReport.wroteKernel) {
                     prefs.edit().putString("failed_boot_id", startBootId).apply()
-                    addLog("已记录：下次运行前需要重启手机")
+                    addLog(RunLog.warn("下次运行前需要重启手机", "本次已写入内核但未拿到 root"))
                 }
                 HistoryStore.finish(ok, stage, elapsedSeconds)
+                // 走到这里说明本进程活到了收尾：墓碑使命完成，清掉，
+                // 否则下次启动会把"正常结束"误报成"死在某个阶段"。
+                RunTrace.clear(context)
+                refreshStats()
                 refreshState()
             }
         }

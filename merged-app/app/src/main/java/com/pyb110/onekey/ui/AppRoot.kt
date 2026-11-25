@@ -315,6 +315,7 @@ internal fun AppRoot(
             }
 
             if (show98260Warning) RunConfirmDialog(
+                rate = controller.successRate,
                 onConfirm = { show98260Warning = false; controller.runJailbreak(); tab = 1 },
                 onDismiss = { show98260Warning = false }
             )

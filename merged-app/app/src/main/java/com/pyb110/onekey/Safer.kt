@@ -35,11 +35,16 @@ object Safer {
             saved.add(p to state)
             // 只停进程、不改包状态：pm disable-user 会改 PackageManager 数据，
             // 在 ColorOS 上可能连带 system_server 重启，看起来像"自动软重启"。
+            val before = BootWatch.snapshot()
             val r = ShizukuShell.run("am force-stop $p 2>&1", 15)
             log("安全组件已停止 $p：" + r.output.trim().take(120))
+            // 每停一个就验一次：谁引发的重启，日志里直接点名，不用事后猜。
+            BootWatch.check(before, "停止 " + p)?.let { log("警告：" + it) }
         }
+        val beforeAnti = BootWatch.snapshot()
         val antiRoot = ShizukuShell.run("stop riskdetect 2>&1", 15)
         log("反 root 弹窗抑制：stop riskdetect rc=" + antiRoot.code)
+        BootWatch.check(beforeAnti, "停止 riskdetect 服务")?.let { log("警告：" + it) }
         lastSaved = saved
         return saved
     }

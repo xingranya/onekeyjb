@@ -117,6 +117,8 @@ internal fun HeroCard(controller: JailbreakController) {
                 modifier = Modifier.weight(1f)
             )
         }
+        Spacer(Modifier.height(14.dp))
+        RateBlock(controller)
         Spacer(Modifier.height(12.dp))
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -171,3 +173,111 @@ internal fun DeviceCell(
         )
     }
 }
+
+/**
+ * 成功率区：一个百分比 + 三个物理量。
+ *
+ * 百分比来自 [com.pyb110.onekey.SuccessRate]，三个物理量各自带状态词，
+ * 这样用户看到的不是"一个玄学数字"，而是"为什么是这个数字"。
+ */
+@Composable
+internal fun RateBlock(controller: JailbreakController) {
+    val c = oneKeyColors()
+    val r = controller.successRate
+    val stats = controller.historyStats
+    val tone = when (r.level) {
+        0, 1 -> c.devicePositive
+        2 -> c.warning
+        else -> c.error
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(CouiShape(14.dp, 2f))
+            .background(c.deviceStatusBg.copy(alpha = 0.5f))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        if (r.valid) String.format(java.util.Locale.US, "%.0f", r.score) else "--",
+                        style = COUITheme.textStyles.headline1,
+                        fontFamily = FontFamily.Monospace,
+                        color = tone
+                    )
+                    Text(
+                        "%",
+                        style = COUITheme.textStyles.body2,
+                        color = tone,
+                        modifier = Modifier.padding(start = 1.dp, bottom = 4.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "本次成功率",
+                        style = COUITheme.textStyles.body2,
+                        fontSize = 11.sp,
+                        color = c.deviceMuted,
+                        modifier = Modifier.padding(bottom = 5.dp)
+                    )
+                }
+                Text(
+                    r.advice(),
+                    style = COUITheme.textStyles.body2,
+                    fontSize = 11.sp,
+                    color = c.deviceMuted
+                )
+            }
+            if (stats.hasData) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        String.format(java.util.Locale.US, "%.0f%%", stats.rate),
+                        style = COUITheme.textStyles.body2,
+                        fontFamily = FontFamily.Monospace,
+                        color = c.deviceInk
+                    )
+                    Text(
+                        "历史 " + stats.ok + "/" + stats.total,
+                        style = COUITheme.textStyles.body2,
+                        fontSize = 10.sp,
+                        color = c.deviceMuted
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth()) {
+            RateCell("内存占用", r.slabText, r.slabState, Modifier.weight(1f))
+            RateCell("CPU 温度", r.tempText, r.tempState, Modifier.weight(1f))
+            RateCell("系统负载", r.loadText, r.loadState, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun RateCell(label: String, value: String, state: String, modifier: Modifier = Modifier) {
+    val c = oneKeyColors()
+    Column(modifier.padding(end = 6.dp)) {
+        Text(label, style = COUITheme.textStyles.body2, fontSize = 10.sp, color = c.deviceMuted, maxLines = 1)
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                value,
+                style = COUITheme.textStyles.body2,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                color = c.deviceInk,
+                maxLines = 1
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                state,
+                style = COUITheme.textStyles.body2,
+                fontSize = 10.sp,
+                color = c.deviceMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
