@@ -5,15 +5,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.pyb110.onekey.ui.components.DialogInset
 import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
-import com.itos.coui.dialog.CouiDialogDefaults
 
 @Composable
-internal fun TermsDialog(onAccept: () -> Unit) {
+internal fun TermsDialog(show: Boolean = true, onAccept: () -> Unit) {
     val ctx = LocalContext.current
     val termsText = remember {
         runCatching {
@@ -33,7 +33,7 @@ internal fun TermsDialog(onAccept: () -> Unit) {
     val canAgree = remain <= 0
     WindowDialog(
         title = "用户协议与免责声明",
-        show = true,
+        show = show,
         onDismissRequest = { },
         actions = listOf(
             DialogAction("退出", COUIIcons.Close) { (ctx as? android.app.Activity)?.finish() },
@@ -43,7 +43,7 @@ internal fun TermsDialog(onAccept: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = CouiDialogDefaults.contentPadding)
+                .padding(horizontal = DialogInset)
         ) {
             Column(Modifier.fillMaxWidth()) {
                 Text(

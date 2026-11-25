@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.pyb110.onekey.JailbreakController
 import com.pyb110.onekey.R
 import com.pyb110.onekey.UpdateChecker
+import com.pyb110.onekey.ui.components.DialogInset
 import com.pyb110.onekey.ui.components.ButtonIconText
 import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.oneKeyColors
@@ -34,10 +35,10 @@ import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
 import com.itos.coui.shape.CouiShape
-import com.itos.coui.dialog.CouiDialogDefaults
 
 @Composable
 internal fun DiagnosticsDialog(
+    show: Boolean = true,
     controller: JailbreakController,
     onDismiss: () -> Unit,
     onOpenLog: () -> Unit,
@@ -45,7 +46,7 @@ internal fun DiagnosticsDialog(
 ) {
     WindowDialog(
         title = "环境诊断",
-        show = true,
+        show = show,
         onDismissRequest = onDismiss,
         actions = listOf(DialogAction("关闭", COUIIcons.Close, primary = true) { onDismiss() }),
     ) {
@@ -80,7 +81,7 @@ internal fun DiagnosticsDialog(
 }
 
 @Composable
-internal fun AppreciationDialog(onMessage: (String) -> Unit, onDismiss: (Boolean) -> Unit) {
+internal fun AppreciationDialog(show: Boolean = true, onMessage: (String) -> Unit, onDismiss: (Boolean) -> Unit) {
     val context = LocalContext.current
     val dismiss = LocalDismissState.current
     var dontShow by remember { mutableStateOf(true) }
@@ -91,7 +92,7 @@ internal fun AppreciationDialog(onMessage: (String) -> Unit, onDismiss: (Boolean
     }
     WindowDialog(
         title = "免费声明 · 禁止倒卖",
-        show = true,
+        show = show,
         onDismissRequest = { close() },
         actions = listOf(
             DialogAction("复制群号", COUIIcons.Copy) {
@@ -104,7 +105,7 @@ internal fun AppreciationDialog(onMessage: (String) -> Unit, onDismiss: (Boolean
         ),
     ) {
         // COUI 弹窗的内容槽本身就是 verticalScroll，再套一层会抛无限高度约束异常直接崩。
-        Column(Modifier.fillMaxWidth().padding(horizontal = CouiDialogDefaults.contentPadding), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = DialogInset), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("倒卖必究", style = COUITheme.textStyles.subtitle, color = oneKeyColors().error)
             Text("本工具免费分享，禁止倒卖。QQ群：1121682811。赞赏完全自愿，不影响任何功能。", style = COUITheme.textStyles.body2, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
             Image(painterResource(R.drawable.appreciation), contentDescription = "作者赞赏码", modifier = Modifier.fillMaxWidth().height(220.dp).clip(CouiShape(12.dp, 2f)))

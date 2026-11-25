@@ -262,7 +262,7 @@ private fun LogRow(entry: LogEntry) {
                 .padding(top = 3.dp)
                 .width(3.dp)
                 .height(13.dp)
-                .clip(CouiShape(2.dp, 1f))
+                .clip(CouiShape(2.dp, 2f))
                 .background(accent)
         )
         Spacer(Modifier.width(8.dp))
@@ -315,7 +315,7 @@ private fun LevelTag(level: LogLevel, accent: Color) {
         Modifier
             .padding(top = 1.dp)
             .width(26.dp)
-            .clip(CouiShape(4.dp, 1f))
+            .clip(CouiShape(4.dp, 2f))
             .background(accent.copy(alpha = 0.14f))
             .padding(vertical = 1.dp),
         contentAlignment = Alignment.Center

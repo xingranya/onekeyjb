@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.itos.coui.backdrop.CouiBackdrop
 import com.itos.coui.sheet.BottomSheet as CouiBottomSheet
 import com.itos.coui.sheet.CouiSheetDefaults
+import com.itos.coui.dialog.CouiDialogActionColors
 import com.itos.coui.dialog.CouiDialogAction
 import com.itos.coui.dialog.CouiDialogActionStyle
 import com.itos.coui.dialog.CouiDialogDefaults
@@ -112,12 +113,21 @@ fun WindowDialog(
     val accent = CouiTheme.colorScheme.accent
     val backdrop = LocalDialogBackdrop.current
 
+    // 次要动作必须自带配色。COUI 把 neutralAction 当作"破坏性操作"，
+    // 缺省配色会把按钮染成红字；复制全文、保存相册这类中性动作被染红属于误读。
+    val secondaryColors = CouiDialogActionColors(
+        surface = if (dark) Color(0xFF353535) else Color(0xFFEBEBEB),
+        content = if (dark) Color(0xE6FFFFFF) else Color(0xE6000000),
+        disabledSurface = if (dark) Color(0x1AFFFFFF) else Color(0x14000000),
+        disabledContent = if (dark) Color(0x28FFFFFF) else Color(0x42000000),
+    )
+
     fun DialogAction.toCoui(isPrimary: Boolean) = CouiDialogAction(
         text = label,
         onClick = onClick,
         enabled = enabled,
         style = if (isPrimary) CouiDialogActionStyle.Primary else CouiDialogActionStyle.Secondary,
-        colors = if (isPrimary) CouiDialogDefaults.primaryActionColors(accent) else null,
+        colors = if (isPrimary) CouiDialogDefaults.primaryActionColors(accent) else secondaryColors,
     )
 
     // 主操作放 confirmAction；其余按顺序落到 dismiss / neutral，与 COUI 的两三键布局一致。
@@ -133,8 +143,11 @@ fun WindowDialog(
         CouiDialog(
             onDismissRequest = onDismissRequest,
             confirmAction = primary?.toCoui(true) ?: CouiDialogAction("关闭", onDismissRequest),
-            dismissAction = secondary.getOrNull(0)?.toCoui(false),
-            neutralAction = secondary.getOrNull(1)?.toCoui(false),
+            // COUI 的排布规则是 horizontal = (neutralAction == null && dismissAction != null)：
+            // 只有两个动作时会并排成两个半宽按钮，与环境诊断那种整宽按钮不搭。
+            // 把第一个次要动作塞进 neutral 槽，horizontal 恒为 false，动作区就永远纵向堆叠。
+            dismissAction = secondary.getOrNull(1)?.toCoui(false),
+            neutralAction = secondary.getOrNull(0)?.toCoui(false),
             dark = dark,
             title = title.takeIf { it.isNotBlank() },
             material = material,
@@ -143,6 +156,36 @@ fun WindowDialog(
         ) { content() }
     }
 }
+
+/**
+ * 弹窗宿主：让弹窗在「隐藏」之后继续留在组合里一小会儿。
+ *
+ * COUI 的进出场动画由 `visible` 参数驱动，库要等动画跑完才真正销毁窗口
+ * （CouiDialogWindow 里的 `retained` 就是这个用途）。但如果调用方写成
+ * `if (show) Dialog(...)`，show 变 false 的同一帧子树就被摘掉，
+ * 窗口跟着销毁——表现就是「弹出有从下往上的动画，消失瞬间没了」。
+ *
+ * 因此所有弹窗都必须常驻组合，用 visible 控制显隐；这个宿主只负责在
+ * 隐藏后多留 [EXIT_MS] 毫秒，把动画窗口让出来。
+ */
+@Composable
+fun DialogSlot(visible: Boolean, content: @Composable () -> Unit) {
+    var composed by remember { mutableStateOf(visible) }
+    // 重新显示时立刻回到组合里，不等上一轮的收尾计时。
+    if (visible && !composed) composed = true
+    if (composed) {
+        content()
+        LaunchedEffect(visible) {
+            if (!visible) {
+                delay(EXIT_MS)
+                composed = false
+            }
+        }
+    }
+}
+
+/** 退场动画时长上限：COUI 底部弹窗进出场都是 250ms，留一点余量。 */
+private const val EXIT_MS = 320L
 
 /** 弹窗材质用的窗口采样源，由 AppRoot 提供；缺省时弹窗退回 COUI 实心表面色。 */
 val LocalDialogBackdrop = androidx.compose.runtime.staticCompositionLocalOf<CouiBackdrop?> { null }
@@ -171,9 +214,11 @@ fun WindowBottomSheet(
     // 每次重组传新常量会打断关闭动画，看起来像闪一下。
     val visible = remember { mutableStateOf(show) }
     LaunchedEffect(show) { visible.value = show }
-    // 关闭流程分两步：先让库跑完收起动画（visible 由库置 false），
-    // 动画结束后再回调 onDismissFinished 让外部复位状态。
-    // 一步做完会把子树提前拆掉，动画被掐断，看起来像"啪一下消失"。
+    // 只有真正显示过之后，visible 变 false 才代表「收起动画结束」。
+    // 首次组合时外部状态可能还是 false（置位与组合在同一帧里赛跑），
+    // 此时回调 onDismissFinished 会把刚创建的抽屉立刻关掉——这正是
+    // 「四个抽屉按了都没反应」的根因。
+    var everShown by remember { mutableStateOf(show) }
     CouiBottomSheet(
         visible = visible,
         onDismissRequest = { onDismissRequest() },
@@ -194,7 +239,14 @@ fun WindowBottomSheet(
     // 库把 visible 置回 false 即代表收起完成，此时才通知外部复位状态；
     // 提前拆子树会掐断收起动画。
     LaunchedEffect(visible.value) {
-        if (!visible.value) onDismissFinished()
+        if (visible.value) {
+            everShown = true
+        } else if (everShown) {
+            // 等收起动画跑完再让外部复位，否则内容会在动画途中被清空，
+            // 看起来像抽屉"缩没了"而不是"滑下去"。
+            delay(EXIT_MS)
+            onDismissFinished()
+        }
     }
 }
 

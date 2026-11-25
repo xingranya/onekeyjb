@@ -9,9 +9,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.itos.coui.dialog.CouiDialogDefaults
 import com.itos.coui.shape.CouiShape
 import com.pyb110.onekey.RateResult
+import com.pyb110.onekey.ui.components.DialogInset
 import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.theme.COUIIcons
@@ -26,19 +26,24 @@ import com.pyb110.onekey.ui.theme.WindowDialog
  * 成功率正常时只给一句常规提示，不打扰。
  */
 @Composable
-internal fun RunConfirmDialog(rate: RateResult, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+internal fun RunConfirmDialog(
+    show: Boolean = true,
+    rate: RateResult,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     val c = oneKeyColors()
     val low = rate.valid && rate.score < 55.0
     WindowDialog(
         title = if (low) "现在跑成功率偏低" else "98260 运行前确认",
-        show = true,
+        show = show,
         onDismissRequest = { onDismiss() },
         actions = listOf(
             DialogAction("取消", COUIIcons.Close) { onDismiss() },
             DialogAction(if (low) "仍然开始" else "确认开始", COUIIcons.Play, primary = true) { onConfirm() },
         ),
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = CouiDialogDefaults.contentPadding)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = DialogInset)) {
             if (low) {
                 Row(
                     Modifier

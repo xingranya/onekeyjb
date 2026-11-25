@@ -1,6 +1,6 @@
 # OneKey 知识库（合集）
 
-> 版本 2.23.0 / 221。不含任何密钥、口令或签名文件内容。
+> 版本 2.23.1 / 222。不含任何密钥、口令或签名文件内容。
 
 
 
@@ -955,7 +955,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.23.0）
+# 12 · 版本变更史（2.18.0 → 2.23.1）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -963,6 +963,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
+| **2.23.1** | 222 | 弹窗统一 + 五处回归修复 | ① **日志页闪退**：`CouiShape(radius, cornerWeight)` 构造期 `require(weight >= 2f)`，日志页两处写了 1f 直接抛异常，改 2f；② **弹窗退场动画**：COUI 靠 `visible` + 内部 `retained` 保留窗口，调用方 `if (show)` 会在同一帧摘子树，新增 `DialogSlot` 让九个弹窗常驻组合、隐藏后多留 320ms；③ **四个抽屉点了没反应**：`WindowBottomSheet` 首帧 `visible` 仍为 false 就触发 `onDismissFinished`，加 `everShown` 门控 + 收起延迟；④ **弹窗左右缩进三套**：环境诊断 16dp、第三方 24dp、用户手册 24+14dp，统一为 `DialogInset = 16.dp`，手册分节去掉 Card 改扁平排版；⑤ **按钮并排与红字**：COUI `horizontal = (neutralAction == null && dismissAction != null)`，次要动作塞进 neutral 槽强制纵向堆叠，并自供 `CouiDialogActionColors` 去掉破坏性红字；⑥ **内存/温度/负载读不到**：普通 App 域被 SELinux 挡在 `proc_loadavg` 与 sysfs 之外，改走 Stellar 特权通道一次读齐三量（3 秒降频），温度加 `dumpsys thermalservice` 兜底；⑦ **历史页幽灵记录与「64560 稳定链」**：`append` 无 activeId 时凭空 start 记录改为直接 return，`title` 的 else 兜底把废案复活改为固定「98260 运行链」 |
 | **2.23.0** | 221 | 日志分级 + 成功率 + COUI alpha17 | ① **日志全面重写**：新增 RunLog，四档中文等级（信息/成功/警告/失败），一行一条，落盘格式 `HH:mm:ss  [标签] 标题 · 详情 · 1.2s`，解析旧格式靠关键字兜底；Runner 的 `EV|v=1|phase=` 结构化行首次被解析成中文阶段；② **阶段墓碑 RunTrace**：软重启会连根拔掉进程，finally 里的归因代码一行都跑不到，因此每进一个阶段就往 `files/onekey-run-trace.json` 写墓碑（stage/boot/ts/intent）并 fsync，下次启动比对 boot_id 指出重启发生在哪一步之后；intent 位区分「用户开的软重启」与「异常重启」；③ **历史页幽灵记录根治**：`HistoryStore.append` 原本在无 activeId 时 凭空 start 一条 unknown 记录，导致每次开 App、每次拨开关都多一条「未完成 0.00s」；改为直接 return，并新增 `abandon()` 把残留 running 标成异常中断、`stats()` 只统计跑完的记录；④ **成功率 SuccessRate**：读 `/proc/slabinfo` 的 posix_timers_cache、`/proc/loadavg`、`thermal_zone0/temp` 三路采样，按 slab/温度/负载三因子乘积给分，上限 **92%**（永不承诺 100%），建议线 55%；首页参数区三格实时显示，低于阈值时开始前弹窗拦一次并指出瓶颈；⑤ **BootWatch 归因**：在每个可能触发重启的动作前后快照 boot_id / system_server pid / zygote 状态，命中就把重启点名到具体动作；⑥ **COUI 升级 alpha11→alpha17**：抽屉换用库原生 BottomSheet（`com.itos.coui.sheet`），获得拖拽手柄与原生回弹；alpha17 要求 `minCompileSdk=37 + minCompileMinorSdk=1`，compileSdk 提到 **37.2**；⑦ 构建链路改走阿里云镜像前置 + 本地 `libs/coui-repo` 离线镜像（Google Maven 直连 reset）；⑧ 新增 20 个单元测试（RunLogTest），覆盖日志格式往返、真实日志行归类回归、成功率因子单调性与边界 |
 | **2.22.1** | 220 | 适配 YukiSU 与 SukiSU Nova | ① 管理器清单 5→**7 家**：yukisu(org.rouyashiki.yukisu) 与 sukisu_nova(com.sukisu.nova)；② 证书从官方 APK 实测提取：YukiSU v1.9.0 = 45bd30fe...，Nova v3.0.0 = 947ae944...；③ **关键修复**：Nova 与 SukiSU Ultra 共用同一签名证书，原按证书分组 + maxByOrNull 会挑错管理器，改为优先按包名精确命中再退回证书候选；④ 下载源 Rouyashiki/YukiSU 与 SukiSU-Nova/SukiSU-Nova（abi=arm64-v8a）；⑤ 执行器侧短名 yukisu / sukisu_nova 与内部 manager_pkg 表一致，无需改 runner |
 | **2.22.0** | 219 | 适配 Shark 2.5 运行时 | ① runner 换新：6.18 451,536→**467,120 B**、6.12 449,544→**478,880 B**（sha 3f6d407d / d51f65f6）；② 上游资产从 assets 迁到 jniLibs，我方仍走 assets 投放，env 协议主体兼容；③ 新增 EV|v=1|phase= 结构化诊断通道，人读日志（[n/4]/MODULE_LOADED/DONE/PLANT_CRED_OK）全部保留，解析不受影响；④ 失败类型从 1 种扩到 2 种（6.18）与 7 种（6.12：contract/mem/probe/profile/tracefs/uname），判定改为 FAIL= 并逐类给可操作提示；⑤ 设备档案补 4 个新内核串（PYB110 284297031c53 / 3977fbeb3462，PMS110 5fd39602326e / 586bfab1b9c5）。未采用 plant_core 变体（libk61821p/x）：我方两台 6.18 的 release 都不在 isPlantCore61821 名单里 |
@@ -1410,6 +1411,134 @@ grep -c "^com.itos.coui.sheet" app/build/outputs/mapping/release/mapping.txt
 **教训**：release 包的内容校验分两类——
 **字符串**用字节计数（见 31），**类/符号**用 mapping.txt。
 两者都不能拿 debug 包的经验套。
+### 33. 日志页一点就闪退：CouiShape 圆角权重必须 ≥ 2
+
+**症状**：点底栏「日志」立刻闪退，历史页正常。
+
+**根因**：crash buffer 首行
+`java.lang.IllegalArgumentException: 圆角权重必须为有限值且不小于 2, 与轮廓 Shader 保持一致`。
+`CouiShape(radius: Dp, cornerWeight: Float)` 在构造期 `require(weight >= 2f)`，
+而日志页两处写了 `1f`：
+
+```kotlin
+.clip(CouiShape(2.dp, 1f))   // LogRow 左侧等级色条
+.clip(CouiShape(4.dp, 1f))   // LevelTag 标签底
+```
+
+**修法**：全部改 `2f`。全仓 32 处 CouiShape 调用只有这两处是 1f。
+
+**教训**：COUI 的 cornerWeight 是给轮廓 Shader 用的平滑参数，不是圆角比例；
+下限 2 是硬性 `require`，越界直接抛异常而不是降级。新增形状先搜一遍同类调用。
+
+### 34. 弹窗「消失瞬间没了」：`if (show)` 把退场动画的子树拆了
+
+**症状**：弹窗弹出有从下往上的动画，点「知道了」瞬间消失，没有收起动画。
+
+**根因**：COUI 的窗口动画由 `visible` 参数驱动，库内部用 `retained` 标记
+（`CouiDialogWindow.kt`：`if (visible != null && !visible && !retained) return`）
+在动画期间把窗口留在组合里。调用方写 `if (show) Dialog(...)`，
+show 变 false 的同一帧子树就被摘掉，窗口跟着销毁，动画来不及跑。
+
+**修法**：新增 `DialogSlot(visible) { ... }` 宿主——弹窗常驻组合，只在隐藏后多留 320ms
+再撤掉；九个弹窗全部加 `show: Boolean = true` 首参并把 `show = true` 改成 `show = show`。
+更新弹窗还要留住最后一次的 `Info`（`lastUpdateInfo`），否则关闭后没有数据可渲染退场帧。
+
+**验证**：`screenrecord` 录屏 + 逐帧算像素差，退场期间存在中间帧（弹窗已下滑一段、背景已亮）。
+
+**教训**：凡是库用「状态 + 保留窗口」实现动画的，调用方就不能用条件组合代替状态参数。
+
+### 35. 抽屉点了没反应：首帧 `visible` 仍是 false，自己把自己关了
+
+**症状**：管理器热切换 / 管理器 / 管理器下载 / 拓展开关四个抽屉按下后都不显示。
+
+**根因**：`WindowBottomSheet` 里 `LaunchedEffect(visible.value) { if (!visible.value) onDismissFinished() }`，
+首次组合时内部 `visible` 还是初始 false（外部 `sheetVisible` 的置位与组合同帧赛跑），
+立刻回调 `onDismissFinished` → 外部把 `sheet` 置 0 → 抽屉刚建就关。
+
+**修法**：加 `everShown` 门控——只有真的显示过才允许触发关闭回调；并 `delay(EXIT_MS)`
+等收起动画跑完再复位，否则内容会在动画途中被清空，看起来像「缩没了」。
+
+### 36. COUI 动作区只有两个按钮时会并排，还会把次要动作染红
+
+**根因**（`Dialog.kt:75-81`）：
+
+```kotlin
+val verticalOrder = listOfNotNull(neutralAction, confirmAction, dismissAction)
+val horizontal = neutralAction == null && dismissAction != null
+val actionRows = if (horizontal) listOf(listOfNotNull(dismissAction, confirmAction))
+                 else verticalOrder.map { listOf(it) }
+```
+
+两件事同时发生：① 只给 confirm+dismiss 时 `horizontal = true`，两个按钮并排成半宽，
+和环境诊断那种整宽按钮不搭；② `destructiveAction = neutralAction`，
+进了 neutral 槽的动作会被套上 `colors.destructive`（红字）。
+
+**修法**：`WindowDialog` 把第一个次要动作塞进 `neutral` 槽（`horizontal` 恒为 false，永远纵向堆叠），
+并给次要动作**显式提供** `CouiDialogActionColors`——
+`DialogActionButton` 里是 `colors = action.colors ?: DialogButtonDefaults.secondaryColors(...)`，
+自己给了配色就不会再被 destructive 覆盖。
+
+**教训**：判断一个库的布局分支，去读它的 `if/else` 判据，不要看渲染结果反推。
+
+### 37. 弹窗左右缩进各写各的：24 / 24+14 / 16 三种，摆一起像两套 UI
+
+**症状**：用户手册、第三方组件说明、免费声明与赞赏码、用户条款四个弹窗
+跟环境诊断的弹窗「不搭」。
+
+**实测**（1080 宽 @420dpi，弹窗左边界 x=67）：
+
+| 弹窗 | 内容左边界 | 换算 | 来源 |
+| --- | --- | --- | --- |
+| 环境诊断 | 117 | 19dp（16dp + 图标留白） | `Column` 无内边距，行用 `BasicComponent`（库内 16dp） |
+| 第三方组件说明 | 132 | 25dp | 外层 `CouiDialogDefaults.contentPadding`（24dp） |
+| 用户手册 | 193 | 48dp | 外层 24dp + 卡片内 14dp |
+
+**修法**：定义 `DialogInset = 16.dp`（与环境诊断的 `Item` 内部内边距一致），
+所有弹窗内容槽一律用它；`ManualSection` 去掉 Card 改扁平排版；
+按钮区靠 36 那条改成纵向堆叠后，与环境诊断的整宽按钮完全同形。
+
+**教训**：**`CouiDialogDefaults.contentPadding` 是给 title/message 槽用的，不是给 content 槽的**。
+content 槽没有内边距，加了就比库自带的 `Item` 多缩进一圈。
+
+### 38. `/proc/slabinfo`、`/proc/loadavg`、sysfs 温度普通 App 读不到
+
+**症状**：内存占用、CPU 温度、系统负载一直显示「读不到」，给了 Stellar 权限也没用。
+
+**根因**：`File(...).readText()` 走的是本进程 untrusted_app 域，logcat 里是
+`avc: denied { read } for name="loadavg" ... tcontext=u:object_r:proc_loadavg:s0`、
+`name="temp" dev="sysfs"`。权限给了不等于路径通了——代码根本没经过特权通道。
+
+**修法**：`SuccessRate.readPrivileged()` 用 `StellarShell.run(script, 6)` 把三条命令一起下发，
+结果按 `SLAB=` / `LOAD=` / `TEMP=` 标签回传解析；采样策略改为「特权优先、本地兜底」，
+特权通道跨进程代价高，降到 **3 秒**一次，中间用上次的值补。
+温度加第三路兜底：`dumpsys thermalservice | grep -m1 -o 'mValue=[0-9.]*'`（摄氏度一位小数 ×1000），
+给 sysfs 全被 SELinux 挡住的机型用；解析时**只认第一条** TEMP。
+
+**教训**：读系统节点前先想清楚自己是什么 SELinux 域。shell 能读不代表 App 能读，
+`adb shell cat` 能读也不代表 `File.readText()` 能读。
+
+### 39. 历史页满屏「未完成 0.00s」：`append` 会凭空建记录
+
+**根因**：`HistoryStore.append(line)` 里 `if (activeId == null && line.isNotBlank()) start(ctx, "unknown", "-", false, "")`，
+任何一次 `addLog` 都会开一条 `exploit=unknown` 的记录，永远停在 `status=running`。
+
+**修法**：`append` 改为 `val id = activeId ?: return`；
+新增 `abandon(context)` 在 Controller 初始化时把残留 running 标 `interrupted`，
+`stats()` 只统计 ok/failed（interrupted 不入分母）。
+
+**教训**：写「顺带兜底」的分支前先想清楚它会在什么频率上被触发——
+日志写入是每行都走的热路径，兜底等于批量生产垃圾。
+
+### 40. 「64560 稳定链」：`title` 的 else 兜底把废案复活了
+
+**根因**：`HistoryRecord.title` 写成 `if (exploit == "cve98260") "98260 新链" else "64560 稳定链"`，
+而 64560 早已废除；历史里 `exploit` 是 `-` / `unknown` / `cve64560` 的旧记录全部显示成「64560 稳定链」。
+
+**修法**：`title` 固定为「98260 运行链」；`exploit` 的 `optString` 缺省值从 `cve64560` 改 `cve98260`。
+
+**教训**：`if/else` 的 else 分支不是「兜底」，是「默认值」——默认值必须跟着产品演进一起改，
+否则它会把已经删掉的东西重新显示出来。
+
 ## 踩过的"以为坏了其实正常"
 
 | 现象 | 结论 |

@@ -23,7 +23,10 @@ data class HistoryRecord(
     val durationSec: Long,
     val logFile: String,
 ) {
-    val title: String get() = if (exploit == "cve98260") "98260 新链" else "64560 稳定链"
+    // 64560 稳定链已废除，任何历史记录都归到现行运行链下。
+    // 旧版本写下的记录里 exploit 可能是 "-"/"unknown"/"cve64560"，一律按现行链显示，
+    // 否则历史页会出现早已不存在的链路名称。
+    val title: String get() = "98260 运行链"
     val stateText: String
         get() = when (status) {
             "ok" -> "成功"
@@ -194,7 +197,7 @@ object HistoryStore {
                     id = j.optString("id", f.name.removeSuffix(".json")),
                     startedAt = j.optLong("startedAt"),
                     endedAt = j.optLong("endedAt"),
-                    exploit = j.optString("exploit", "cve64560"),
+                    exploit = j.optString("exploit", "cve98260"),
                     manager = j.optString("manager", "finasu"),
                     versionName = j.optString("versionName", ""),
                     adaptive = j.optBoolean("adaptive", true),

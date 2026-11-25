@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pyb110.onekey.ui.components.DialogInset
 import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.components.MarkdownText
 import com.pyb110.onekey.ui.oneKeyColors
@@ -18,10 +19,9 @@ import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.Text
 import com.pyb110.onekey.ui.theme.WindowDialog
-import com.itos.coui.dialog.CouiDialogDefaults
 
 @Composable
-internal fun ThirdPartyDialog(onDismiss: () -> Unit) {
+internal fun ThirdPartyDialog(show: Boolean = true, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val noticeText = remember {
         runCatching {
@@ -30,7 +30,7 @@ internal fun ThirdPartyDialog(onDismiss: () -> Unit) {
     }
     WindowDialog(
         title = "第三方组件说明",
-        show = true,
+        show = show,
         onDismissRequest = { onDismiss() },
         actions = listOf(
             DialogAction("复制全文", COUIIcons.Copy) {
@@ -43,7 +43,7 @@ internal fun ThirdPartyDialog(onDismiss: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = CouiDialogDefaults.contentPadding)
+                .padding(horizontal = DialogInset)
         ) {
             MarkdownText(
                 markdown = noticeText,

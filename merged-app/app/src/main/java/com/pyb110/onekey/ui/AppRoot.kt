@@ -245,14 +245,16 @@ internal fun AppRoot(
             // 轻提示：COUI 无 Snackbar 组件，用其配色在底部渲染。
             SnackbarHost(state = snackbarHostState)
 
-            // 抽屉的可见状态提到根级：内容里的开关/筛选变化不会重建它，避免整块弹一下。
-            if (sheet != 0) {
-                WindowBottomSheet(
-                    show = sheetVisible,
-                    title = sheetTitle(sheet),
-                    onDismissRequest = { sheetVisible = false },
-                    onDismissFinished = { sheet = 0; sheetVisible = false }
-                ) {
+            // 抽屉常驻组合，只用 visible 控制显隐——理由同弹窗：
+            // 用 if (sheet != 0) 包起来会在关闭的同一帧拆掉子树，收起动画被掐断。
+            // sheet 为 0 时内容留空，库自己按 visible=false 收尾。
+            WindowBottomSheet(
+                show = sheetVisible,
+                title = if (sheet != 0) sheetTitle(sheet) else null,
+                onDismissRequest = { sheetVisible = false },
+                onDismissFinished = { sheet = 0; sheetVisible = false }
+            ) {
+                if (sheet != 0) {
                     when (sheet) {
                         1 -> Column(Modifier.fillMaxWidth()) {
                             HotSwitchPanel(
@@ -283,8 +285,12 @@ internal fun AppRoot(
                 }
             }
 
-            if (showDiagnostics) {
+            // 全部弹窗常驻组合，只用 visible 控制显隐。
+            // 写成 if (show) Dialog(...) 会在 show 变 false 的同一帧拆掉子树，
+            // COUI 的退场动画（库内 retained 机制）来不及跑，看起来就是"啪一下消失"。
+            DialogSlot(showDiagnostics) {
                 DiagnosticsDialog(
+                    show = showDiagnostics,
                     controller = controller,
                     onDismiss = { showDiagnostics = false },
                     onOpenLog = { tab = 1 },
@@ -292,14 +298,22 @@ internal fun AppRoot(
                 )
             }
 
-            if (showManual) ManualDialog { showManual = false }
+            DialogSlot(showManual) {
+                ManualDialog(show = showManual) { showManual = false }
+            }
 
-            if (showThirdParty) ThirdPartyDialog { showThirdParty = false }
+            DialogSlot(showThirdParty) {
+                ThirdPartyDialog(show = showThirdParty) { showThirdParty = false }
+            }
 
-            if (showTerms) TermsDialog { termsPrefs.edit().putBoolean("terms_accepted_v2", true).apply(); showTerms = false }
+            DialogSlot(showTerms) {
+                TermsDialog(show = showTerms) { termsPrefs.edit().putBoolean("terms_accepted_v2", true).apply(); showTerms = false }
+            }
 
-            if (showNotice && !showTerms) {
+            val noticeOpen = showNotice && !showTerms
+            DialogSlot(noticeOpen) {
                 AppreciationDialog(
+                    show = noticeOpen,
                     onMessage = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } },
                     onDismiss = { suppress ->
                         showNotice = false
@@ -314,26 +328,39 @@ internal fun AppRoot(
                 }
             }
 
-            if (show98260Warning) RunConfirmDialog(
-                rate = controller.successRate,
-                onConfirm = { show98260Warning = false; controller.runJailbreak(); tab = 1 },
-                onDismiss = { show98260Warning = false }
-            )
+            DialogSlot(show98260Warning) {
+                RunConfirmDialog(
+                    show = show98260Warning,
+                    rate = controller.successRate,
+                    onConfirm = { show98260Warning = false; controller.runJailbreak(); tab = 1 },
+                    onDismiss = { show98260Warning = false }
+                )
+            }
 
-            if (showFolkPrompt) RunDoneDialog(controller) { showFolkPrompt = false }
+            DialogSlot(showFolkPrompt) {
+                RunDoneDialog(show = showFolkPrompt, controller = controller) { showFolkPrompt = false }
+            }
 
-            if (showClearHistoryConfirm) ClearHistoryDialog(
-                onCancel = { showClearHistoryConfirm = false },
-                onConfirm = {
-                    showClearHistoryConfirm = false
-                    haptic(CouiHapticEffect.Switch)
-                    scope.launch(Dispatchers.IO) { HistoryStore.clear(context); reloadHistoryTick++ }
-                    scope.launch { snackbarHostState.showSnackbar("历史记录已清空") }
-                }
-            )
+            DialogSlot(showClearHistoryConfirm) {
+                ClearHistoryDialog(
+                    show = showClearHistoryConfirm,
+                    onCancel = { showClearHistoryConfirm = false },
+                    onConfirm = {
+                        showClearHistoryConfirm = false
+                        haptic(CouiHapticEffect.Switch)
+                        scope.launch(Dispatchers.IO) { HistoryStore.clear(context); reloadHistoryTick++ }
+                        scope.launch { snackbarHostState.showSnackbar("历史记录已清空") }
+                    }
+                )
+            }
 
-            updateInfo?.let { info ->
-                UpdateDialog(
+            // 更新弹窗要留住最后一次的 info：关闭后仍需用它渲染退场动画。
+            var lastUpdateInfo by remember { mutableStateOf<UpdateChecker.Info?>(null) }
+            if (updateInfo != null) lastUpdateInfo = updateInfo
+            DialogSlot(updateInfo != null) {
+                val info = updateInfo ?: lastUpdateInfo
+                if (info != null) UpdateDialog(
+                    show = updateInfo != null,
                     ui = UpdateUi(info, updateDownloading, updateProgress, updateError, updateExpandedVersion),
                     onToggleVersion = { v ->
                         haptic(CouiHapticEffect.Switch)

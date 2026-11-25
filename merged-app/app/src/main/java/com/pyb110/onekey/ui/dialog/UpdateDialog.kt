@@ -6,12 +6,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.pyb110.onekey.UpdateChecker
+import com.pyb110.onekey.ui.components.DialogInset
 import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.oneKeyColors
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.COUITheme
 import com.pyb110.onekey.ui.theme.*
-import com.itos.coui.dialog.CouiDialogDefaults
 
 internal data class UpdateUi(
     val info: UpdateChecker.Info,
@@ -23,6 +23,7 @@ internal data class UpdateUi(
 
 @Composable
 internal fun UpdateDialog(
+    show: Boolean = true,
     ui: UpdateUi,
     onToggleVersion: (Int) -> Unit,
     onDownload: () -> Unit,
@@ -30,7 +31,7 @@ internal fun UpdateDialog(
 ) {
         WindowDialog(
             title = "发现新版本 · v" + ui.info.versionName + " (" + ui.info.versionCode + ")",
-            show = true,
+            show = show,
             onDismissRequest = { if (!ui.downloading) onDismiss() },
             actions = listOf(
                 DialogAction("稍后", COUIIcons.Close, enabled = !ui.downloading) { onDismiss() },
@@ -42,7 +43,7 @@ internal fun UpdateDialog(
                 ) { onDownload() },
             ),
         ) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = CouiDialogDefaults.contentPadding)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = DialogInset)) {
                 Text(
                     "更新时间 " + UpdateChecker.formatTime(ui.info.publishedAt) +
                         (if (ui.info.size > 0) " · 安装包 " + UpdateChecker.formatSize(ui.info.size) else ""),

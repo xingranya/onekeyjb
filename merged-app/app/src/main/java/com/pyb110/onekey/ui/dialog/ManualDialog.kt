@@ -9,21 +9,17 @@ import com.pyb110.onekey.ui.components.DialogAction
 import com.pyb110.onekey.ui.components.ManualSection
 import com.pyb110.onekey.ui.theme.COUIIcons
 import com.pyb110.onekey.ui.theme.*
-import com.itos.coui.dialog.CouiDialogDefaults
 
 @Composable
-internal fun ManualDialog(onDismiss: () -> Unit) {
+internal fun ManualDialog(show: Boolean = true, onDismiss: () -> Unit) {
     WindowDialog(
         title = "使用手册",
-        show = true,
+        show = show,
         onDismissRequest = { onDismiss() },
         actions = listOf(DialogAction("知道了", COUIIcons.Ok, primary = true) { onDismiss() }),
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = CouiDialogDefaults.contentPadding)
-        ) {
+        // 分节自带 DialogInset，这里不再叠内边距，否则缩进又比环境诊断多一圈。
+        Column(Modifier.fillMaxWidth()) {
             ManualSection("一、准备", listOf(
                 "安装要用的管理器（KernelSU / KernelSU-Next / SukiSU / BakaSU / FinaSU 之一），App 不再内置管理器和模块。",
                 "启动 Stellar（推荐）或 Shizuku 服务，回到 App 授予权限；首页显示「服务已连接并授权」才能继续。"

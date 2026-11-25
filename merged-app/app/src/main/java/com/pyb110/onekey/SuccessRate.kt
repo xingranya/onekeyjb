@@ -171,6 +171,18 @@ object SuccessRate {
 
     // ---------------------------------------------------------------- 采样
 
+    /**
+     * 三个物理量的原始读数。-1 表示这一项没读到。
+     */
+    data class Raw(val slab: Int, val tempMilliC: Int, val load1: Double) {
+        val anyValid: Boolean get() = slab > 0 || tempMilliC > 0 || load1 >= 0.0
+        fun fill(other: Raw) = Raw(
+            if (slab > 0) slab else other.slab,
+            if (tempMilliC > 0) tempMilliC else other.tempMilliC,
+            if (load1 >= 0.0) load1 else other.load1,
+        )
+    }
+
     /** 读 /proc/slabinfo 里 posix_timers_cache 的活跃对象数，失败返回 -1。 */
     fun readSlab(): Int = try {
         File("/proc/slabinfo").useLines { seq ->
@@ -195,13 +207,86 @@ object SuccessRate {
         -1.0
     }
 
-    /** 读 thermal_zone0 温度（毫摄氏度），失败返回 -1。 */
-    fun readTempMilli(): Int = try {
-        File("/sys/class/thermal/thermal_zone0/temp").readText().trim().toIntOrNull() ?: -1
-    } catch (_: Throwable) {
-        -1
+    /** 读温度（毫摄氏度），失败返回 -1。逐个 zone 试，第一个读得出合理数值的就用。 */
+    fun readTempMilli(): Int {
+        for (i in 0..12) {
+            val v = try {
+                File("/sys/class/thermal/thermal_zone" + i + "/temp").readText().trim().toIntOrNull()
+            } catch (_: Throwable) {
+                null
+            }
+            if (v != null && v > 1000 && v < 200000) return v
+        }
+        return -1
     }
 
-    /** 采一次样。 */
-    fun sample(): RateResult = evaluate(readSlab(), readTempMilli(), readLoad1(), cores)
+    /** 本进程自己读：普通 App 域会被 SELinux 拦在 proc_loadavg 与 sysfs 之外，读不到就是 -1。 */
+    fun readLocal(): Raw = Raw(readSlab(), readTempMilli(), readLoad1())
+
+    /**
+     * 借特权通道一次读齐三个量。
+     *
+     * 普通 App 域（untrusted_app）在真机与模拟器上都被 SELinux 挡住
+     * proc_loadavg 与 sysfs，logcat 里能直接看到 avc denied；
+     * 所以必须让 Stellar 的 shell 身份去读，把三行带标签的结果回传后解析。
+     */
+    fun readPrivileged(): Raw {
+        if (!StellarShell.available() || !StellarShell.hasPermission()) return Raw(-1, -1, -1.0)
+        val script = listOf(
+            "grep -m1 posix_timers_cache /proc/slabinfo 2>/dev/null | awk '{print \"SLAB=\" \$2}'",
+            "awk '{print \"LOAD=\" \$1}' /proc/loadavg 2>/dev/null",
+            // 先试 sysfs：绝大多数机型 thermal_zone0..N 里总有一个可读。
+            "for z in /sys/class/thermal/thermal_zone*/temp; do v=\$(cat \$z 2>/dev/null); case \"\$v\" in ''|*[!0-9]*) continue;; esac; echo \"TEMP=\$v\"; break; done",
+            // sysfs 全被 SELinux 挡住的机型退到 thermalservice：它给的是摄氏度一位小数，乘 1000 换成毫度。
+            "dumpsys thermalservice 2>/dev/null | grep -m1 -o 'mValue=[0-9.]*' | cut -d= -f2 | awk '{ if (\$1+0 > 0) printf \"TEMP=%.0f\\n\", \$1*1000 }'",
+        ).joinToString("\n")
+        val out = try {
+            StellarShell.run(script, 6).output
+        } catch (_: Throwable) {
+            return Raw(-1, -1, -1.0)
+        }
+        var slab = -1
+        var temp = -1
+        var load = -1.0
+        for (line in out.lineSequence()) {
+            val s = line.trim()
+            when {
+                s.startsWith("SLAB=") -> slab = s.removePrefix("SLAB=").trim().toIntOrNull() ?: -1
+                // 两条温度来源都可能命中，只认第一条（sysfs 优先于 thermalservice）。
+                s.startsWith("TEMP=") -> if (temp < 0) {
+                    temp = s.removePrefix("TEMP=").trim().toIntOrNull() ?: -1
+                }
+                s.startsWith("LOAD=") -> load = s.removePrefix("LOAD=").trim().toDoubleOrNull() ?: -1.0
+            }
+        }
+        return Raw(slab, temp, load)
+    }
+
+    /** 上一次特权读到的值。特权通道每次都要跨进程，降频到 3 秒一次。 */
+    @Volatile
+    private var lastPriv: Raw = Raw(-1, -1, -1.0)
+
+    @Volatile
+    private var lastPrivAt = 0L
+
+    private const val PRIV_INTERVAL_MS = 3000L
+
+    /**
+     * 采一次样。
+     *
+     * 顺序是「特权优先、本地兜底」：特权通道能读全三项，本地读只能补它缺的那几项。
+     * 两者都失败时保留上一次的读数——成功率不该因为一次采样抖动就跳成「读不到」。
+     */
+    fun sample(): RateResult {
+        val now = System.currentTimeMillis()
+        if (now - lastPrivAt >= PRIV_INTERVAL_MS) {
+            val pr = readPrivileged()
+            if (pr.anyValid) {
+                lastPriv = pr
+                lastPrivAt = now
+            }
+        }
+        val merged = lastPriv.fill(readLocal())
+        return evaluate(merged.slab, merged.tempMilliC, merged.load1, cores)
+    }
 }

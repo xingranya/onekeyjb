@@ -186,47 +186,54 @@ internal fun PanelButton(
     }
 }
 
+/**
+ * 弹窗内容统一外边距。
+ *
+ * 取值必须与 COUI Item（[BasicComponent]）的内部内边距一致：环境诊断的行列表直接铺在
+ * 内容槽里，库自己给 16dp；其它弹窗若沿用 CouiDialogDefaults.contentPadding（24dp），
+ * 左右边界就比环境诊断多缩进一圈，几个弹窗摆在一起明显不搭。
+ */
+internal val DialogInset = 16.dp
+
+/** 弹窗正文段落：与环境诊断的行共享同一条左右边界。 */
+@Composable
+internal fun DialogParagraph(text: String, muted: Boolean = false, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = COUITheme.textStyles.body2,
+        color = if (muted) oneKeyColors().muted else COUITheme.colorScheme.onSurface,
+        modifier = modifier.fillMaxWidth().padding(horizontal = DialogInset)
+    )
+}
+
+/**
+ * 手册分节：扁平排版，不用卡片。
+ *
+ * 早先每节套一张 Card，卡片内 14dp 再叠上外层 24dp 内边距，缩进比环境诊断多出 38dp，
+ * 摆在一起像两套 UI。现在与环境诊断同一套网格：只有 16dp 外边距，标题用行标题字号，
+ * 条目用正文加圆点。
+ */
 @Composable
 internal fun ManualSection(title: String, lines: List<String>) {
-    val index = when {
-        title.startsWith("一") -> 1
-        title.startsWith("二") -> 2
-        title.startsWith("三") -> 3
-        title.startsWith("四") -> 4
-        title.startsWith("五") -> 5
-        else -> null
-    }
-    Card(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-        Row(Modifier.fillMaxWidth().padding(14.dp)) {
-            if (index != null) {
-                Box(
-                    Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(COUITheme.colorScheme.primary.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("$index", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
-                }
-                Spacer(Modifier.width(12.dp))
-            }
-            Column(Modifier.weight(1f)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = DialogInset, vertical = 8.dp)
+    ) {
+        Text(
+            title,
+            style = COUITheme.textStyles.body1,
+            color = COUITheme.colorScheme.onSurface
+        )
+        lines.forEach { line ->
+            Row(Modifier.padding(top = 6.dp)) {
+                Text("·", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
+                Spacer(Modifier.width(6.dp))
                 Text(
-                    title,
-                    style = COUITheme.textStyles.body1,
-                    color = if (index != null) COUITheme.colorScheme.onSurface else COUITheme.colorScheme.primary
+                    line,
+                    style = COUITheme.textStyles.body2,
+                    color = oneKeyColors().muted
                 )
-                lines.forEach { line ->
-                    Row(Modifier.padding(top = 6.dp)) {
-                        Text("·", style = COUITheme.textStyles.body2, color = COUITheme.colorScheme.primary)
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            line,
-                            style = COUITheme.textStyles.body2,
-                            color = oneKeyColors().muted
-                        )
-                    }
-                }
             }
         }
     }
