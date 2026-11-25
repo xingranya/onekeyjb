@@ -5,7 +5,7 @@ BASE = "https://api.cnb.cool/xingranya/onekeyjb/-/releases/2115388998399250432"
 TOK = os.environ["CNB_TOKEN"]
 R = "/Users/xingranya/Downloads/onekeyjb-private"
 
-VC, VN = 221, "2.23.0"
+VC, VN = 222, "2.23.1"
 size = os.path.getsize(APK)
 sha = hashlib.sha256(open(APK, "rb").read()).hexdigest()
 print("size", size, "sha", sha)
@@ -14,25 +14,24 @@ with urllib.request.urlopen("https://cnb.cool/xingranya/onekeyjb/-/releases/down
     doc = json.load(r)
 
 notes = [
-    "日志改为分级显示：信息 / 成功 / 警告 / 失败，一行一条，中文标签带色条",
-    "日志新增阶段墓碑：进程被重启打断后，下次启动能指出重启发生在哪一步之后",
-    "开关操作与退出不再被记成失败，历史页不再凭空产生「未完成」记录",
-    "首页参数区新增成功率：内存占用、CPU 温度、系统负载三格实时采样",
-    "成功率偏低时开始前弹窗提醒，并给出瓶颈与建议",
-    "许可证说明补充成功率的计算方式与边界",
-    "升级 COUI 到 0.0.1-alpha17，抽屉换用库原生 BottomSheet",
-    "compileSdk 提到 37.2，解决新依赖的 AAR 元数据要求"
+    "修复日志页点开闪退：COUI 圆角权重下限是 2，两处写了 1",
+    "修复四个抽屉按下不显示：首帧就被自己的关闭回调关掉",
+    "修复弹窗没有退场动画：九个弹窗改为常驻组合，隐藏后保留动画窗口",
+    "内存占用 / CPU 温度 / 系统负载改走特权通道读取，温度再加 thermalservice 兜底",
+    "历史页不再出现已废除的「64560 稳定链」与满屏「未完成 0.00s」",
+    "弹窗统一到同一套网格：左右缩进 16dp，按钮纵向堆叠整宽，次要动作不再被染红",
+    "使用手册去掉嵌套卡片，改为扁平分节排版",
 ]
 doc["versionCode"] = VC
 doc["versionName"] = VN
-doc["publishedAt"] = "2026-11-25T14:00:00+08:00"
+doc["publishedAt"] = "2026-11-25T15:20:00+08:00"
 doc["size"] = size
 doc["sha256"] = sha
 doc["changelog"] = "v" + VN + "\n\n" + "\n".join("- " + n for n in notes)
 vs = [v for v in doc.get("versions", []) if v.get("versionCode") != VC]
 vs.insert(0, {"versionName": VN, "versionCode": VC, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
 doc["versions"] = vs
-open("/tmp/upd-2300.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
+open("/tmp/upd-2310.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
 print("prepared", doc["versionCode"], doc["versionName"], "versions", len(vs))
 
 def api(url, data=None, method="POST"):
@@ -55,7 +54,7 @@ def upload(name, path):
     print("upload", name, "put", put, "verify", st2, flush=True)
 
 upload("OneKeyJB-latest.apk", APK)
-upload("update.json", "/tmp/upd-2300.json")
+upload("update.json", "/tmp/upd-2310.json")
 upload("OneKey-Knowledge.md", R + "/dist/OneKey-Knowledge.md")
 upload("onekey-kb.json", R + "/knowledge/ai-kb/onekey-kb.json")
 upload("onekey-kb.docs.json", R + "/knowledge/ai-kb/onekey-kb.docs.json")
