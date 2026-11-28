@@ -5,7 +5,7 @@ BASE = "https://api.cnb.cool/xingranya/onekeyjb/-/releases/2115388998399250432"
 TOK = os.environ["CNB_TOKEN"]
 R = "/Users/xingranya/Downloads/onekeyjb-private"
 
-VC, VN = 223, "2.24.0"
+VC, VN = 224, "2.25.0"
 size = os.path.getsize(APK)
 sha = hashlib.sha256(open(APK, "rb").read()).hexdigest()
 print("size", size, "sha", sha)
@@ -14,24 +14,24 @@ with urllib.request.urlopen("https://cnb.cool/xingranya/onekeyjb/-/releases/down
     doc = json.load(r)
 
 notes = [
-    "修复日志页点开闪退：COUI 圆角权重下限是 2，两处写了 1",
-    "修复四个抽屉按下不显示：首帧就被自己的关闭回调关掉",
-    "修复弹窗没有退场动画：九个弹窗改为常驻组合，隐藏后保留动画窗口",
-    "内存占用 / CPU 温度 / 系统负载改走特权通道读取，温度再加 thermalservice 兜底",
-    "历史页不再出现已废除的「64560 稳定链」与满屏「未完成 0.00s」",
-    "弹窗统一到同一套网格：左右缩进 16dp，按钮纵向堆叠整宽，次要动作不再被染红",
-    "使用手册去掉嵌套卡片，改为扁平分节排版",
+    "自研特权 Shell 通道：服务端以 app_process 常驻，与 App 进程完全解耦",
+    "双传输：抽象 Unix socket 优先，被 SELinux 拦时自动降级到文件队列",
+    "无线调试自配对：通知栏回 6 位配对码，无需 root 即可拉起通道",
+    "通道状态每秒重算，首页不再出现通道已通却显示离线",
+    "修复 shell 会话结束连带清掉服务端：启动脚本等到 socket 就绪才返回",
+    "修复心跳文件判活的幽灵就绪：改为真实往返探测",
+    "调用点零改动：StellarShell / ShizukuShell 保留原名原签名，内部路由",
 ]
 doc["versionCode"] = VC
 doc["versionName"] = VN
-doc["publishedAt"] = "2026-11-25T15:20:00+08:00"
+doc["publishedAt"] = "2026-11-28T21:20:00+08:00"
 doc["size"] = size
 doc["sha256"] = sha
 doc["changelog"] = "v" + VN + "\n\n" + "\n".join("- " + n for n in notes)
 vs = [v for v in doc.get("versions", []) if v.get("versionCode") != VC]
 vs.insert(0, {"versionName": VN, "versionCode": VC, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
 doc["versions"] = vs
-open("/tmp/upd-2240.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
+open("/tmp/upd-2250.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
 print("prepared", doc["versionCode"], doc["versionName"], "versions", len(vs))
 
 def api(url, data=None, method="POST"):
@@ -54,7 +54,7 @@ def upload(name, path):
     print("upload", name, "put", put, "verify", st2, flush=True)
 
 upload("OneKeyJB-latest.apk", APK)
-upload("update.json", "/tmp/upd-2240.json")
+upload("update.json", "/tmp/upd-2250.json")
 upload("OneKey-Knowledge.md", R + "/dist/OneKey-Knowledge.md")
 upload("onekey-kb.json", R + "/knowledge/ai-kb/onekey-kb.json")
 upload("onekey-kb.docs.json", R + "/knowledge/ai-kb/onekey-kb.docs.json")
