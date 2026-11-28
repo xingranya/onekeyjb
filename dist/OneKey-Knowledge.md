@@ -1,6 +1,6 @@
 # OneKey 知识库（合集）
 
-> 版本 2.24.0 / 223。不含任何密钥、口令或签名文件内容。
+> 版本 2.25.0 / 224。不含任何密钥、口令或签名文件内容。
 
 
 
@@ -10,7 +10,7 @@
 
 本目录是 OneKey 越狱工具的技术资料库，面向三类读者：装机用户、二次开发、以及接手本项目的 AI 助手。
 
-> 更新于 2.19.3（versionCode 201）。所有结论都在文中标了来源（代码位置 / 真机日志 / 上游发布说明）。
+> 更新于 2.25.0（versionCode 224）。所有结论都在文中标了来源（代码位置 / 真机日志 / 上游发布说明）。
 > **本知识库不含任何密钥、口令、token 或签名文件内容。**
 
 ## 阅读顺序
@@ -28,8 +28,9 @@
 | [09-新系统17.0.1.201适配.md](09-新系统17.0.1.201适配.md) | 新内核差异与适配点 | 换机/换系统的人 |
 | [10-98260执行引擎.md](10-98260执行引擎.md) | 引擎调用协议、输出→阶段映射、成功证据 | 想懂执行链的人 |
 | [11-热切换与通用模块.md](11-热切换与通用模块.md) | 通用模块前提、加载器替换、切换协议、已知行为 | 用热切换的人 |
-| [12-版本变更史.md](12-版本变更史.md) | 2.18.0 → 2.24.0 逐版变更 | 想知道某版改了什么的人 |
+| [12-版本变更史.md](12-版本变更史.md) | 2.18.0 → 2.25.0 逐版变更 | 想知道某版改了什么的人 |
 | [13-踩坑与修复记录.md](13-踩坑与修复记录.md) | 症状 → 根因 → 修法（含"以为坏了其实正常"） | 所有人，**建议先读** |
+| [16-自研Shell通道.md](16-自研Shell通道.md) | OneKeyShell 架构、双传输（socket/文件队列）、鉴权、引导阶梯、迁移方式 | 想去掉 Stellar 依赖、排查通道不通的人 |
 | [15-成功率模型.md](15-成功率模型.md) | 为什么旧算法不可用、Beta 后验公式、boot 分桶、遥测解析 | 想懂百分比怎么来的、要改模型的人 |
 | [14-验证清单.md](14-验证清单.md) | 发版前检查、真机回归、已知未验证项 | 发版、验收的人 |
 
@@ -956,7 +957,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.24.0）
+# 12 · 版本变更史（2.18.0 → 2.25.0）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -964,6 +965,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
+| **2.25.0** | 224 | 自研 OneKeyShell 通道（去 Stellar 依赖） | ① **自研特权 shell 通道**：新增 `shell/` 包（OneKeyShellServer 服务端 + OneKeyShell 客户端 + ShellProtocol 帧协议 + ShellSecrets 材料 + ShellBootstrap 引导阶梯 + ShellStreams 流式抽象），服务端由 `app_process` 以 shell(2000) 或 root(0) 身份常驻，与 App 进程完全解耦；② **双传输**：抽象 Unix socket 优先（延迟 <1 ms），被 SELinux 拦（`avc: denied { connectto } untrusted_app → shell`，域对不匹配，应用侧无法规避）时自动降级到 `getExternalFilesDir/onekey-shell/{q,r,k}` 文件队列（轮询 40/30 ms，端到端约 70 ms），服务端同时开两条路；③ **鉴权**：HELLO 发 32 字节 nonce，客户端回 `HMAC-SHA256(SHA256(token), nonce + boot_id)`，socket 名取 token 前 16 hex，目的是防同设备其它 App 复用我们的 root shell 而不是防 root；④ **引导阶梯四级**：L0 复用已运行 → L1 su 拉起（uid 0）→ L1b 写 KernelSU 开机模块 `/data/adb/modules/onekey_shell` → L2 无线调试自配对（mDNS + SPAKE2 + 通知栏 RemoteInput 回 6 位码 + 自签证书 TLS，无 root 也能起，得 uid 2000）→ L3 UI 展示可复制的 `adb shell sh <start.sh>`；⑤ **调用点零改动迁移**：`StellarShell` / `ShizukuShell` 保留原名原签名，内部先判 `OneKeyShell.available()`，命中就路由到自研通道，未命中走原实现 —— 106 处调用点一行未改，两条通道任一活着 App 就完整可用；⑥ **状态语义分离**：`available()/hasPermission()/serviceUid()` 保持只反映 Stellar 自身状态（供引导阶梯判断能否兜底），控制器改用 `shellReady()`/`shellGranted()` 表示「任意通道可用/已授权」，首页「服务通道」格显示具体通道名；⑦ **无线调试通道（L2）**：`adb/` 包新增 AdbProtocol / AdbMessage / AdbKey / AdbMdns / AdbClient / AdbPairing / Spake2 / AdbBootstrap / AdbPairingService；自签 X.509 用手写 DER（省掉 bcpkix 约 4 MB），SPAKE2 用纯 Java 实现（不引 native、不需 NDK）；配对交互走前台服务 + 通知栏 `RemoteInput`（配对端口只在设置页对话框可见期间存活，应用内弹窗必然失败）；⑧ **协议层 13 个单测**：帧往返、空 body、1 MiB body、超限拒写、截断头返回 null、截断体抛 EOF、负长度拒绝、ExecRequest 往返（含中文与 `C=x=y`）、env 数超限拒绝、二进制透传、ExitFrame、Hello、含代理对的中文字符串；⑨ **密码学 17 个单测**：SPAKE2 12 个（曲线点编码、KDF、名字带 NUL、密码哈希 64 字节、8 组 fuzz 双端一致）+ 自签证书 5 个（X.509 可解析、CN=00、签名自验、公钥一致、adb 公钥 524 字节布局）；⑩ **通道状态改为周期重算**：`serviceReady`/`serviceGranted` 不再只靠 Stellar binder 回调，改为每秒随成功率采样重算一次（`OneKeyShell.available()` 自带 2 秒缓存），自研通道三条拉起路径（配对 / su / 手跑脚本）都能立刻反映到首页 |
 | **2.24.0** | 223 | 成功率改为实测概率模型 | ① **整体替换评分逻辑**：2.23.x 的「slab × 温度 × 负载」三因子乘积里，slab 读的 posix_timers_cache 只对 6.12 链有意义（strings onekey-98260 里 posix_timers 命中 0），三张阈值表（340/430/540/660/900、38/43/48/56/65°C、per-core 1/2/3.5/6）无任何实测出处；现改为 **Beta 后验**：每次运行的真实 attempt / hit / 单次耗时落盘 files/run-stats.tsv（14 列 TSV，保留 200 条），Beta(1+hits, 20+misses) 给单次命中率，先验均值 4.76% 出自 docs 的 3%/attempt 量级；② **概率含中止闸门**：P = min(92, 1-(1-p)^k)，k = min(ABORT_AFTER, budgetMs/msPerAttempt)——旧实现漏算中止阈值，4 次把真实上限压到 11.5% 而界面显示 92%；③ **预算对齐引擎**：引擎内建 --auto240（240 秒）并自报 SLIDE=… BUDGET=…s，旧实现写死 90 秒等于只给 37% 预算；改为 budgetMs 参数，6.18 给 300 秒、6.12 给 180 秒，中止阈值 4→6；④ **boot 分桶**：实测同一开机内第二次运行命中率崩塌（0/60~0/248，因 6.18 runner 无 min_drain 脏基线保护），新增 BootClass（COLD_FIRST / COLD_RERUN / DIRTY），各自独立后验，重跑桶无样本时用首次桶均值 × 0.25；⑤ **引擎遥测**：新增 EngineTelemetryParser，首次把 UAF mode=… ms=… rc=…、LEAK_TASK attempt=…、RECLAIM_WRITES=… HIT=…、BUDGET=…s、FAIL=… 解析成结构化数据，成为成功率的唯一事实来源；⑥ **硬闸分层**：脏 boot / 电量 <30% / procs_running > 64 任一命中就不显示百分比，只显示原因；样本 <5 次 attempt 显示「样本不足（n=x）」；⑦ **环境修正反直觉**：procs_running ≤ 8 是**扣分项**（实测 8 候选第 10 次命中 vs 1 候选 212 次零命中），修正系数锁在 [0.70, 1.10]；⑧ **界面**：主数字带区间，依据行显示「本次开机首次运行 · 预计 6 次尝试 · 单次约 6.2 秒」；6.18 设备去掉「内存占用」格（该链不读 slabinfo），改为「CPU 温度 / 线程运行 / 电量」；RunConfirmDialog 拦截条件改为「概率 <40%」或「同 boot 重跑」 |
 | **2.23.1** | 222 | 弹窗统一 + 五处回归修复 | ① **日志页闪退**：`CouiShape(radius, cornerWeight)` 构造期 `require(weight >= 2f)`，日志页两处写了 1f 直接抛异常，改 2f；② **弹窗退场动画**：COUI 靠 `visible` + 内部 `retained` 保留窗口，调用方 `if (show)` 会在同一帧摘子树，新增 `DialogSlot` 让九个弹窗常驻组合、隐藏后多留 320ms；③ **四个抽屉点了没反应**：`WindowBottomSheet` 首帧 `visible` 仍为 false 就触发 `onDismissFinished`，加 `everShown` 门控 + 收起延迟；④ **弹窗左右缩进三套**：环境诊断 16dp、第三方 24dp、用户手册 24+14dp，统一为 `DialogInset = 16.dp`，手册分节去掉 Card 改扁平排版；⑤ **按钮并排与红字**：COUI `horizontal = (neutralAction == null && dismissAction != null)`，次要动作塞进 neutral 槽强制纵向堆叠，并自供 `CouiDialogActionColors` 去掉破坏性红字；⑥ **内存/温度/负载读不到**：普通 App 域被 SELinux 挡在 `proc_loadavg` 与 sysfs 之外，改走 Stellar 特权通道一次读齐三量（3 秒降频），温度加 `dumpsys thermalservice` 兜底；⑦ **历史页幽灵记录与「64560 稳定链」**：`append` 无 activeId 时凭空 start 记录改为直接 return，`title` 的 else 兜底把废案复活改为固定「98260 运行链」 |
 | **2.23.0** | 221 | 日志分级 + 成功率 + COUI alpha17 | ① **日志全面重写**：新增 RunLog，四档中文等级（信息/成功/警告/失败），一行一条，落盘格式 `HH:mm:ss  [标签] 标题 · 详情 · 1.2s`，解析旧格式靠关键字兜底；Runner 的 `EV|v=1|phase=` 结构化行首次被解析成中文阶段；② **阶段墓碑 RunTrace**：软重启会连根拔掉进程，finally 里的归因代码一行都跑不到，因此每进一个阶段就往 `files/onekey-run-trace.json` 写墓碑（stage/boot/ts/intent）并 fsync，下次启动比对 boot_id 指出重启发生在哪一步之后；intent 位区分「用户开的软重启」与「异常重启」；③ **历史页幽灵记录根治**：`HistoryStore.append` 原本在无 activeId 时 凭空 start 一条 unknown 记录，导致每次开 App、每次拨开关都多一条「未完成 0.00s」；改为直接 return，并新增 `abandon()` 把残留 running 标成异常中断、`stats()` 只统计跑完的记录；④ **成功率 SuccessRate**：读 `/proc/slabinfo` 的 posix_timers_cache、`/proc/loadavg`、`thermal_zone0/temp` 三路采样，按 slab/温度/负载三因子乘积给分，上限 **92%**（永不承诺 100%），建议线 55%；首页参数区三格实时显示，低于阈值时开始前弹窗拦一次并指出瓶颈；⑤ **BootWatch 归因**：在每个可能触发重启的动作前后快照 boot_id / system_server pid / zygote 状态，命中就把重启点名到具体动作；⑥ **COUI 升级 alpha11→alpha17**：抽屉换用库原生 BottomSheet（`com.itos.coui.sheet`），获得拖拽手柄与原生回弹；alpha17 要求 `minCompileSdk=37 + minCompileMinorSdk=1`，compileSdk 提到 **37.2**；⑦ 构建链路改走阿里云镜像前置 + 本地 `libs/coui-repo` 离线镜像（Google Maven 直连 reset）；⑧ 新增 20 个单元测试（RunLogTest），覆盖日志格式往返、真实日志行归类回归、成功率因子单调性与边界 |
@@ -1608,6 +1610,110 @@ content 槽没有内边距，加了就比库自带的 `Item` 多缩进一圈。
 | SukiSU 显示 41158 而下载列表是 41150 | 41158 是 `manager-ci` 预发布，列表只跟 stable |
 | 首页"100%"但进度条没到顶 | 完成后按语义显示 100%，与实际 progress 字段解耦 |
 
+---
+
+### 46. 自研 shell 通道：socket 被 SELinux 拦住，必须双传输
+
+**现象**：自研服务端（`app_process` 起、uid 2000）能正常启动，`ps` 可见、`server.log` 有「监听中」，但客户端一直显示「未连接」。
+
+**根因**：抽象 Unix socket 的 `connectto` 是 SELinux 跨域检查，不是路径权限：
+
+```
+avc: denied { connectto } for path=006F6E656B65795F7368656C6C5F...
+scontext=u:r:untrusted_app:s0:c192,c256,c512,c768
+tcontext=u:r:shell:s0 tclass=unix_stream_socket permissive=0
+```
+
+`untrusted_app` 域没有连 `shell` 域的权限，应用侧绕过不了（改 socket 路径、改权限位都无效，因为拦的是域对）。
+
+**修法**：双传输。socket 优先（延迟 <1 ms），失败自动降级到文件队列（`getExternalFilesDir/onekey-shell/{q,r,k}/`，轮询 40/30 ms，端到端约 70 ms）。文件访问不受这条策略限制 —— token 与 `start.sh` 本来就是靠它传的。
+
+**关键细节**：
+- 服务端必须**同时**开 socket 与文件队列，两条路都能进；只开一条会在另一种 SELinux 配置下全瞎。
+- 文件队列要写 `heartbeat`（3 秒一次），客户端靠 mtime 判断服务端是否活着 —— 否则无法区分「没起来」和「起来了但还在排队」。
+- `.go` 文件必须最后写：它的出现就是「请求完整」的原子信号。
+- `isRunning()` 在文件模式下必须顺手 `poll()`：socket 是推送（reader 线程写 done），文件是拉取（没人读 `rc` 就永远不 done），而引擎的等待循环只调 `isRunning()`。
+- socket 失败要记冷却期（60 秒）：`connectto` 拒绝是策略级、不会自愈，而 `connOrNull` 每次试 3 轮共空等 400 ms，`available()` 在 46 个调用点被反复调用。
+
+**教训**：跨进程通道设计时，先把「内核允许的通信方式」列一遍再选{{TERM_2y25qziz}}。binder 要 aidl + 权限校验，抽象 socket 要域匹配，文件是唯一在 untrusted_app 域稳过的 —— 它的代价（70 ms 轮询）在「读日志行判断是否中止」这个场景里完全可接受。
+
+---
+
+### 47. `app_process` 的参数顺序：`--nice-name` 必须在 parent-dir 之后
+
+**现象**：`start.sh` 执行后打印 `started`，但 `ps` 里没有进程、`server.log` 空白、退出码 0。完全静默失败。
+
+**根因**：参数顺序写成了 `app_process --nice-name=onekey_shell /system/bin <class>`。`app_process` 的语法是：
+
+```
+app_process [vm-options] <parent-dir> [options] <class> [args]
+```
+
+`--nice-name` 放在 `/system/bin` 之前会被当成 vm-option 区域的兄弟参数，整条命令静默退出，既不报错也不输出。
+
+**修法**：`app_process /system/bin --nice-name=onekey_shell <class> --socket ...`。
+
+**教训**：这类「退出码 0 但什么都没发生」的失败，必须靠前台手工执行 + 观察 stderr 定位；后台 `&` 加 `echo started` 的写法会把失败吞得干干净净。
+
+---
+
+### 48. token 权限：`-rw-------` 让 shell(2000) 读不到
+
+**现象**：服务端日志打「token 读取失败」，退出码 71。
+
+**根因**：`ShellSecrets.token()` 里 `setReadable(false, false)` + `setReadable(true, true)` 生成 0600，owner 是 App 的 uid（如 `u0_a192`），而服务端是以 shell(2000) 或 root 身份跑的另一个进程，读不到。
+
+**修法**：改 `setReadable(true, false)` 生成 0644。落点已在 `/sdcard/Android/data/<pkg>/` 内，受分区存储保护，其它 App 进不来，0644 不扩大暴露面。
+
+**教训**：跨 uid 传递的文件，权限要按「谁来读」定，不是按「越严越好」定。安全边界由目录位置（分区存储）提供，不是由文件权限位。
+
+### 49. 无线调试 TLS 连接：升级完 TLS 后不能再发 A_CNXN
+
+**现象**：配对成功、TLS 握手成功、A_CNXN banner 也收到了，但一发 A_OPEN shell 就收到 A_STLS（0x534c5453），日志打「shell 通道未建立：0x534c5453」。
+
+**根因**：connect() 里 TLS 升级后多调了一次 sendConnect()。adbd 在 TLS 握手完成那一刻会主动推一条 344 字节的 A_CNXN banner（device::ro.product.name=...）；此时客户端再补一条 A_CNXN，adbd 把它当成新的一次认证握手，回一个 A_STLS 要求二次升级。客户端在 shell 阶段读到的第一帧就是这个 A_STLS。
+
+**修法**：TLS 升级后直接 read() 等 banner，不 sendConnect()。python 独立复现脚本（A_CNXN 到 A_STLS，再回 A_STLS/A_STLS_VERSION，TLS 升级，只读，最后 A_OPEN）确认全链通过，返回 0。
+
+**教训**：协议里「客户端先说话」只适用于明文阶段。TLS 升级是状态分界线，升级前必须客户端开场，升级后设备会主动发 banner。凭直觉在两个阶段都补 A_CNXN，就会触发二次握手。
+
+### 50. start.sh 里 echo started 一返回，服务端就被连坐清掉
+
+**现象**：adb shell sh start.sh 回执 started，但 ps -A 查 onekey_shell 立刻是空的；App 侧报「复用已运行的服务端（uid=2000）」，随后一切执行都失败。
+
+**根因**：adb 的 shell 会话在脚本进程退出的那一刻关闭。会话一关，adbd 会把它拉起的整个进程组一起清掉 —— setsid 只是脱离控制终端，挡不住 adbd 按会话清理。而 app_process 起 JVM 要 300~600 ms，start.sh 里 & 之后立刻 echo started 就退出，JVM 还没到绑定 socket 就被杀了。
+
+**修法**：脚本末尾轮询 /proc/net/unix 等抽象 socket 真的出现再退出：
+
+    i=0
+    while [ $i -lt 50 ]; do
+      grep -q 'onekey_shell_xxxx' /proc/net/unix 2>/dev/null && break
+      i=$((i+1)); sleep 0.1
+    done
+    echo started
+
+**教训**：往「一次性的远端会话」里塞长驻进程，脚本必须活到子进程自证就绪为止。用固定 sleep 也行但会在慢设备上偶发失败；轮询一个子进程必然会创建的可见物（socket 节点、pid 文件）才是确定性的。
+
+### 51. 心跳文件判活：20 秒阈值 = 最长 17 秒的幽灵「已就绪」
+
+**现象**：pkill onekey_shell 之后点「启动 Shell 通道」，日志说「复用已运行的服务端（uid=2000）」，但 ps 里没有进程，后续执行全失败。
+
+**根因**：文件队列的心跳每 3 秒写一次，而 HEARTBEAT_STALE_MS 是 20 秒。服务端被杀后心跳文件还在，mtime 最多过期 17 秒，这段时间内 fileModeUsable() 一直返回 true。
+
+**修法**：阈值收到 8 秒，并在 fileModeUsable() 里做一次真实往返 —— 投一条 echo OKX_PING，1.5 秒内拿到 rc=0 才算活。代价只在 socket 不通时发生（结果有 2 秒缓存）。
+
+**教训**：心跳只能证明「不久前活过」，不能证明「现在活着」。任何用来做路由决策的存活判断，都必须有一次真实请求-响应，否则会把失败延后暴露，且暴发点离根因很远。
+
+### 52. 通道状态不会自己变：只在 Stellar binder 回调里刷新会漏掉所有自研通道路径
+
+**现象**：通道实际已通（ps 里有 onekey_shell，环境诊断能跑出真实输出），首页却一直显示「服务离线 / 未连接 / 未就绪」。
+
+**根因**：serviceReady / serviceGranted 只在 Stellar.OnBinderReceivedListener / OnBinderDeadListener / init / 权限回调里赋值。自研通道起来的三条路径（无线调试配对、su 拉起、用户手跑 start.sh）都不经过 Stellar，所以状态永远不刷新。
+
+**修法**：把探测并进每秒一次的成功率采样循环里 —— val ready = shellReady(); if (ready != serviceReady) { serviceReady = ready; serviceGranted = shellGranted() }。OneKeyShell.available() 自带 2 秒缓存，每秒探一次代价可忽略。
+
+**教训**：状态源有两套以上时，「谁变化谁通知」这种设计必然漏；应该让 UI 状态跟着一个周期性重算走，回调只作为「立刻刷新一次」的加速器。
+
 
 ---
 
@@ -1772,3 +1878,185 @@ ts  boot  bootClass  attempts  hits  msPerAttempt  totalMs  ok  failKind  budget
 - 6.18 链**没有** slab 概念，不补指标 —— 硬凑只会再次变成假数字。
 - 不把 `CEILING` 抬到 100。
 - 引擎 `--auto240` 与 `run` 子命令的关系待真机 `BUDGET=` 行确认；当前只做「读它自报的预算」，解析不到才用档案默认值。
+
+
+---
+
+# 16 · 自研 Shell 通道（OneKeyShell）
+
+> 目标：不依赖 Stellar / Shizuku 也能以特权身份跑 shell。2.25.0 起为默认通道。
+
+## 为什么需要它
+
+Stellar 是第三方 App，它有三个绕不开的代价：
+
+| 问题 | 后果 |
+| --- | --- |
+| 需要用户额外装一个 App 并手动授权 | 装机门槛，且对方一旦改协议我们就得跟 |
+| 权限授予走 binder + 弹窗 | 无人值守场景（开机自动越狱）没法自己完成 |
+| 开机自启由对方控制 | 对方不开自启，我们的自动越狱就等不到通道 |
+
+自研通道把这三条都拿回来了：服务端是我们自己的代码，身份由「谁来拉起它」决定。
+
+## 架构
+
+```
+App 进程 (untrusted_app)
+  ├─ StellarShell / ShizukuShell   ← 保留原名原签名，内部路由
+  │     └─ OneKeyShell.available() ? 自研通道 : 原实现
+  └─ OneKeyShell（客户端）
+        ├─ socket 传输（优先）
+        └─ 文件队列传输（兜底）
+              ↓
+服务端进程 (shell / root)
+  └─ OneKeyShellServer（app_process 起的常驻 JVM）
+        ├─ LocalServerSocket（抽象命名空间）
+        └─ FileTransport.serveLoop
+```
+
+服务端与 App 进程完全解耦：App 被杀、被升级、被强停都不影响它；只要不被系统回收就一直可用。
+
+## 双传输（关键设计）
+
+### 为什么不能只用 socket
+
+抽象 Unix socket 的 `connectto` 在 SELinux 上是**跨域检查**，不是路径权限：
+
+```
+avc: denied { connectto } for path=006F6E656B65795F7368656C6C5F...
+scontext=u:r:untrusted_app:s0:c192,c256,c512,c768
+tcontext=u:r:shell:s0 tclass=unix_stream_socket permissive=0
+```
+
+`untrusted_app` 域没有连 `shell` 域的权限。改 socket 路径、改文件权限位都无效 —— 拦的是域对。
+
+### 文件队列
+
+落点 `getExternalFilesDir(null)/onekey-shell/`，受分区存储保护（其它 App 进不来），shell 与 root 读得到。
+
+```
+q/<id>.sh  .env  .cwd  .to  请求体
+q/<id>.go                   原子触发（最后写）
+r/<id>.out .err .rc         结果体（.rc 出现即完成）
+k/<id>                      终止请求
+heartbeat                   服务端心跳（3 秒一次）
+```
+
+服务端每 40 ms 扫 `q/`，客户端每 30 ms 扫 `r/`。端到端约 70 ms —— 对「读日志行决定是否中止」完全够用。
+
+### 选路逻辑
+
+```
+connOrNull() 成功  →  socket 传输
+connOrNull() 失败  →  记 socketBlockedAt（60 秒冷却）
+heartbeat 新鲜     →  文件队列
+两者都不可用        →  通道不可用，回落 Stellar
+```
+
+## 鉴权
+
+不是防 root（拦不住），是防**同设备其它 App**通过 `/proc/net/unix` 枚举到抽象 socket 名后复用我们的 root shell。
+
+```
+服务端 → HELLO  { protoVer, uid, nonce[32] }
+客户端 → AUTH   HMAC-SHA256( token, nonce ‖ boot_id )
+服务端 → AUTH_OK / AUTH_FAIL
+```
+
+- `token` = 64 个十六进制字符（256 bit），首次启动生成，存 `onekey-shell/token`（0644）。
+- socket 名 = `onekey_shell_` + token 前 16 hex → 泄露 64 bit，剩余 192 bit 未知。
+- 鉴权窗口 10 秒；失败即断开，不执行任何命令。
+
+## 引导阶梯
+
+| 级 | 手段 | 前提 | 得到 | 状态 |
+| --- | --- | --- | --- | --- |
+| L0 | 连接已存在的 socket / 文件队列 | 服务端在跑 | 原权限 | ✅ |
+| L1 | `su -c "sh start.sh"` | 已有 root | **uid 0** | ✅ |
+| L1b | 写 `/data/adb/modules/onekey_shell` | 已有 root | 每次开机自动起 | ✅ |
+| L2 | 无线调试自配对（通知栏回码） | `WRITE_SECURE_SETTINGS` | uid 2000 | ✅ |
+| L3 | UI 展示 `adb shell sh <start.sh>` | 用户手动 | uid 2000 | ✅ |
+
+顺序刻意如此：先试最省事也最安全的（复用），再试需要 root 的，最后才麻烦用户。
+
+### L2 无线调试配对的实际形状
+
+完整链路在 `adb/AdbBootstrap.kt` + `adb/AdbPairingService.kt`：
+
+1. `Settings.Global.putInt(cr, "adb_wifi_enabled", 1)` 打开无线调试（需 `WRITE_SECURE_SETTINGS`，首次由 root 一次性授予）。
+2. mDNS 发现 `_adb-tls-pairing._tcp` 端口。
+3. 前台服务 + 通知栏 `RemoteInput` 让用户回 6 位配对码，跑 SPAKE2（纯 Java 实现，见 `adb/Spake2.kt`）。
+4. mDNS 发现 `_adb-tls-connect._tcp` 端口，用自签证书做 TLS 客户端证书连 adbd。
+5. `shell:sh start.sh` 把服务端拉起来。
+
+**配对端口只在设置页那个对话框可见期间存活**：切走应用（哪怕只是按 HOME）adbd 立刻关掉端口，`adb mdns services` 变空。所以「应用内弹输入框让用户抄码再切回来」根本走不通，必须通知栏 RemoteInput 让用户全程停在设置页。
+
+**TLS 升级后设备会主动发 A_CNXN banner**，客户端此时不能再补一条 `A_CNXN`，否则 adbd 当成二次认证并回 `A_STLS`，shell 阶段第一帧就读到 `0x534c5453`。详见踩坑记录第 49 条。
+
+### start.sh 必须活到服务端自证就绪
+
+脚本末尾轮询 `/proc/net/unix` 等抽象 socket 出现再退出：
+
+```sh
+i=0
+while [ $i -lt 50 ]; do
+  grep -q 'onekey_shell_<16hex>' /proc/net/unix 2>/dev/null && break
+  i=$((i+1)); sleep 0.1
+done
+echo started
+```
+
+原因：adb 的 shell 会话在脚本退出那一刻关闭，adbd 会按会话清掉整个进程组（`setsid` 挡不住）。`app_process` 起 JVM 要 300~600 ms，不等就必然被杀。详见踩坑记录第 50 条。
+
+## 服务端启动脚本
+
+`ShellSecrets.ensureScript()` 生成 `onekey-shell/start.sh`：
+
+```sh
+APK=$(pm path <pkg> | head -1 | cut -d: -f2)
+CLASSPATH="$APK" setsid app_process /system/bin --nice-name=onekey_shell \
+    com.pyb110.onekey.shell.OneKeyShellServer \
+    --socket <name> --token-file <path> --log <path> </dev/null >>log 2>&1 &
+echo started
+```
+
+**参数顺序是硬约束**：`app_process [vm-options] <parent-dir> [options] <class> [args]`。
+`--nice-name` 放在 `/system/bin` 之前会被当成 vm-option，整条命令静默退出（退出码 0、无输出）。
+
+## 调用点迁移方式
+
+**不在 106 处调用点逐个替换**，而是让 `StellarShell` / `ShizukuShell` 内部路由：
+
+```kotlin
+// StellarShell.kt
+private fun self(): Boolean = OneKeyShell.available()
+
+fun run(script: String, timeoutSec: Long = 60, extraEnv: Array<String>? = null): Result {
+    if (self()) return OneKeyShell.run(script, timeoutSec, extraEnv).let { Result(it.code, it.output) }
+    return try { /* 原 Stellar 实现 */ }
+}
+```
+
+理由：调用点分散在 11 个文件，逐个替换必然漏改，而漏改的那一处会在「用户已卸载 Stellar」时静默失败。
+
+**但状态查询不做路由**：`available() / hasPermission() / serviceUid()` 必须只反映 Stellar 自身状态，
+否则 `ShellBootstrap` 就没法判断「Stellar 能不能兜底」。需要「任意通道可用」的语义用 `shellReady()`。
+
+## 状态语义
+
+| 查询 | 含义 |
+| --- | --- |
+| `OneKeyShell.available()` | 自研通道可执行 |
+| `StellarShell.available()` | Stellar 自身可用（不看自研） |
+| `JailbreakController.shellReady()` | 任意通道可用 |
+| `JailbreakController.shellGranted()` | 任意通道已授权（自研通道恒 true） |
+| `JailbreakController.shellLabel()` | 当前通道名（自研通道 / Stellar / 未连接） |
+
+## 已知限制
+
+| 限制 | 影响 | 出路 |
+| --- | --- | --- |
+| 无 root 且无 adb 时通道起不来 | 首次装机必须手动执行一次 | 已实现 L2 无线调试自配对，可全自动 |
+| 文件队列延迟约 70 ms | 高频短命令比 socket 慢 | 只在高频场景下才明显，引擎不敏感 |
+| 服务端被系统回收后不自愈 | 需要 App 侧重新引导 | `ShellBootstrap.start()` 在开机服务与 UI 按钮里都会触发 |
+| 从 uid 2000 升到 uid 0 | 需要 root 才能拿 uid 0 | 这是 SELinux 的必然结果，不是实现缺陷；L2 只到 2000 |

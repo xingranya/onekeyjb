@@ -20,3 +20,6 @@ dist/*.apk
 # 脚本编译缓存
 __pycache__/
 *.pyc
+
+# 临时工作目录
+tmp/

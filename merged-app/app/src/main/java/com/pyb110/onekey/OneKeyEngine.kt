@@ -134,7 +134,9 @@ object OneKeyEngine {
         var failedStageSignals = 0
         var telemetry = EngineTelemetry()
         try {
-            val proc = ShizukuShell.start(cmd) { raw ->
+            // 走 ShellStreams 而不是直接用 ShizukuShell.start：
+            // 自研通道的长驻句柄不是 java.lang.Process，抽象层负责抹平差异。
+            val proc = com.pyb110.onekey.shell.ShellStreams.start(cmd) { raw ->
                 var line = raw.trim()
                 if (line.isEmpty()) return@start
                 // 外部引擎的标识串不外泄到我们的日志

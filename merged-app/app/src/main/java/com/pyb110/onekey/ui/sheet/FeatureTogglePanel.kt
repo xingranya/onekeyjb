@@ -32,7 +32,7 @@ internal fun FeatureTogglePanel(
         rows = listOf(
             ListRow(
                 title = "开机自动越狱",
-                summary = if (controller.autoJailbreak) "开机后自动运行一次，需 Stellar 已开启开机启动"
+                summary = if (controller.autoJailbreak) "开机后自动运行一次，需 Shell 通道就绪"
                           else "关闭：开机后需手动运行",
                 icon = COUIIcons.Play,
                 end = {
@@ -113,7 +113,7 @@ internal fun FeatureTogglePanel(
                 title = { Text("使用前提", style = COUITheme.textStyles.body1) },
                 summary = {
                     Text(
-                        "① 在 Stellar 里开启「开机启动」\n② 在系统设置里允许本应用自启动\n③ 忽略电池优化",
+                        "① 启动 Shell 通道（首次需一次 adb 或已有 root）\n② 在系统设置里允许本应用自启动\n③ 忽略电池优化",
                         style = COUITheme.textStyles.body2,
                         color = c.muted
                     )
@@ -135,12 +135,34 @@ internal fun FeatureTogglePanel(
                     )
                 }
             }
-            PanelButton("打开 Stellar", Modifier.weight(1f)) {
-                runCatching {
-                    context.packageManager.getLaunchIntentForPackage("roro.stellar.manager")
-                        ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        ?.let { context.startActivity(it) }
-                }
+            PanelButton("启动 Shell 通道", Modifier.weight(1f)) {
+                haptic(CouiHapticEffect.Switch)
+                // 引导是同步阻塞的（su 拉起要等 socket 就绪），放后台线程再回主线程报结果
+                Thread {
+                    val outcome = com.pyb110.onekey.shell.ShellBootstrap.start(context) { line ->
+                        controller.addUiLog(com.pyb110.onekey.RunLog.info(line))
+                    }
+                    controller.addUiLog(
+                        if (outcome.ok) com.pyb110.onekey.RunLog.success(
+                            "Shell 通道已就绪（" + outcome.label + "，uid=" + outcome.uid + "）"
+                        ) else com.pyb110.onekey.RunLog.warn(
+                            "Shell 通道未就绪",
+                            "可手动执行：" + outcome.manualCommand
+                        )
+                    )
+                    // 全部引导都失败时，走无线调试配对这条最后的路。
+                    // 必须用前台服务 + 通知栏回码：配对端口只在设置页对话框可见期间存活，
+                    // 弹应用内对话框会让用户切走、端口立刻关闭。
+                    if (!outcome.ok) {
+                        com.pyb110.onekey.adb.AdbPairingService.start(context)
+                        controller.addUiLog(
+                            com.pyb110.onekey.RunLog.info(
+                                "已发起无线调试配对",
+                                "请在设置里打开「使用配对码配对设备」，再从通知栏回复 6 位配对码"
+                            )
+                        )
+                    }
+                }.start()
             }
         }
     }

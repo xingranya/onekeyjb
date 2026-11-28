@@ -133,18 +133,64 @@ class JailbreakController private constructor(private val context: Context) {
     /** 历史成功率统计。 */
     var historyStats: HistoryStore.Stats by mutableStateOf(HistoryStore.Stats(0, 0, 0, 0)); private set
 
+    /**
+     * 无线调试配对是否在进行中。
+     *
+     * 配对交互不在这里：配对端口只在「设置 → 无线调试 → 使用配对码配对设备」对话框
+     * 可见期间存活，弹应用内输入框会让用户切走、端口立刻关闭。
+     * 所以真正的交互在 [com.pyb110.onekey.adb.AdbPairingService] 里，
+     * 用前台服务 + 通知栏 RemoteInput 让用户全程停在设置页。
+     */
+    var pairingBusy: Boolean by mutableStateOf(false); private set
+
     private var autoRepairTried = false
 
+    /**
+     * 服务通道状态。
+     *
+     * 不再只看 Stellar：自研 OneKeyShell 起来之后，即使 Stellar 没装、没授权，
+     * 所有执行类调用也能跑通（StellarShell / ShizukuShell 内部已把执行路由到自研通道）。
+     * 所以这里的语义是「任意一条通道可用」，而不是「Stellar 可用」。
+     */
+    private fun shellReady(): Boolean = try {
+        com.pyb110.onekey.shell.OneKeyShell.available() || StellarShell.available()
+    } catch (_: Throwable) {
+        false
+    }
+
+    /** 当前生效的通道名，供首页与抽屉显示。 */
+    fun shellLabel(): String = when {
+        runCatching { com.pyb110.onekey.shell.OneKeyShell.available() }.getOrDefault(false) -> "自研通道"
+        StellarShell.available() -> "Stellar"
+        else -> "未连接"
+    }
+
+    /**
+     * 通道是否「已授权」。
+     *
+     * 自研通道没有权限概念：socket/文件队列的鉴权是 HMAC token，起来就等于已授权。
+     * 只有 Stellar 需要额外的 checkSelfPermission，所以必须分开判断 ——
+     * 否则只装自研通道时首页会一直显示「待授权」，用户会以为还要去点什么。
+     */
+    private fun shellGranted(): Boolean = try {
+        if (com.pyb110.onekey.shell.OneKeyShell.available()) true else StellarShell.hasPermission()
+    } catch (_: Throwable) {
+        false
+    }
+
     private val binderListener = Stellar.OnBinderReceivedListener {
-        serviceReady = StellarShell.available()
-        serviceGranted = StellarShell.hasPermission()
+        serviceReady = shellReady()
+        serviceGranted = shellGranted()
         if (serviceReady) {
-            addLog("Stellar 服务已连接")
+            addLog("服务通道已连接（" + shellLabel() + "）")
             scope.launch { cleanupStaleExecutor() }
         }
     }
     private val deadListener = Stellar.OnBinderDeadListener {
-        serviceReady = false; serviceGranted = false; addLog("Stellar 服务已断开")
+        // Stellar 死了不代表通道死了：自研通道可能还在，所以重新探一次再下结论
+        serviceReady = shellReady()
+        serviceGranted = shellGranted()
+        addLog(if (serviceReady) "Stellar 已断开，改用" + shellLabel() else "服务通道已断开")
     }
     private val permissionListener = Stellar.OnRequestPermissionResultListener { code, granted, _ ->
         serviceGranted = granted
@@ -160,6 +206,18 @@ class JailbreakController private constructor(private val context: Context) {
         scope.launch {
             while (true) {
                 refreshRate()
+                // 顺带盯住通道状态。
+                //
+                // 通道可能在任意时刻从无到有：无线调试配对成功、su 拉起服务端、
+                // 用户手动跑了 start.sh。这些路径都不经过本类，如果只靠 Stellar 的
+                // binder 回调刷新，首页会一直显示「服务离线 / 未连接」，
+                // 但功能其实是通的 —— 这是实测踩到的现象。
+                // OneKeyShell.available() 自带 2 秒缓存，每秒探一次的代价可以忽略。
+                val ready = shellReady()
+                if (ready != serviceReady) {
+                    serviceReady = ready
+                    serviceGranted = shellGranted()
+                }
                 delay(SuccessRate.SAMPLE_MS)
             }
         }
@@ -286,8 +344,8 @@ class JailbreakController private constructor(private val context: Context) {
             Stellar.addBinderDeadListener(deadListener, null)
             Stellar.addRequestPermissionResultListener(permissionListener, null)
         }
-        serviceReady = StellarShell.available()
-        serviceGranted = StellarShell.hasPermission()
+        serviceReady = shellReady()
+        serviceGranted = shellGranted()
         refreshState()
         scope.launch {
             snapshotFlow { stage to progress }.collect { (s, p) ->
@@ -331,8 +389,8 @@ class JailbreakController private constructor(private val context: Context) {
         refreshRootedFlag()
         // 服务在线但未授权时主动申请，否则所有探测都会是空结果。
         if (serviceReady && !serviceGranted) runCatching { StellarShell.requestPermission(1001) }
-        serviceReady = StellarShell.available()
-        serviceGranted = StellarShell.hasPermission()
+        serviceReady = shellReady()
+        serviceGranted = shellGranted()
         if (!RunState.active && lockFile().isFile()) {
             lockFile().delete()
             addLog("已清理上次中断留下的运行锁，可直接重试")
@@ -883,10 +941,78 @@ class JailbreakController private constructor(private val context: Context) {
      */
     fun addUiLog(entry: LogEntry) = addLog(entry, toHistory = false)
 
+    /**
+     * 发起无线调试配对。
+     *
+     * 交互不在这里做：配对端口只在「设置 → 无线调试 → 使用配对码配对设备」这个对话框
+     * 可见期间存活，一旦切走应用就立刻关闭。所以流程被搬到
+     * [com.pyb110.onekey.adb.AdbPairingService]：前台服务 + 通知栏 RemoteInput，
+     * 用户全程停在设置页，只下拉通知栏回一条 6 位配对码。
+     *
+     * 配对成功后服务会自己跑 start.sh 把自研通道拉起来；UI 侧靠轮询
+     * [com.pyb110.onekey.shell.OneKeyShell.available] 感知，不需要回调。
+     */
+    fun startAdbPairing() {
+        if (pairingBusy) return
+        pairingBusy = true
+        addUiLog(
+            RunLog.info(
+                "已发起无线调试配对",
+                "请在设置里打开「无线调试 → 使用配对码配对设备」，再从通知栏回复 6 位配对码"
+            )
+        )
+        scope.launch {
+            val ctx = context
+            com.pyb110.onekey.adb.AdbPairingService.start(ctx)
+            // 服务那边整条链最长约 60 秒（找端口 20s + 配对 15s + 等 shell 8s + 余量）。
+            // 这里只等通道出现，不重复做配对动作。
+            var waited = 0
+            while (waited < 90) {
+                kotlinx.coroutines.delay(1000)
+                waited++
+                if (runCatching { com.pyb110.onekey.shell.OneKeyShell.available() }.getOrDefault(false)) {
+                    withContext(Dispatchers.Main) {
+                        pairingBusy = false
+                        serviceReady = shellReady()
+                        serviceGranted = shellGranted()
+                        addUiLog(
+                            RunLog.success(
+                                "Shell 通道已就绪",
+                                "已通过无线调试启动，服务通道 " + shellLabel()
+                            )
+                        )
+                    }
+                    return@launch
+                }
+            }
+            withContext(Dispatchers.Main) {
+                pairingBusy = false
+                addUiLog(
+                    RunLog.warn(
+                        "无线调试配对没有完成",
+                        "确认配对码正确、配对窗口未关闭；也可以直接给本机一次 adb 执行通知栏里的命令"
+                    )
+                )
+            }
+        }
+    }
+
     fun clearLogs() = synchronized(logLock) { logs = emptyList() }
 
     private fun ensurePermission(): Boolean {
-        if (!StellarShell.available()) { addLog("Stellar 未运行：请先打开 Stellar 并通过无线调试启动服务"); return false }
+        // 自研通道优先：它不需要任何权限授予流程，起来就能跑。
+        if (runCatching { com.pyb110.onekey.shell.OneKeyShell.available() }.getOrDefault(false)) {
+            serviceReady = true
+            serviceGranted = true
+            return true
+        }
+        if (!StellarShell.available()) {
+            addLog(RunLog.warn(
+                "Shell 通道未就绪",
+                "可在「拓展开关」里点「启动 Shell 通道」，或安装 Stellar 后启动服务"
+            ))
+            return false
+        }
         if (StellarShell.hasPermission()) return true
         addLog("请求 Stellar 权限…（弹窗请点允许）")
         android.os.Handler(android.os.Looper.getMainLooper()).post { StellarShell.requestPermission(1001) }
@@ -1266,7 +1392,9 @@ class JailbreakController private constructor(private val context: Context) {
         val text = logs.joinToString("\n")
         runCatching { File(context.filesDir, "onekey-last.log").writeText(text) }
         runCatching {
-            if (ShizukuShell.available() && ShizukuShell.hasPermission()) {
+            // ShizukuShell.stageBytes 内部会路由到自研通道，所以前置条件不能只看 Stellar：
+            // 只装自研通道时 available() 恒 false，日志就永远投不出去。
+            if (shellReady()) {
                 ShizukuShell.stageBytes(text.toByteArray(Charsets.UTF_8), "/data/local/tmp/onekey-last.log", 644)
             }
         }

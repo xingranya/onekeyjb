@@ -22,7 +22,7 @@ internal fun ManualDialog(show: Boolean = true, onDismiss: () -> Unit) {
         Column(Modifier.fillMaxWidth()) {
             ManualSection("一、准备", listOf(
                 "安装要用的管理器（KernelSU / KernelSU-Next / SukiSU / BakaSU / FinaSU 之一），App 不再内置管理器和模块。",
-                "启动 Stellar（推荐）或 Shizuku 服务，回到 App 授予权限；首页显示「服务已连接并授权」才能继续。"
+                "启动 Shell 通道：在「拓展开关」里点「启动 Shell 通道」。自研通道不需要装任何第三方 App，首次可让 App 用已有 root 拉起，或手动执行一次界面给出的 adb 命令。已装 Stellar 或 Shizuku 的话它们也能直接顶上。首页「服务通道」显示通道名（自研通道 / Stellar）才能继续。"
             ))
             ManualSection("二、一键越狱", listOf(
                 "点「运行 98260 越狱链」，确认后等待日志出现「越狱完成」。",

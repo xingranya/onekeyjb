@@ -89,7 +89,9 @@ internal fun HeroCard(controller: JailbreakController) {
         Row(Modifier.fillMaxWidth()) {
             DeviceCell(
                 label = "服务通道",
-                value = if (controller.serviceReady && controller.serviceGranted) "已授权"
+                // 显示具体是哪条通道在跑：自研通道与 Stellar 的行为差别（是否需要权限授予）
+                // 会直接影响用户下一步该点什么，只写「已连接」等于什么都没说。
+                value = if (controller.serviceReady && controller.serviceGranted) controller.shellLabel()
                         else if (controller.serviceReady) "待授权" else "未连接",
                 icon = COUIIcons.Link,
                 positive = controller.serviceReady && controller.serviceGranted,

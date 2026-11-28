@@ -82,11 +82,31 @@ public final class ShizukuShell {
 
     public interface LineSink { void line(String s); }
 
+    /** 自研 OneKeyShell 是否接管执行。 */
+    private static boolean selfRouted() {
+        try {
+            return com.pyb110.onekey.shell.OneKeyShell.INSTANCE.available();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private static Result fromSelf(com.pyb110.onekey.shell.OneKeyShell.Result r) {
+        return new Result(r.getCode(), r.getOutput());
+    }
+
     public static Result run(String script, long timeoutSec) {
         return runStreaming(script, timeoutSec, null);
     }
 
     public static Result runStreaming(String script, long timeoutSec, LineSink sink) {
+        if (selfRouted()) {
+            kotlin.jvm.functions.Function1<String, kotlin.Unit> cb = sink == null ? null : s -> {
+                sink.line(s);
+                return kotlin.Unit.INSTANCE;
+            };
+            return fromSelf(com.pyb110.onekey.shell.OneKeyShell.INSTANCE.runStreaming(script, timeoutSec, cb));
+        }
         try {
             ProcessRunner.Result result = ProcessRunner.await(shell(script), null, timeoutSec,
                     sink == null ? null : sink::line);
@@ -179,6 +199,9 @@ public final class ShizukuShell {
     }
 
     public static Result stageBytes(byte[] data, String dest, int mode) {
+        if (selfRouted()) {
+            return fromSelf(com.pyb110.onekey.shell.OneKeyShell.INSTANCE.stageBytes(data, dest, mode));
+        }
         // 临时文件写完再替换，避免 cat 失败后 chmod 成功掩盖错误。
         String script = stageScript(dest, mode, data.length);
         try (InputStream in = new ByteArrayInputStream(data)) {

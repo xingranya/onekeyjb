@@ -83,15 +83,21 @@ class AutoJailbreakService : Service() {
             return
         }
 
-        updateNotification("等待 Stellar 服务就绪…")
+        updateNotification("等待 Shell 通道就绪…")
+        // 每 10 轮（20 秒）做一次完整引导：自研通道在开机阶段往往还没起来，
+        // 而「等」本身不会让它起来 —— 必须主动尝试 su 拉起。
         var ready = false
         for (i in 0 until 90) {
-            if (StellarShell.available() && StellarShell.hasPermission()) { ready = true; break }
-            if (i % 10 == 9) updateNotification("等待 Stellar 服务…（请确认已开启 Stellar 开机启动）")
+            if (com.pyb110.onekey.shell.ShellBootstrap.quickReady()) { ready = true; break }
+            if (i % 10 == 9) {
+                updateNotification("正在启动 Shell 通道…")
+                val o = com.pyb110.onekey.shell.ShellBootstrap.start(this@AutoJailbreakService) { }
+                if (o.ok) { ready = true; break }
+            }
             delay(2000)
         }
         if (!ready) {
-            finishNotify("Stellar 未就绪，自动越狱已取消；请在 Stellar 里开启开机启动后重试")
+            finishNotify("Shell 通道未就绪，自动越狱已取消；可在「拓展开关」里手动启动通道后重试")
             return
         }
 

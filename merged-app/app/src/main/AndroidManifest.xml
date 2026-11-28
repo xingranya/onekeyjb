@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- 自研 Shell 通道的 L2 引导（无线调试自配对）需要改系统设置；首次 root 后由 su 授予 -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
 
     <queries>
         <package android:name="roro.stellar.manager" />
@@ -23,6 +25,7 @@
     </queries>
 
     <application
+        android:name="com.pyb110.onekey.OneKeyApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -88,6 +91,18 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="用户主动发起的设备维护与运行状态保持" />
+        </service>
+
+        <!-- 无线调试配对：配对端口只在设置页对话框可见期间存活，
+             因此必须用前台服务 + 通知栏 RemoteInput 回码，不能弹应用内对话框。 -->
+        <service
+            android:name=".adb.AdbPairingService"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="用户主动发起的无线调试配对" />
         </service>
 
     </application>

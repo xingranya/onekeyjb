@@ -385,7 +385,10 @@ object SuccessRate {
      * 所以必须让 Stellar 的 shell 身份去读，把带标签的结果回传后解析。
      */
     fun readPrivileged(): Env {
-        if (!StellarShell.available() || !StellarShell.hasPermission()) return Env.EMPTY
+        // 自研通道没有「权限」概念，起来就能跑；Stellar 需要 binder + 权限双满足。
+        // 用「任意通道可执行」判断，避免只装了自研通道时成功率读不到任何量。
+        val selfUp = runCatching { com.pyb110.onekey.shell.OneKeyShell.available() }.getOrDefault(false)
+        if (!selfUp && (!StellarShell.available() || !StellarShell.hasPermission())) return Env.EMPTY
         val script = listOf(
             "grep -m1 posix_timers_cache /proc/slabinfo 2>/dev/null | awk '{print \"SLAB=\" \$2}'",
             "awk '{print \"LOAD=\" \$1}' /proc/loadavg 2>/dev/null",
