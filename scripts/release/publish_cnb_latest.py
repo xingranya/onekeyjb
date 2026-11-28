@@ -5,7 +5,7 @@ BASE = "https://api.cnb.cool/xingranya/onekeyjb/-/releases/2115388998399250432"
 TOK = os.environ["CNB_TOKEN"]
 R = "/Users/xingranya/Downloads/onekeyjb-private"
 
-VC, VN = 224, "2.25.0"
+VC, VN = 225, "2.25.1"
 size = os.path.getsize(APK)
 sha = hashlib.sha256(open(APK, "rb").read()).hexdigest()
 print("size", size, "sha", sha)
@@ -14,24 +14,25 @@ with urllib.request.urlopen("https://cnb.cool/xingranya/onekeyjb/-/releases/down
     doc = json.load(r)
 
 notes = [
-    "自研特权 Shell 通道：服务端以 app_process 常驻，与 App 进程完全解耦",
-    "双传输：抽象 Unix socket 优先，被 SELinux 拦时自动降级到文件队列",
-    "无线调试自配对：通知栏回 6 位配对码，无需 root 即可拉起通道",
-    "通道状态每秒重算，首页不再出现通道已通却显示离线",
-    "修复 shell 会话结束连带清掉服务端：启动脚本等到 socket 就绪才返回",
-    "修复心跳文件判活的幽灵就绪：改为真实往返探测",
-    "调用点零改动：StellarShell / ShizukuShell 保留原名原签名，内部路由",
+    "修复配对成功后永久连不上：私钥生成加锁 + 原子写，重连与配对互斥",
+    "修复配对配额被烧光：不再对配对端口做 TCP 活性探测",
+    "修复 shell 会话永久挂死：不再多读一帧，空闲超时改为 30 秒",
+    "修复帧错位无感知：magic 与 crc32 校验真正生效",
+    "修复 TLS 升级后多发一帧被当成二次认证",
+    "修复跨块中文被碎成替换字符",
+    "修复配对服务在等待输入时被系统杀掉",
+    "修复 socket 泄漏与 mDNS 重试线程堆积",
 ]
 doc["versionCode"] = VC
 doc["versionName"] = VN
-doc["publishedAt"] = "2026-11-28T21:20:00+08:00"
+doc["publishedAt"] = "2026-11-28T22:40:00+08:00"
 doc["size"] = size
 doc["sha256"] = sha
 doc["changelog"] = "v" + VN + "\n\n" + "\n".join("- " + n for n in notes)
 vs = [v for v in doc.get("versions", []) if v.get("versionCode") != VC]
 vs.insert(0, {"versionName": VN, "versionCode": VC, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
 doc["versions"] = vs
-open("/tmp/upd-2250.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
+open("/tmp/upd-2251.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
 print("prepared", doc["versionCode"], doc["versionName"], "versions", len(vs))
 
 def api(url, data=None, method="POST"):
@@ -54,7 +55,7 @@ def upload(name, path):
     print("upload", name, "put", put, "verify", st2, flush=True)
 
 upload("OneKeyJB-latest.apk", APK)
-upload("update.json", "/tmp/upd-2250.json")
+upload("update.json", "/tmp/upd-2251.json")
 upload("OneKey-Knowledge.md", R + "/dist/OneKey-Knowledge.md")
 upload("onekey-kb.json", R + "/knowledge/ai-kb/onekey-kb.json")
 upload("onekey-kb.docs.json", R + "/knowledge/ai-kb/onekey-kb.docs.json")
