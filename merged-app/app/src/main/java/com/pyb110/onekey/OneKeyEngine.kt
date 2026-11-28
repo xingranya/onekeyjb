@@ -129,9 +129,13 @@ object OneKeyEngine {
         val cmd = "cd " + ws + " && " + env + " ./onekey-98260 run 2>&1"
         log("执行引擎启动（manager=" + k + "，" + (if (universal) "通用多管理器模块" else "管理器自带模块") + "）")
         var ok = false
-        var abortReason: String? = null
+        // 下面两个必须用原子类型：它们由 reader 线程（日志回调）写、主线程读，
+        // 普通的 var 没有 happens-before 保证，主线程可能永远看到旧值 ——
+        // 表现是「已经中止了但循环还在跑」，或者更糟：日志里 abortReason 已经打出来，
+        // 而 return 判断读到的还是 null，把失败当成成功返回。
+        val abortRef = java.util.concurrent.atomic.AtomicReference<String?>(null)
+        val failedSignals = java.util.concurrent.atomic.AtomicInteger(0)
         var sawPermissive = false
-        var failedStageSignals = 0
         var telemetry = EngineTelemetry()
         try {
             // 走 ShellStreams 而不是直接用 ShizukuShell.start：
@@ -151,19 +155,20 @@ object OneKeyEngine {
                 // 竞态没落地时引擎会继续盲写并反复重试，这是内核被拖挂的直接原因：立即中止。
                 // 一次尝试会同时打出 HIT=0 与 rc=-1，只按 rc 行计一次失败，避免把单次失败当成两次。
                 // 阈值从 4 抬到 6：4 次把理论上限压到 11.5%，且样本太少无法标定成功率。
-                if (abortReason == null && line.contains("rc=-1")) {
-                    failedStageSignals += 1
-                    if (failedStageSignals >= SuccessRate.ABORT_AFTER) {
-                        abortReason = "连续 " + failedStageSignals + " 次尝试未命中"
-                        RunReport.stop("布置提权原语", abortReason!!)
+                if (abortRef.get() == null && line.contains("rc=-1")) {
+                    val n = failedSignals.incrementAndGet()
+                    if (n >= SuccessRate.ABORT_AFTER) {
+                        val reason = "连续 " + n + " 次尝试未命中"
+                        abortRef.compareAndSet(null, reason)
+                        RunReport.stop("布置提权原语", reason)
                         log(
-                            "已连续尝试 " + failedStageSignals + " 次未命中（引擎累计 " +
+                            "已连续尝试 " + n + " 次未命中（引擎累计 " +
                                 telemetry.attempts + " 次、命中 " + telemetry.hits +
                                 " 次，单次约 " + (if (telemetry.avgMs > 0) telemetry.avgMs else 0L) +
                                 "ms），中止以避免内核进入不稳定状态"
                         )
                     } else {
-                        log("第 " + failedStageSignals + " 次尝试未命中，继续重试")
+                        log("第 " + n + " 次尝试未命中，继续重试")
                     }
                 }
                 when {
@@ -196,15 +201,15 @@ object OneKeyEngine {
             }
             // 预算按内核给：引擎自身按 --auto240 设计，90 秒会把正常链路提前砍断。
             val deadline = System.currentTimeMillis() + budgetMs
-            while (proc.isRunning() && abortReason == null && System.currentTimeMillis() < deadline) Thread.sleep(200)
+            while (proc.isRunning() && abortRef.get() == null && System.currentTimeMillis() < deadline) Thread.sleep(200)
             if (proc.isRunning()) {
                 runCatching { proc.destroy() }.onFailure {
                     engineBroken = true
                     log("执行器进程销毁失败，已标记引擎不可用：" + (it.message ?: it.javaClass.simpleName))
                 }
                 killRunner(log, useRoot = false)
-                if (abortReason == null) {
-                    abortReason = "执行超时（" + (budgetMs / 1000L) + " 秒）"
+                if (abortRef.get() == null) {
+                    abortRef.set("执行超时（" + (budgetMs / 1000L) + " 秒）")
                     log(
                         "引擎超时，已终止（累计 " + telemetry.attempts + " 次尝试、" +
                             telemetry.hits + " 次命中）"
@@ -223,14 +228,15 @@ object OneKeyEngine {
             killRunner(log, useRoot = ok)
             ShizukuShell.run("rm -rf " + ws + "; true", 10)
         }
+        val aborted = abortRef.get()
         // 中止后若已把 SELinux 改为 permissive，尽量恢复，减少残留影响。
-        if (abortReason != null && sawPermissive) {
+        if (aborted != null && sawPermissive) {
             val restored = ShizukuShell.run("timeout 5 su -c 'setenforce 1' 2>&1; timeout 5 su -c getenforce", 12).output.trim()
             log("已尝试恢复 SELinux：" + restored.lineSequence().lastOrNull().orEmpty())
         }
-        if (abortReason != null) {
-            RunReport.stop("布置提权原语", abortReason!!)
-            log("本次已中止：" + abortReason + "；建议重启后再试")
+        if (aborted != null) {
+            RunReport.stop("布置提权原语", aborted)
+            log("本次已中止：" + aborted + "；建议重启后再试")
             return false
         }
         // 明确区分“拿到了 root”和“内核暴露了热切换节点”，避免两者混淆。

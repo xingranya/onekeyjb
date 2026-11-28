@@ -1,6 +1,6 @@
 # OneKey 知识库（合集）
 
-> 版本 2.25.0 / 224。不含任何密钥、口令或签名文件内容。
+> 版本 2.25.1 / 225。不含任何密钥、口令或签名文件内容。
 
 
 
@@ -10,7 +10,7 @@
 
 本目录是 OneKey 越狱工具的技术资料库，面向三类读者：装机用户、二次开发、以及接手本项目的 AI 助手。
 
-> 更新于 2.25.0（versionCode 224）。所有结论都在文中标了来源（代码位置 / 真机日志 / 上游发布说明）。
+> 更新于 2.25.1（versionCode 225）。所有结论都在文中标了来源（代码位置 / 真机日志 / 上游发布说明）。
 > **本知识库不含任何密钥、口令、token 或签名文件内容。**
 
 ## 阅读顺序
@@ -28,7 +28,7 @@
 | [09-新系统17.0.1.201适配.md](09-新系统17.0.1.201适配.md) | 新内核差异与适配点 | 换机/换系统的人 |
 | [10-98260执行引擎.md](10-98260执行引擎.md) | 引擎调用协议、输出→阶段映射、成功证据 | 想懂执行链的人 |
 | [11-热切换与通用模块.md](11-热切换与通用模块.md) | 通用模块前提、加载器替换、切换协议、已知行为 | 用热切换的人 |
-| [12-版本变更史.md](12-版本变更史.md) | 2.18.0 → 2.25.0 逐版变更 | 想知道某版改了什么的人 |
+| [12-版本变更史.md](12-版本变更史.md) | 2.18.0 → 2.25.1 逐版变更 | 想知道某版改了什么的人 |
 | [13-踩坑与修复记录.md](13-踩坑与修复记录.md) | 症状 → 根因 → 修法（含"以为坏了其实正常"） | 所有人，**建议先读** |
 | [16-自研Shell通道.md](16-自研Shell通道.md) | OneKeyShell 架构、双传输（socket/文件队列）、鉴权、引导阶梯、迁移方式 | 想去掉 Stellar 依赖、排查通道不通的人 |
 | [15-成功率模型.md](15-成功率模型.md) | 为什么旧算法不可用、Beta 后验公式、boot 分桶、遥测解析 | 想懂百分比怎么来的、要改模型的人 |
@@ -957,7 +957,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.25.0）
+# 12 · 版本变更史（2.18.0 → 2.25.1）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -965,6 +965,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
+| **2.25.1** | 225 | 无线调试通道的可用性与安全性加固（12 项审查修复） | ① **配对配额**：`waitEndpoint` 不再对 `_adb-tls-pairing._tcp` 做 TCP 活性探测 —— AOSP 的 pairing_server 每次 accept 都计一次尝试（`kMaxPairingAttempts = 20`），连上即断也算，探活会把配额烧光，用户面对「配对码正确但永远失败」；② **TLS 后不补帧**：`AdbClient` 升级 TLS 后只读不写（adbd 会主动推 344 字节 `A_CNXN` banner），补发 `A_CNXN` 会被当成二次认证回 `A_STLS`；③ **`shellCommand` 首帧**：删掉「首帧是 `A_WRTE` 就多读一帧再丢掉」的逻辑（丢掉的那帧若是 `A_CLSE` 就永久挂死），改为 `first` 标志统一循环；`soTimeout` 从 0 改为 30 秒空闲超时；④ **帧校验**：`read()` 真正调用 `AdbMessage.validate()`（magic + crc32），`readFrom` 对负长度抛异常；⑤ **`AdbKey.get`**：`@Synchronized` + tmp/rename 原子写 + 写后回读校验，并在 `reconnect()` 上加 `running` CAS 与 `completePairing` 互斥 —— 否则开机自启重连撞上手动配对会各生成一把 RSA 私钥互相覆盖，造成「配对成功后永久连不上且不可自愈」；⑥ **服务存活**：`AdbPairingService` 找到配对端口后不再 `stopForeground(DETACH)`（cached 进程等用户输码随时被杀，`AdbBootstrap.state` 随进程消失），并补 `onDestroy` 打断工作线程、`report()` 加 512 KiB 轮转；⑦ **GCM 计数器**：`AdbPairing` 的 enc/dec 各自独立 `nonce(seq++)`，不再都用 `nonce(0)`（同一连接多发一帧即密钥流重用）；PeerInfo 校验对端包类型，`readPacket` 三个字段全包 `runCatching`，`describe` 补 EOF 文案；⑧ **mDNS**：`resolveSerial` 的重试从「新建 Thread + sleep」改为单线程 `ScheduledExecutorService`（多设备广播时线程会堆到 7 条且 `stop()` 叫不醒）；⑨ **fd 泄漏**：`AdbClient.connect()` 先挂字段再 connect，异常时能关掉 socket；`shellCapture` 改收原始字节后统一解码（逐块 `String(bytes)` 会碎中文）；⑩ **密钥格式**：`fingerprint` 不再 `take(47)` 截半（32 字节应为 95 字符）；`sign()` 按 token 长度选 SHA1/SHA256；`KeyManager` 补 `chooseEngineClientAlias` 与 `getClientAliases`，`keyTypes` 改 `contains("RSA", ignoreCase)`；⑪ **信任边界**：`AdbClient` 构造期与 `AdbPairing.pair()` 入口 `require` 只连回环地址（TrustManager 是 trust-all）；`shellCapture` 的路径拼接改 POSIX 单引号转义；⑫ **引导文案**：`ShellBootstrap` 在无线调试未打开时也记一条日志，`findPairingPort` 的权限失败文案补「请手动到开发者选项打开无线调试后重试」 |
 | **2.25.0** | 224 | 自研 OneKeyShell 通道（去 Stellar 依赖） | ① **自研特权 shell 通道**：新增 `shell/` 包（OneKeyShellServer 服务端 + OneKeyShell 客户端 + ShellProtocol 帧协议 + ShellSecrets 材料 + ShellBootstrap 引导阶梯 + ShellStreams 流式抽象），服务端由 `app_process` 以 shell(2000) 或 root(0) 身份常驻，与 App 进程完全解耦；② **双传输**：抽象 Unix socket 优先（延迟 <1 ms），被 SELinux 拦（`avc: denied { connectto } untrusted_app → shell`，域对不匹配，应用侧无法规避）时自动降级到 `getExternalFilesDir/onekey-shell/{q,r,k}` 文件队列（轮询 40/30 ms，端到端约 70 ms），服务端同时开两条路；③ **鉴权**：HELLO 发 32 字节 nonce，客户端回 `HMAC-SHA256(SHA256(token), nonce + boot_id)`，socket 名取 token 前 16 hex，目的是防同设备其它 App 复用我们的 root shell 而不是防 root；④ **引导阶梯四级**：L0 复用已运行 → L1 su 拉起（uid 0）→ L1b 写 KernelSU 开机模块 `/data/adb/modules/onekey_shell` → L2 无线调试自配对（mDNS + SPAKE2 + 通知栏 RemoteInput 回 6 位码 + 自签证书 TLS，无 root 也能起，得 uid 2000）→ L3 UI 展示可复制的 `adb shell sh <start.sh>`；⑤ **调用点零改动迁移**：`StellarShell` / `ShizukuShell` 保留原名原签名，内部先判 `OneKeyShell.available()`，命中就路由到自研通道，未命中走原实现 —— 106 处调用点一行未改，两条通道任一活着 App 就完整可用；⑥ **状态语义分离**：`available()/hasPermission()/serviceUid()` 保持只反映 Stellar 自身状态（供引导阶梯判断能否兜底），控制器改用 `shellReady()`/`shellGranted()` 表示「任意通道可用/已授权」，首页「服务通道」格显示具体通道名；⑦ **无线调试通道（L2）**：`adb/` 包新增 AdbProtocol / AdbMessage / AdbKey / AdbMdns / AdbClient / AdbPairing / Spake2 / AdbBootstrap / AdbPairingService；自签 X.509 用手写 DER（省掉 bcpkix 约 4 MB），SPAKE2 用纯 Java 实现（不引 native、不需 NDK）；配对交互走前台服务 + 通知栏 `RemoteInput`（配对端口只在设置页对话框可见期间存活，应用内弹窗必然失败）；⑧ **协议层 13 个单测**：帧往返、空 body、1 MiB body、超限拒写、截断头返回 null、截断体抛 EOF、负长度拒绝、ExecRequest 往返（含中文与 `C=x=y`）、env 数超限拒绝、二进制透传、ExitFrame、Hello、含代理对的中文字符串；⑨ **密码学 17 个单测**：SPAKE2 12 个（曲线点编码、KDF、名字带 NUL、密码哈希 64 字节、8 组 fuzz 双端一致）+ 自签证书 5 个（X.509 可解析、CN=00、签名自验、公钥一致、adb 公钥 524 字节布局）；⑩ **通道状态改为周期重算**：`serviceReady`/`serviceGranted` 不再只靠 Stellar binder 回调，改为每秒随成功率采样重算一次（`OneKeyShell.available()` 自带 2 秒缓存），自研通道三条拉起路径（配对 / su / 手跑脚本）都能立刻反映到首页 |
 | **2.24.0** | 223 | 成功率改为实测概率模型 | ① **整体替换评分逻辑**：2.23.x 的「slab × 温度 × 负载」三因子乘积里，slab 读的 posix_timers_cache 只对 6.12 链有意义（strings onekey-98260 里 posix_timers 命中 0），三张阈值表（340/430/540/660/900、38/43/48/56/65°C、per-core 1/2/3.5/6）无任何实测出处；现改为 **Beta 后验**：每次运行的真实 attempt / hit / 单次耗时落盘 files/run-stats.tsv（14 列 TSV，保留 200 条），Beta(1+hits, 20+misses) 给单次命中率，先验均值 4.76% 出自 docs 的 3%/attempt 量级；② **概率含中止闸门**：P = min(92, 1-(1-p)^k)，k = min(ABORT_AFTER, budgetMs/msPerAttempt)——旧实现漏算中止阈值，4 次把真实上限压到 11.5% 而界面显示 92%；③ **预算对齐引擎**：引擎内建 --auto240（240 秒）并自报 SLIDE=… BUDGET=…s，旧实现写死 90 秒等于只给 37% 预算；改为 budgetMs 参数，6.18 给 300 秒、6.12 给 180 秒，中止阈值 4→6；④ **boot 分桶**：实测同一开机内第二次运行命中率崩塌（0/60~0/248，因 6.18 runner 无 min_drain 脏基线保护），新增 BootClass（COLD_FIRST / COLD_RERUN / DIRTY），各自独立后验，重跑桶无样本时用首次桶均值 × 0.25；⑤ **引擎遥测**：新增 EngineTelemetryParser，首次把 UAF mode=… ms=… rc=…、LEAK_TASK attempt=…、RECLAIM_WRITES=… HIT=…、BUDGET=…s、FAIL=… 解析成结构化数据，成为成功率的唯一事实来源；⑥ **硬闸分层**：脏 boot / 电量 <30% / procs_running > 64 任一命中就不显示百分比，只显示原因；样本 <5 次 attempt 显示「样本不足（n=x）」；⑦ **环境修正反直觉**：procs_running ≤ 8 是**扣分项**（实测 8 候选第 10 次命中 vs 1 候选 212 次零命中），修正系数锁在 [0.70, 1.10]；⑧ **界面**：主数字带区间，依据行显示「本次开机首次运行 · 预计 6 次尝试 · 单次约 6.2 秒」；6.18 设备去掉「内存占用」格（该链不读 slabinfo），改为「CPU 温度 / 线程运行 / 电量」；RunConfirmDialog 拦截条件改为「概率 <40%」或「同 boot 重跑」 |
 | **2.23.1** | 222 | 弹窗统一 + 五处回归修复 | ① **日志页闪退**：`CouiShape(radius, cornerWeight)` 构造期 `require(weight >= 2f)`，日志页两处写了 1f 直接抛异常，改 2f；② **弹窗退场动画**：COUI 靠 `visible` + 内部 `retained` 保留窗口，调用方 `if (show)` 会在同一帧摘子树，新增 `DialogSlot` 让九个弹窗常驻组合、隐藏后多留 320ms；③ **四个抽屉点了没反应**：`WindowBottomSheet` 首帧 `visible` 仍为 false 就触发 `onDismissFinished`，加 `everShown` 门控 + 收起延迟；④ **弹窗左右缩进三套**：环境诊断 16dp、第三方 24dp、用户手册 24+14dp，统一为 `DialogInset = 16.dp`，手册分节去掉 Card 改扁平排版；⑤ **按钮并排与红字**：COUI `horizontal = (neutralAction == null && dismissAction != null)`，次要动作塞进 neutral 槽强制纵向堆叠，并自供 `CouiDialogActionColors` 去掉破坏性红字；⑥ **内存/温度/负载读不到**：普通 App 域被 SELinux 挡在 `proc_loadavg` 与 sysfs 之外，改走 Stellar 特权通道一次读齐三量（3 秒降频），温度加 `dumpsys thermalservice` 兜底；⑦ **历史页幽灵记录与「64560 稳定链」**：`append` 无 activeId 时凭空 start 记录改为直接 return，`title` 的 else 兜底把废案复活改为固定「98260 运行链」 |
@@ -1713,6 +1714,75 @@ app_process [vm-options] <parent-dir> [options] <class> [args]
 **修法**：把探测并进每秒一次的成功率采样循环里 —— val ready = shellReady(); if (ready != serviceReady) { serviceReady = ready; serviceGranted = shellGranted() }。OneKeyShell.available() 自带 2 秒缓存，每秒探一次代价可忽略。
 
 **教训**：状态源有两套以上时，「谁变化谁通知」这种设计必然漏；应该让 UI 状态跟着一个周期性重算走，回调只作为「立刻刷新一次」的加速器。
+### 53. 配对端口做 TCP 活性探测会烧掉 adbd 的配对配额
+
+**现象**：配对码输对了却一直失败，或者点「配对」后 mDNS 再也找不到配对端口，只能关掉无线调试重开。
+
+**根因**：AOSP 的 pairing_server 每次 accept 都算一次尝试，累计 kMaxPairingAttempts = 20 次后直接关掉配对服务器。我们的 waitEndpoint 对每个 mDNS 候选端点做 portAlive TCP 探测，连上即断——这一次「连上即断」在服务端就是一次 SetupTlsConnection 失败 → NotifyResult(nullptr) → num_tries++。用户点「配对」、mDNS 报旧端口、反复重试都会烧配额。
+
+**修法**：waitEndpoint 增加「是否探测」开关，TLS_PAIRING 跳过 portAlive（配对端口存在即有效，真正的连接由 AdbPairing.pair() 建立），只对 TLS_CONNECT 保留探测。
+
+**教训**：对端有「尝试次数配额」的协议，任何「先探活再正式连」的写法都要先查配额语义。TCP 探测看起来最无害，恰恰是唯一会消耗配额的动作。
+
+### 54. TLS 升级后不能补发 A_CNXN，否则 adbd 回 A_STLS
+
+**现象**：配对成功、TLS 握手也成功，但 shellCommand 收到的第一帧是 0x534c5453（A_STLS），日志「shell 通道未建立：0x534c5453」。
+
+**根因**：无线调试的正确顺序是 发 A_CNXN → 收 A_STLS → 回 A_STLS/A_STLS_VERSION → TLS 升级 → **只读**（设备主动推 344 字节 A_CNXN banner）→ 直接发 A_OPEN。多补一条 A_CNXN 会被 adbd 当成二次认证，回 A_STLS。
+
+**修法**：AdbClient 的 TLS 分支升级完只 read()，不 sendConnect()。
+
+**教训**：协议里「谁先说话」必须用独立脚本逐帧验证，不能靠「看起来对称」推断。当时的 python 复现脚本就是这个用途。
+
+### 55. start.sh 必须活到服务端自证就绪，否则被 adbd 连坐清掉
+
+**现象**：日志有「adbd 回执：started」，但 ps 里没有 onekey_shell，下一轮又报「复用已运行的服务端」。
+
+**根因**：adb 的 shell 会话在脚本进程退出那一刻关闭，adbd 按会话清掉整个进程组（setsid 挡不住）。app_process 起 JVM 要 300~600 ms，脚本立刻退出就必被杀。
+
+**修法**：start.sh 末尾轮询 /proc/net/unix 等抽象 socket 出现再退出。
+
+**教训**：「启动一个后台进程」在 adb shell 上下文里等于「启动一个活到会话结束的进程」。detach 的正确做法是等目标自证就绪，不是 setsid 加 &。
+
+### 56. AdbKey.get 必须加锁 + 原子写
+
+**现象**：配对成功，但此后永久连不上；重新配对也只堆 adb_keys 条目，永远修不好。
+
+**根因**：get() 无同步。开机时 BootReceiver 起 AutoJailbreakService 走 reconnect()，用户此刻可能同时点「无线调试配对」；两条线程同时进 get()、文件又不存在时各生成一把 RSA 私钥并互相覆盖。先返回的对象持有已被覆盖的旧私钥，用它配对成功（adbd 存旧公钥）；下次重连读出文件里的新私钥，TLS 握手时 adbd 不认识，立刻断连——而错误提示判成「还没配对过」，引导用户再配一次，陷入死循环。
+
+**修法**：get() 加 @Synchronized，写盘改 tmp + rename 原子替换，写完回读校验能解析；reconnect() 也加同一把 running CAS 与 completePairing 互斥。
+
+**教训**：「读文件 → 不存在就生成 → 写文件」在任何多线程可达的路径上都必须整体加锁。生成 RSA 要几百毫秒，窗口比想象中宽。
+
+### 57. COUI 窗口动画要求组件留在组合里，退场靠 visible 而不是拆子树
+
+**现象**：所有弹窗点「知道了」瞬间消失没有动画；抽屉按了没反应（首帧自杀）。
+
+**根因**：COUI 的窗口动画由 visible 驱动，库内 retained 机制要等动画跑完才销毁窗口。调用方写 if (show) Dialog(...) 会在 show 变 false 的同一帧摘掉子树。抽屉那边更隐蔽：首次组合时 visible 仍为 false（外部置位与组合同帧赛跑），LaunchedEffect 立刻回调 onDismissFinished → sheet = 0 → 抽屉刚建就关。
+
+**修法**：新增 DialogSlot(visible, content)，用 composed 状态把子树留住，visible 变 false 后 delay(320ms) 才摘；WindowBottomSheet 加 everShown 门控，只有真正显示过才回调。
+
+**教训**：带进出场动画的容器，调用方必须常驻组合。「show 就组合、不 show 就不组合」是最自然也最错的写法。
+
+### 58. 中文日志分级必须先判否定式，最后才判肯定式
+
+**现象**：日志「连续 4 次尝试未成功」被判成 SUCCESS，比不分类更误导。
+
+**根因**：中文否定式与肯定式共用词根——「未成功」含「成功」、「未完成」含「完成」。先判肯定式，所有否定句都会被误判。
+
+**修法**：classify() 判序固定为 ①未发现→SUCCESS（特例）②发现冲突→ERROR ③否定式/故障词→ERROR ④未完成/被拦下→WARN ⑤肯定式→SUCCESS ⑥else INFO。对「未在…里找到 ksud」这种语序，单查「未找到」抓不到，要 contains(未) 且 contains(找到) 双条件兜。
+
+**教训**：任何基于关键词的中文分类器，都要先穷举否定式并放在肯定式之前。顺序错了，分类结果会系统性偏向乐观。
+
+### 59. run_code REPL 的同名 const 重复声明会让整段代码不执行
+
+**现象**：改了代码却没生效，日志里没有任何新东西；或 bash 命令报奇怪的 No such file。
+
+**根因**：REPL 里变量一经声明即跨调用存在，重复声明同名 const/let 直接 SyntaxError，而错误发生在解析阶段，整段程序一行都不执行——连前面的 await tools.bash 都没跑。
+
+**修法**：新变量一律加数字后缀；整段逻辑包进 await (async () => { ... })() 用块级作用域。bash 里花括号变量默认值语法与反斜杠美元混排会被 JS 模板字符串吞掉，改用数组 join 拼命令。
+
+**教训**：REPL 的「状态保留」是双刃剑。看不见的 SyntaxError 比运行时报错更危险，因为它的症状是「什么都没发生」。
 
 
 ---

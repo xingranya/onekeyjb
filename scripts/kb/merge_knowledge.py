@@ -1,6 +1,6 @@
 import os, glob
 root='/Users/xingranya/Downloads/onekeyjb-private/knowledge'
-out=['# OneKey 知识库（合集）','','> 版本 2.25.0 / 224。不含任何密钥、口令或签名文件内容。','']
+out=['# OneKey 知识库（合集）','','> 版本 2.25.1 / 225。不含任何密钥、口令或签名文件内容。','']
 files=sorted(glob.glob(root+'/*.md'))
 ordered=[p for p in files if os.path.basename(p)=='README.md']+[p for p in files if os.path.basename(p)!='README.md']
 for p in ordered:

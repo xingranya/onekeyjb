@@ -86,18 +86,24 @@ class AutoJailbreakService : Service() {
         updateNotification("等待 Shell 通道就绪…")
         // 每 10 轮（20 秒）做一次完整引导：自研通道在开机阶段往往还没起来，
         // 而「等」本身不会让它起来 —— 必须主动尝试 su 拉起。
+        //
+        // 判据是「拿到 root」而不是「通道能执行」：
+        // 开机时无线调试重连往往先成功，通道以 shell(2000) 身份起来，
+        // 命令能跑、环境诊断看起来全绿，但引擎里的 finit_module / 写 /proc 全部失败，
+        // 跑完还会触发 lastBootFailed() 把「开机自动越狱」开关自动关掉。
+        // 用户看到的是「这功能自己关了」，根因只是通道还停在 shell 身份。
         var ready = false
         for (i in 0 until 90) {
-            if (com.pyb110.onekey.shell.ShellBootstrap.quickReady()) { ready = true; break }
+            if (com.pyb110.onekey.shell.ShellBootstrap.readyWithRoot()) { ready = true; break }
             if (i % 10 == 9) {
                 updateNotification("正在启动 Shell 通道…")
                 val o = com.pyb110.onekey.shell.ShellBootstrap.start(this@AutoJailbreakService) { }
-                if (o.ok) { ready = true; break }
+                if (o.ok && com.pyb110.onekey.shell.ShellBootstrap.readyWithRoot()) { ready = true; break }
             }
             delay(2000)
         }
         if (!ready) {
-            finishNotify("Shell 通道未就绪，自动越狱已取消；可在「拓展开关」里手动启动通道后重试")
+            finishNotify("Shell 通道未拿到 root，自动越狱已取消；请手动运行一次完成越狱")
             return
         }
 

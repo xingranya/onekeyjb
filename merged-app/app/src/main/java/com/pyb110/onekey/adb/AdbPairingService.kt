@@ -41,7 +41,26 @@ class AdbPairingService : Service() {
 
     private val busy = AtomicBoolean(false)
 
+    /** 正在跑的线程，onDestroy 时打断，避免服务已销毁而线程仍持有 this。 */
+    private val workers = java.util.Collections.synchronizedList(mutableListOf<Thread>())
+
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onDestroy() {
+        // 线程可能正阻塞在 waitEndpoint 的 latch.await 或 shellCapture 的读上。
+        // 不打断的话服务对象会被线程引用住，report() 还会继续往 filesDir 写日志。
+        synchronized(workers) {
+            workers.forEach { runCatching { it.interrupt() } }
+            workers.clear()
+        }
+        super.onDestroy()
+    }
+
+    private fun worker(name: String, body: () -> Unit) {
+        val t = Thread(body, name)
+        workers.add(t)
+        t.start()
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createChannels()
@@ -58,27 +77,37 @@ class AdbPairingService : Service() {
         }
 
         // 普通启动：先找端口，再发带输入框的通知
-        Thread({
+        worker("ok-adb-pair-find") {
             val port = AdbBootstrap.findPairingPort(this)
             if (port <= 0) {
                 finish("没找到配对端口，请先在开发者选项里打开「使用配对码配对设备」")
-                return@Thread
+                return@worker
             }
+            // 找到端口后**继续留在前台**。
+            // 原来这里 stopForeground(DETACH) 让服务降为 cached，然后干等用户输入配对码
+            // （可能几分钟）。Android 13+ 的 cached 进程随时被冻结/杀死，进程一死
+            // AdbBootstrap.state 这个静态字段就没了，用户回投配对码时读到 pairPort=0，
+            // 只能从头再来。保持 FOREGROUND_SERVICE_TYPE_SPECIAL_USE 到配对结束才安全。
             post(promptNotification("配对端口 " + port + " 已就绪，请回复设备上显示的 6 位配对码"))
-            stopForeground(STOP_FOREGROUND_DETACH)
-        }, "ok-adb-pair-find").start()
+        }
         return START_NOT_STICKY
     }
 
     /** 拿到配对码后的全部动作。 */
     private fun runPairing(code: String) {
-        if (!busy.compareAndSet(false, true)) return
-        Thread({
+        if (!busy.compareAndSet(false, true)) {
+            // 用户连点两次「发送」，或系统重复投递 ACTION_SUBMIT_CODE 时会走到这里。
+            // 不能静默 return —— 那会让通知停在「正在查找配对端口…」这个错的状态，
+            // 而真正的配对还在跑，用户以为没反应。
+            post(promptNotification("正在配对中，请稍候…"))
+            return
+        }
+        worker("ok-adb-pair-run") {
             try {
                 val port = AdbBootstrap.state.pairPort
                 if (port <= 0) {
                     finish("配对端口已失效，请重新打开「使用配对码配对设备」")
-                    return@Thread
+                    return@worker
                 }
                 post(promptNotification("正在配对…"))
                 val ok = AdbBootstrap.completePairing(this, port, code) { entry -> report(entry) }
@@ -86,7 +115,7 @@ class AdbPairingService : Service() {
             } finally {
                 busy.set(false)
             }
-        }, "ok-adb-pair-run").start()
+        }
     }
 
     // ---- 通知 ----
@@ -103,12 +132,14 @@ class AdbPairingService : Service() {
             .setAllowFreeFormInput(true)
             .build()
 
+        // FLAG_MUTABLE 是 RemoteInput 的硬要求（系统要往 Intent 里塞回复内容）。
+        // 显式 Intent + exported=false 兜住了 fill-in 面，不需要再叠
+        // FLAG_ACTIVITY_NEW_TASK / FLAG_GRANT_READ_URI_PERMISSION —— 那两个对
+        // getService 目标是空转。
         val reply = PendingIntent.getService(
             this,
             REQ_REPLY,
-            Intent(this, AdbPairingService::class.java)
-                .setAction(ACTION_SUBMIT_CODE)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION),
+            Intent(this, AdbPairingService::class.java).setAction(ACTION_SUBMIT_CODE),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         )
 
@@ -169,10 +200,17 @@ class AdbPairingService : Service() {
     }
 
     private fun report(entry: LogEntry) {
-        // 服务里拿不到 controller 实例，直接落到内存日志 + 文件，
+        // 服务里拿不到 controller 实例，直接落到文件，
         // 用户打开应用时就能在日志页看到这一步发生了什么。
         runCatching {
             val f = java.io.File(filesDir, "onekey-live.log")
+            // 轮转：配对/重连每次开机至少一条，异常栈单条可达数百字节，
+            // 长期不轮转会慢慢吃满 /data。
+            if (f.length() > 512 * 1024) {
+                val old = java.io.File(filesDir, "onekey-live.log.1")
+                runCatching { old.delete() }
+                runCatching { f.renameTo(old) }
+            }
             f.appendText(entry.format() + "\n")
         }
     }

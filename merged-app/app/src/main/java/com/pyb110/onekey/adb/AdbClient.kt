@@ -26,18 +26,27 @@ import javax.net.ssl.SSLSocket
  * 单路足够，少一层状态机就少一处出错的地方。
  */
 class AdbClient(private val host: String, private val port: Int, private val key: AdbKey) : Closeable {
+    init {
+        // 信任边界钉在调用点：本类的 TrustManager 是 trust-all（adbd 用自签证书，
+        // 没有可校验的信任根），一旦有人把 host 传成非回环地址，就是裸奔。
+        // 现在所有调用点都传 127.0.0.1，这条 require 让「将来有人改坏」直接炸在构造期。
+        require(host == "127.0.0.1" || host == "::1") { "只允许连回环地址，收到：" + host }
+    }
+
     companion object {
         private const val CONNECT_TIMEOUT_MILLIS = 3_000
         private const val AUTH_TIMEOUT_MILLIS = 6_000
         private const val MAX_MESSAGE = 1024 * 1024
 
         /**
-         * 判断端口是不是「TLS 优先」用的探测超时。
+         * shell 会话的空闲超时。
          *
-         * 无线调试端口不会先发帧，只能靠读超时来区分；
-         * 800ms 足够真实 adbd 把首帧吐出来，也不会让人等太久。
+         * 不能设成 0（无限等待）：一旦 adbd 那边的通道已经关闭而我们漏掉了一帧
+         * A_CLSE，读就会永久阻塞，调用线程卡死、配对服务的 busy 标志永不释放，
+         * 用户看到的是「一直在转圈」而日志里什么都没有。
+         * 30 秒足够跑完 pm grant / start.sh 这类短命令，又不会让死锁无限期挂着。
          */
-        private const val PROBE_TIMEOUT_MILLIS = 800
+        private const val SHELL_IDLE_TIMEOUT_MILLIS = 30_000
     }
 
     private lateinit var socket: Socket
@@ -77,9 +86,16 @@ class AdbClient(private val host: String, private val port: Int, private val key
 
     fun connect() {
         val s = Socket()
-        s.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MILLIS)
-        s.tcpNoDelay = true
+        // 先挂到字段上再 connect：connect 抛异常时 close() 才能关掉它。
+        // 否则每次开机重连失败都漏一个 fd，长期累积会 EMFILE。
         socket = s
+        try {
+            s.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MILLIS)
+        } catch (e: Exception) {
+            runCatching { s.close() }
+            throw e
+        }
+        s.tcpNoDelay = true
         plainIn = DataInputStream(s.inputStream)
         plainOut = DataOutputStream(s.outputStream)
         s.soTimeout = AUTH_TIMEOUT_MILLIS
@@ -110,8 +126,8 @@ class AdbClient(private val host: String, private val port: Int, private val key
         }
         banner = msg.dataAsString()
         connected = true
-        socket.soTimeout = 0
-        tls?.soTimeout = 0
+        socket.soTimeout = SHELL_IDLE_TIMEOUT_MILLIS
+        tls?.soTimeout = SHELL_IDLE_TIMEOUT_MILLIS
     }
 
     /**
@@ -148,20 +164,21 @@ class AdbClient(private val host: String, private val port: Int, private val key
         val localId = 1
         write(AdbProtocol.A_OPEN, localId, 0, "shell:" + command)
 
-        var msg = read()
-        if (msg.command != AdbProtocol.A_OKAY && msg.command != AdbProtocol.A_WRTE) {
-            error("shell 通道未建立：0x" + Integer.toHexString(msg.command))
-        }
-        if (msg.command == AdbProtocol.A_WRTE) {
-            val remote = msg.arg0
-            msg.data?.let { if (it.isNotEmpty()) onChunk?.invoke(it) }
-            write(AdbProtocol.A_OKAY, localId, remote)
-            msg = read()
-        }
-
+        // 第一帧单独处理：它可能是 A_OKAY（通道就绪，后续输出才来），
+        // 也可能直接是 A_WRTE（短命令，数据先于 OKAY 到）。
+        // 这里刻意不「多读一帧再看」—— 早先的写法会在首帧是 A_WRTE 时
+        // 额外 read() 一次再把结果丢掉，若丢掉的那帧正好是 A_CLSE，
+        // 后续循环就阻塞在一个已关闭的会话上（配合 soTimeout=0 即永久挂死）。
+        var first = true
         while (true) {
-            msg = read()
+            val msg = read()
             val remote = msg.arg0
+            if (first) {
+                first = false
+                if (msg.command != AdbProtocol.A_OKAY && msg.command != AdbProtocol.A_WRTE) {
+                    error("shell 通道未建立：0x" + Integer.toHexString(msg.command))
+                }
+            }
             when (msg.command) {
                 AdbProtocol.A_WRTE -> {
                     msg.data?.let { if (it.isNotEmpty()) onChunk?.invoke(it) }
@@ -173,23 +190,30 @@ class AdbClient(private val host: String, private val port: Int, private val key
                     return
                 }
 
-                else -> return
+                AdbProtocol.A_OKAY -> Unit
+
+                else -> {
+                    // 未知帧不静默吞掉：adbd 在会话过期时会发 A_AUTH / A_STLS，
+                    // 静默 return 会让调用方拿到半截输出，排查时毫无线索。
+                    android.util.Log.w(
+                        "OneKeyAdb",
+                        "shell 通道收到未处理帧 0x" + Integer.toHexString(msg.command),
+                    )
+                    return
+                }
             }
         }
     }
 
     /** 跑一条命令并收集全部输出（有上限，防止 cat 大文件把内存吃爆）。 */
     fun shellCapture(command: String, limitBytes: Int = 256 * 1024): String {
-        val sb = StringBuilder()
-        var total = 0
+        // 先收原始字节再统一解码：A_MAXDATA 是 4096，逐块 String(chunk) 会把
+        // 正好跨块边界的多字节 UTF-8 字符碎成 U+FFFD（中文回执必踩）。
+        val buf = java.io.ByteArrayOutputStream()
         shellCommand(command) { chunk ->
-            if (total < limitBytes) {
-                val s = String(chunk, Charsets.UTF_8)
-                sb.append(s)
-                total += chunk.size
-            }
+            if (buf.size() < limitBytes) buf.write(chunk, 0, minOf(chunk.size, limitBytes - buf.size()))
         }
-        return sb.toString()
+        return String(buf.toByteArray(), Charsets.UTF_8)
     }
 
     private fun write(command: Int, arg0: Int, arg1: Int, text: String) {
@@ -207,6 +231,15 @@ class AdbClient(private val host: String, private val port: Int, private val key
     private fun read(): AdbMessage {
         val m = AdbMessage.readFrom(input)
         if (m.dataLength > MAX_MESSAGE) error("ADB 帧过大：" + m.dataLength)
+        // 必须校验 magic 与 crc：一旦发生帧错位（版本差异、代理注入、协商不一致），
+        // 后续每个 read() 都会拿到「长度对、内容乱」的帧。不校验的话表现是
+        // 「命令发出去了但回执是乱码」，完全无从排查。
+        if (!m.validate()) {
+            error(
+                "ADB 帧校验失败：cmd=0x" + Integer.toHexString(m.command) +
+                    " magic=0x" + Integer.toHexString(m.magic),
+            )
+        }
         return m
     }
 

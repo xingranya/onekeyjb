@@ -100,11 +100,16 @@ object AdbMdns {
                 override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
                     if (stopped.get()) return
                     if (errorCode == NsdManager.FAILURE_ALREADY_ACTIVE) {
-                        // 另一条解析在飞，稍后重试同一条
-                        Thread {
-                            Thread.sleep(180L)
-                            resolveSerial(nsd, serviceInfo, stopped, onFound, attempt + 1)
-                        }.start()
+                        // 另一条解析在飞，稍后重试同一条。
+                        // 用 schedule 而不是 Thread.sleep：多设备同时广播时每个
+                        // onServiceFound 都可能触发一轮重试，线程数会堆到 7 条，
+                        // 而且 stop() 叫不醒 sleep 中的线程。
+                        runCatching {
+                            retryExecutor.schedule(
+                                { if (!stopped.get()) resolveSerial(nsd, serviceInfo, stopped, onFound, attempt + 1) },
+                                180L, java.util.concurrent.TimeUnit.MILLISECONDS,
+                            )
+                        }
                     }
                 }
 
@@ -138,12 +143,28 @@ object AdbMdns {
         return null
     }
 
+    /** 单线程调度器，专门跑 resolveService 的延迟重试。 */
+    private val retryExecutor: java.util.concurrent.ScheduledExecutorService by lazy {
+        java.util.concurrent.Executors.newSingleThreadScheduledExecutor { r ->
+            Thread(r, "ok-adb-mdns-retry").apply { isDaemon = true }
+        }
+    }
+
     /** 发现句柄。 */
     class Handle internal constructor(
         private val nsd: NsdManager?,
         private val listener: NsdManager.DiscoveryListener?,
         private val stopped: AtomicBoolean,
     ) {
+        /**
+         * 停止发现。
+         *
+         * 只置 stopped 并 stopServiceDiscovery 就够了：resolveSerial 在每次
+         * 进入与每次回调里都查 stopped，正在飞的 resolve 结果会被丢弃，
+         * 排队中的重试也会在 schedule 回调里看到 stopped 而放弃。
+         * 不去显式注销 ResolveListener —— NsdManager 没有这个 API，
+         * 而 listener 是匿名对象，靠 stopped 短路比留引用去清更简单。
+         */
         fun stop() {
             if (!stopped.compareAndSet(false, true)) return
             val n = nsd ?: return

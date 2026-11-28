@@ -19,11 +19,21 @@ interface ShellStream {
 
 object ShellStreams {
 
-    /** 按当前可用通道启动流式执行。 */
+    /**
+     * 按当前可用通道启动流式执行。
+     *
+     * 自研通道失败必须回落到 Stellar：OneKeyShell.start() 在
+     * 「available() 为真但 submit() 拿不到连接」时会抛 IllegalStateException
+     * （典型场景：服务端刚好在这两个调用之间死掉）。
+     * 不接住的话异常会一路冒到 OneKeyEngine 的 catch(Throwable)，
+     * 整轮判定失败、finally 还把工作目录删了 ——
+     * 而此刻 Stellar 可能好好的，白白浪费一次越狱机会。
+     */
     @Throws(Exception::class)
     fun start(script: String, sink: ((String) -> Unit)?): ShellStream {
         if (OneKeyShell.available()) {
-            return FromOneKey(OneKeyShell.start(script, sink))
+            val ok = runCatching { OneKeyShell.start(script, sink) }.getOrNull()
+            if (ok != null) return FromOneKey(ok)
         }
         return FromShizuku(ShizukuShell.start(script) { line -> sink?.invoke(line) })
     }

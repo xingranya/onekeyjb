@@ -43,8 +43,21 @@ object OneKeyShellServer {
     @Volatile private var bootId: String = ""
     @Volatile private var logFile: File? = null
 
-    private val activeExecs = ConcurrentHashMap<Int, Process>()
+    /**
+     * 执行中的请求：id -> (进程, marker)。
+     *
+     * 必须带上 marker：T_KILL 只 destroyForcibly 直接子 sh 是杀不干净的，
+     * 脚本里的 `sh -c`、管道、`&` 都会 fork 出孙进程，
+     * 父进程死了它们还在跑（还占着端口/文件/CPU）。
+     * 超时路径本来就靠 killByMarker 收尾，kill 路径必须一致。
+     */
+    private val activeExecs = ConcurrentHashMap<Int, Pair<Process, String>>()
     private val execSeq = AtomicInteger(1000)
+
+    /** 帧写入的唯一出口。多线程并发写同一个 OutputStream 会把 5 字节头和 body 交错，客户端解出垃圾长度后整条连接报废。 */
+    private fun writeFrame(output: OutputStream, type: Int, body: ByteArray) {
+        synchronized(output) { ShellProtocol.write(output, type, body) }
+    }
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -83,10 +96,25 @@ object OneKeyShellServer {
 
         // LocalServerSocket(String) 绑定的是抽象命名空间（不需要文件系统节点，
         // 也不会被 /data 的 SELinux 标签挡住），正是我们要的。
-        val server: LocalServerSocket = try {
-            LocalServerSocket(socketName)
-        } catch (t: Throwable) {
-            log("绑定 socket 失败：" + t)
+        // bind 失败时先重试探测：旧实例可能正处在启动中（还没回 T_PONG），
+        // 直接 exit 会让 App 侧看到「服务端不存在」，白等到下次拉起。
+        var server: LocalServerSocket? = null
+        for (attempt in 0 until 3) {
+            server = try {
+                LocalServerSocket(socketName)
+            } catch (t: Throwable) {
+                log("绑定 socket 失败（第 " + (attempt + 1) + " 次）：" + t)
+                null
+            }
+            if (server != null) break
+            if (probeExisting(socketName)) {
+                log("同名 socket 已被在跑的实例占用，本实例退出")
+                return
+            }
+            Thread.sleep(300)
+        }
+        val bound = server ?: run {
+            log("三次绑定都失败，退出")
             System.exit(72)
             return
         }
@@ -98,25 +126,42 @@ object OneKeyShellServer {
         // 两条路同时开，客户端自动挑能用的那条。
         val dir = tokenPath.substringBeforeLast('/', "")
         if (dir.isNotEmpty()) {
-            Thread({ FileTransport.serveLoop(null, File(dir)) { log(it) } }, "okshell-filequeue").start()
-            log("文件队列已启动：" + dir)
+            val d = File(dir).also { it.mkdirs() }
+            // uid 文件：文件队列模式下客户端没有握手，拿不到真实 uid，
+            // 而「有没有 root」决定开机自动越狱该不该开跑（2000 跑必然失败）。
+            runCatching { File(d, "uid").writeText(uid().toString()) }
+            runCatching { File(d, "server.pid").writeText(android.os.Process.myPid().toString()) }
+            if (!File(d, "q").let { it.exists() || it.mkdirs() } || !File(d, "q").canWrite()) {
+                log("文件队列目录不可写，仅保留 socket：" + d)
+            } else {
+                Thread({ FileTransport.serveLoop(null, d) { log(it) } }, "okshell-filequeue").start()
+                log("文件队列已启动：" + d)
+                // 结果文件（r/）靠调用方 cleanup() 清；引擎超时路径不 cleanup，
+                // 长期跑会把外部目录填满，所以服务端自己定期收。
+                Thread({
+                    while (true) {
+                        Thread.sleep(3_600_000L)
+                        runCatching { FileTransport.sweepDir(d, keep = 200) }
+                    }
+                }, "okshell-sweep").apply { isDaemon = true }.start()
+            }
         }
 
         Runtime.getRuntime().addShutdownHook(Thread {
             log("收到退出信号，关闭")
-            runCatching { server.close() }
+            runCatching { bound.close() }
         })
 
         while (true) {
             val client = try {
-                server.accept()
+                bound.accept()
             } catch (t: Throwable) {
                 log("accept 失败：" + t)
                 break
             }
             Thread({ serve(client) }, "okshell-" + client.hashCode()).start()
         }
-        runCatching { server.close() }
+        runCatching { bound.close() }
     }
 
     private fun probeExisting(name: String): Boolean = try {
@@ -148,13 +193,13 @@ object OneKeyShellServer {
                 if (!authed) {
                     when (frame.type) {
                         ShellProtocol.T_PING -> {
-                            ShellProtocol.write(output, ShellProtocol.T_PONG, ShellProtocol.pack { writeLong(System.currentTimeMillis()) })
+                            writeFrame(output, ShellProtocol.T_PONG, ShellProtocol.pack { writeLong(System.currentTimeMillis()) })
                         }
                         ShellProtocol.T_HELLO -> {
                             val n = ByteArray(32)
                             SecureRandom().nextBytes(n)
                             nonce = n
-                            ShellProtocol.write(output, ShellProtocol.T_HELLO,
+                            writeFrame(output, ShellProtocol.T_HELLO,
                                 ShellProtocol.encodeHello(uid(), n))
                             helloAt = System.currentTimeMillis()
                         }
@@ -162,16 +207,20 @@ object OneKeyShellServer {
                             val n = nonce
                             val ok = n != null && helloAt > 0 &&
                                 System.currentTimeMillis() - helloAt <= AUTH_WINDOW_MS &&
-                                MessageDigest.isEqual(frame.body, expectedHmac(n))
+                                MessageDigest.isEqual(frame.body, expectedHmac(n, "C"))
                             if (!ok) {
-                                ShellProtocol.write(output, ShellProtocol.T_AUTH_FAIL, ByteArray(0))
+                                writeFrame(output, ShellProtocol.T_AUTH_FAIL, ByteArray(0))
                                 log("鉴权失败，断开：" + client.hashCode())
                                 return
                             }
                             authed = true
+                            // 双向证明：客户端已证明持有 token（上面那句校验），
+                            // 这里服务端再证一次自己持有 token，方向用不同后缀区分，
+                            // 否则同一份 HMAC 可以在两个方向重放。
+                            val proof = expectedHmac(n, "S")
                             nonce = null
-                            ShellProtocol.write(output, ShellProtocol.T_AUTH_OK,
-                                ShellProtocol.pack { writeInt(uid()) })
+                            writeFrame(output, ShellProtocol.T_AUTH_OK,
+                                ShellProtocol.encodeAuthOk(uid(), proof))
                             log("客户端接入：" + client.hashCode() + " uid=" + uid())
                         }
                         else -> {
@@ -183,13 +232,15 @@ object OneKeyShellServer {
                 }
                 when (frame.type) {
                     ShellProtocol.T_EXEC -> handleExec(output, ShellProtocol.decodeExec(frame.body))
-                    ShellProtocol.T_PING -> ShellProtocol.write(output, ShellProtocol.T_PONG,
+                    ShellProtocol.T_PING -> writeFrame(output, ShellProtocol.T_PONG,
                         ShellProtocol.pack { writeLong(System.currentTimeMillis()) })
                     ShellProtocol.T_KILL -> {
                         val din = ShellProtocol.parser(frame.body)
                         val id = din.readInt()
-                        activeExecs.remove(id)?.let { p ->
-                            log("客户端要求终止 id=" + id)
+                        activeExecs.remove(id)?.let { (p, mk) ->
+                            log("客户端要求终止 id=" + id + " 标记=" + mk)
+                            // 与超时路径保持一致：先按 marker 清孙进程，再杀直接子进程。
+                            runCatching { killByMarker(mk) }
                             runCatching { p.destroyForcibly() }
                         }
                     }
@@ -204,11 +255,19 @@ object OneKeyShellServer {
         }
     }
 
-    private fun expectedHmac(nonce: ByteArray): ByteArray {
+    /**
+     * 鉴权用的 HMAC。
+     *
+     * dir = "C" 是客户端证明，dir = "S" 是服务端证明 —— 必须分开：
+     * 用同一个值的话，一个只在中间观察的人可以把客户端的 AUTH 帧原样当成
+     * 服务端的 AUTH_OK 回放，冒充就成立了。
+     */
+    private fun expectedHmac(nonce: ByteArray, dir: String): ByteArray {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(token, "HmacSHA256"))
         mac.update(nonce)
         mac.update(bootId.toByteArray(Charsets.UTF_8))
+        mac.update(dir.toByteArray(Charsets.UTF_8))
         return mac.doFinal()
     }
 
@@ -234,19 +293,23 @@ object OneKeyShellServer {
             }
 
             val p = pb.start()
-            activeExecs[req.id] = p
+            activeExecs[req.id] = p to marker
             val out = Thread { pump(p.inputStream, output, req.id, ShellProtocol.STREAM_OUT) }
             val err = Thread { pump(p.errorStream, output, req.id, ShellProtocol.STREAM_ERR) }
             out.start()
             err.start()
 
+            // 必须用带超时的 waitFor 轮询。
+            // 无参 waitFor() 会一直阻塞，而连接线程从不被 interrupt，
+            // 于是「超时就杀」这段代码永远走不到 —— 被执行的脚本只要有一个子进程
+            // 不退出（cat 等 stdin、常驻服务、卡在网络 IO），这条连接就永久挂死，
+            // T_EXIT 永不发出，客户端 await() 超时返回 -1，服务端却泄漏线程+进程+临时文件。
             val deadline = started + req.timeoutSec.coerceIn(1, 3600) * 1000
-            var code: Int
+            var code = -1
             while (true) {
-                try {
-                    code = p.waitFor()
+                if (p.waitFor(200, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                    code = p.exitValue()
                     break
-                } catch (_: InterruptedException) {
                 }
                 if (System.currentTimeMillis() > deadline) {
                     log("执行超时，终止 id=" + req.id + " 标记=" + marker)
@@ -260,12 +323,11 @@ object OneKeyShellServer {
             err.join(3000)
             activeExecs.remove(req.id)
             val dur = (System.currentTimeMillis() - started).toInt()
-            ShellProtocol.write(output, ShellProtocol.T_EXIT,
-                ShellProtocol.encodeExit(req.id, code, dur))
+            writeFrame(output, ShellProtocol.T_EXIT, ShellProtocol.encodeExit(req.id, code, dur))
         } catch (t: Throwable) {
             log("执行异常 id=" + req.id + "：" + t)
             runCatching {
-                ShellProtocol.write(output, ShellProtocol.T_EXIT,
+                writeFrame(output, ShellProtocol.T_EXIT,
                     ShellProtocol.encodeExit(req.id, -2, (System.currentTimeMillis() - started).toInt()))
             }
         } finally {
@@ -304,9 +366,7 @@ object OneKeyShellServer {
         if (acc.size() == 0) return
         val bytes = acc.toByteArray()
         acc.reset()
-        synchronized(output) {
-            ShellProtocol.write(output, ShellProtocol.T_OUT, ShellProtocol.encodeOut(id, stream, bytes))
-        }
+        writeFrame(output, ShellProtocol.T_OUT, ShellProtocol.encodeOut(id, stream, bytes))
     }
 
     /** 按 ONEKEY_EXEC_MARK 环境变量杀掉本次执行留下的所有子进程。 */
@@ -331,19 +391,32 @@ object OneKeyShellServer {
     private fun hexToBytes(hex: String): ByteArray =
         ByteArray(hex.length / 2) { i -> hex.substring(i * 2, i * 2 + 2).toInt(16).toByte() }
 
+    private val logLock = Any()
+
     private fun log(msg: String) {
         val line = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US).format(Date()) + "  " + msg
-        System.err.println(line)
-        val f = logFile ?: return
-        runCatching {
-            f.parentFile?.mkdirs()
-            FileOutputStream(f, true).use { it.write((line + "\n").toByteArray()); it.flush() }
+        val f = logFile
+        // 有日志文件时只写文件。
+        // start.sh 里 stderr 已经被重定向到同一个文件（>>log 2>&1），
+        // 再 println 一次会让每行都出现两遍 —— 排查时极易误以为有并发双写。
+        if (f == null) {
+            System.err.println(line)
+            return
         }
-        // 日志超过 512 KiB 时截半，避免开机自启长期运行把分区写满。
-        runCatching {
-            if (f.length() > 512 * 1024) {
-                val keep = f.readLines().takeLast(2000)
-                f.writeText(keep.joinToString("\n") + "\n")
+        // 多连接并发 + 轮转同时发生时，不加锁会丢行或写到已被截断的 inode 上。
+        synchronized(logLock) {
+            runCatching {
+                f.parentFile?.mkdirs()
+                FileOutputStream(f, true).use { it.write((line + "\n").toByteArray()); it.flush() }
+            }
+            // 日志超过 512 KiB 时把旧的挪成 .1 再重建，避免开机自启长期运行把分区写满。
+            // 不原地重写：另一个线程可能正握着旧 inode 的追加句柄，重写会让它的写入落进空洞。
+            runCatching {
+                if (f.length() > 512 * 1024) {
+                    val bak = File(f.parentFile, f.name + ".1")
+                    runCatching { bak.delete() }
+                    f.renameTo(bak)
+                }
             }
         }
     }

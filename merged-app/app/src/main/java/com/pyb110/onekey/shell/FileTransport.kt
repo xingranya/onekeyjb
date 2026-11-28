@@ -3,6 +3,9 @@ package com.pyb110.onekey.shell
 import android.content.Context
 import java.io.File
 import java.io.RandomAccessFile
+import java.security.MessageDigest
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * 文件队列传输层。
@@ -25,6 +28,30 @@ import java.io.RandomAccessFile
 object FileTransport {
 
     private const val POLL_MS = 40L
+
+    /**
+     * 请求签名。
+     *
+     * 文件队列必须自己鉴权：q/ 在外部私有目录下，能写它的主体不止本 App
+     * （adb shell、shell 域进程、root 都能）。没有签名的话，
+     * 「特权 shell 只对持有 token 的调用方开放」这条承诺在兜底路径上就不成立 ——
+     * 服务端会以自身 uid（可能是 root）执行任何投进来的脚本。
+     *
+     * 签名材料就是 token 本身：它本来就以文件形式放在同一个目录，
+     * shell 读得到、App 读得到，而其它 App 读不到（分区存储保护）。
+     */
+    private fun sign(token: String, id: Int, timeoutSec: Long, cwd: String, env: List<String>, script: String): String {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(hexToBytes(token), "HmacSHA256"))
+        mac.update((id.toString() + "\n" + timeoutSec + "\n" + cwd + "\n").toByteArray(Charsets.UTF_8))
+        mac.update(env.joinToString("\n").toByteArray(Charsets.UTF_8))
+        mac.update(0)
+        mac.update(script.toByteArray(Charsets.UTF_8))
+        return mac.doFinal().joinToString("") { String.format("%02x", it) }
+    }
+
+    private fun hexToBytes(hex: String): ByteArray =
+        ByteArray(hex.length / 2) { i -> hex.substring(i * 2, i * 2 + 2).toInt(16).toByte() }
 
     fun root(context: Context): File = ShellSecrets.dir(context)
     private fun q(context: Context) = File(root(context), "q").also { it.mkdirs() }
@@ -50,7 +77,7 @@ object FileTransport {
         @Volatile var done = false
         @Volatile var code: Int? = null
 
-        /** 读增量输出并推给 sink；返回是否已结束。 */
+        /** 读增量输出并推给 sink；返回是否已结束。幂等，可任意次调用。 */
         fun poll(): Boolean {
             drain(outFile, true)
             drain(errFile, false)
@@ -114,7 +141,14 @@ object FileTransport {
             val end = System.currentTimeMillis() + timeoutSec * 1000
             while (System.currentTimeMillis() < end) {
                 synchronized(history) { for (l in history) if (l.contains(needle)) return l }
-                if (done) return null
+                // done 之后要再扫一遍：标记可能正好在最后一批数据里，
+                // 上一轮扫描发生在它落盘之前，此时直接 return null 会把成功判成失败。
+                if (done) {
+                    poll()
+                    synchronized(history) { for (l in history) if (l.contains(needle)) return l }
+                    return null
+                }
+                poll()
                 Thread.sleep(50)
             }
             return null
@@ -145,10 +179,22 @@ object FileTransport {
         return try {
             val qd = q(context)
             val base = File(qd, id.toString())
+            // 必须先清掉上一次同名 id 的结果。
+            // execSeq 是进程内计数器，App 重启后从 1 重新开始，
+            // 而 r/<id>.rc 还留在磁盘上 —— 不清的话第一次 poll() 立刻看到旧的 rc，
+            // 调用方拿到的是「上一次」的退出码和残留输出，脚本可能根本没跑。
+            // 这类 bug 不报错、只给错数据，比直接失败更难查。
+            for (suffix in listOf(".out", ".err", ".rc")) {
+                runCatching { File(r(context), id.toString() + suffix).delete() }
+            }
+            runCatching { File(k(context), id.toString()).delete() }
+            val tok = runCatching { File(root(context), "token").readText().trim() }.getOrDefault("")
+            if (tok.length != 64) return null
             File(base.path + ".sh").writeText(script)
             File(base.path + ".env").writeText(env.joinToString("\n"))
             File(base.path + ".cwd").writeText(cwd)
             File(base.path + ".to").writeText(timeoutSec.toString())
+            File(base.path + ".sig").writeText(sign(tok, id, timeoutSec, cwd, env, script))
             // .go 最后写：它的出现就是「请求完整」的信号，
             // 服务端看到 .go 才读其它文件，避免读到写了一半的脚本。
             File(base.path + ".go").writeText("1")
@@ -159,11 +205,15 @@ object FileTransport {
     }
 
     /** 清理历史遗留的结果文件，避免外部目录无限增长。 */
-    fun sweep(context: Context, keep: Int = 200) {
+    fun sweep(context: Context, keep: Int = 200) = sweepDir(root(context), keep)
+
+    /** 同 [sweep]，但按目录而不是按 Context —— 服务端没有 Context。 */
+    fun sweepDir(dir: File, keep: Int = 200) {
         runCatching {
-            val files = r(context).listFiles()?.sortedByDescending { it.lastModified() } ?: return
+            val rd = File(dir, "r")
+            val files = rd.listFiles()?.sortedByDescending { it.lastModified() } ?: return
             files.drop(keep).forEach { runCatching { it.delete() } }
-            q(context).listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 600_000 }
+            File(dir, "q").listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 600_000 }
                 ?.forEach { runCatching { it.delete() } }
         }
     }
@@ -186,6 +236,14 @@ object FileTransport {
         val hb = File(dir, "heartbeat")
         var lastBeat = 0L
         val seen = HashSet<Int>()
+        // 并发上限：每个请求一个线程，不设上限的话
+        // 「引擎流式输出 + 每秒采样 + UI 探测 + 诊断脚本」叠起来能瞬间起上百个线程，
+        // 每个都 fork 一个 sh，root 服务端被自己的线程数拖垮。
+        // 满了就先不派发（从 seen 撤掉，下一轮重试），客户端只是多等一个轮询周期。
+        val running = java.util.concurrent.atomic.AtomicInteger(0)
+        val maxConcurrent = 16
+        // 队列签名用的 token：与 socket 鉴权同一份材料，就在同一个目录里。
+        val tokenHex = runCatching { File(dir, "token").readText().trim() }.getOrDefault("")
         while (true) {
             try {
                 val now = System.currentTimeMillis()
@@ -198,14 +256,46 @@ object FileTransport {
                     val id = go.name.removeSuffix(".go").toIntOrNull() ?: continue
                     if (!seen.add(id)) continue
                     val base = File(qd, id.toString())
-                    val script = runCatching { File(base.path + ".sh").readText() }.getOrNull() ?: continue
+                    // 读不到 .sh 说明写端还没落盘（submit 是 4 次独立 writeText，没有整体原子性），
+                    // 必须把 id 从 seen 里撤掉，否则这个请求永久丢失、客户端只能等到超时。
+                    val script = runCatching { File(base.path + ".sh").readText() }.getOrNull()
+                    if (script == null) {
+                        seen.remove(id)
+                        continue
+                    }
                     val env = runCatching { File(base.path + ".env").readText() }.getOrNull()
                         ?.lines()?.filter { it.isNotBlank() } ?: emptyList()
                     val cwd = runCatching { File(base.path + ".cwd").readText().trim() }.getOrNull() ?: "/"
                     val to = runCatching { File(base.path + ".to").readText().trim().toLong() }.getOrDefault(120L)
-                    Thread {
-                        runOne(id, script, env, cwd, to, rd, kd, base, log)
+                    val sig = runCatching { File(base.path + ".sig").readText().trim() }.getOrDefault("")
+                    // 验签失败一律拒绝执行：q/ 目录不只本 App 可写（adb shell、shell 域进程、root 都能写），
+                    // 服务端以自身 uid 执行，不验签等于给全设备开了一个 root 执行口。
+                    val want = if (tokenHex.length == 64) sign(tokenHex, id, to, cwd, env, script) else ""
+                    if (want.isEmpty() || !MessageDigest.isEqual(want.toByteArray(), sig.toByteArray())) {
+                        log("文件队列请求验签失败，已拒绝 id=" + id)
+                        runCatching {
+                            val t = File(rd, id.toString() + ".rc.tmp")
+                            t.writeText("-3")
+                            t.renameTo(File(rd, id.toString() + ".rc"))
+                        }
+                        for (suffix in listOf(".sh", ".env", ".cwd", ".to", ".go", ".sig")) {
+                            runCatching { File(base.path + suffix).delete() }
+                        }
                         seen.remove(id)
+                        continue
+                    }
+                    if (running.get() >= maxConcurrent) {
+                        seen.remove(id)
+                        continue
+                    }
+                    running.incrementAndGet()
+                    Thread {
+                        try {
+                            runOne(id, script, env, cwd, to, rd, kd, base, log)
+                        } finally {
+                            seen.remove(id)
+                            running.decrementAndGet()
+                        }
                     }.start()
                 }
             } catch (t: Throwable) {
@@ -270,15 +360,25 @@ object FileTransport {
                 }
                 Thread.sleep(30)
             }
-            tOut.join(2000); tErr.join(2000)
-            rcFile.writeText(code.toString())
+            // 拷完再写 rc：rc 是「结果完整」的信号，提前写会让客户端读到截断的输出。
+            // 输出量大时 2 秒可能不够，但宁可让客户端多等一轮 poll，也不能给半个结果。
+            tOut.join(30_000); tErr.join(30_000)
+            // rc 用临时文件 + rename 原子替换：客户端随时可能在读，
+            // 直接 writeText 会出现「文件存在但内容为空」的瞬间，读出来就是 code=-1。
+            val tmp = File(rd, id.toString() + ".rc.tmp")
+            tmp.writeText(code.toString())
+            runCatching { tmp.renameTo(rcFile) }
             runCatching { scriptFile.delete() }
         } catch (t: Throwable) {
             log("执行异常 id=" + id + "：" + t)
-            runCatching { rcFile.writeText("-2") }
+            runCatching {
+                val tmp = File(rd, id.toString() + ".rc.tmp")
+                tmp.writeText("-2")
+                tmp.renameTo(rcFile)
+            }
         } finally {
             runCatching { p?.destroyForcibly() }
-            for (suffix in listOf(".sh", ".env", ".cwd", ".to", ".go")) {
+            for (suffix in listOf(".sh", ".env", ".cwd", ".to", ".go", ".sig")) {
                 runCatching { File(base.path + suffix).delete() }
             }
             runCatching { killFile.delete() }

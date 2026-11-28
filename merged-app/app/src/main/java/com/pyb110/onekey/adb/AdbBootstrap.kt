@@ -98,7 +98,14 @@ object AdbBootstrap {
      */
     fun findPairingPort(context: Context): Int {
         if (!enableWireless(context)) {
-            set(Phase.FAILED, "没有写入系统设置的权限")
+            // WRITE_SECURE_SETTINGS 是 signature|privileged，普通安装永远拿不到，
+            // 只有 root 后 pm grant 或 su 补授才生效。所以这里不能只说「没有权限」——
+            // 用户照着去开发者选项手动打开无线调试就能过，必须把这个下一步写出来。
+            set(
+                Phase.FAILED,
+                "无法自动打开无线调试（缺少 WRITE_SECURE_SETTINGS，需 root 补授一次）；" +
+                    "请手动到「开发者选项 → 无线调试」打开后重试",
+            )
             return 0
         }
         set(Phase.FINDING_PAIR, "正在查找配对端口")
@@ -163,7 +170,7 @@ object AdbBootstrap {
             val client = AdbClient(LOOPBACK, conn.port, key)
             try {
                 client.connect()
-                val out = client.shellCapture("sh '" + script.absolutePath + "'")
+                val out = client.shellCapture("sh " + shellQuote(script.absolutePath))
                 log(RunLog.info("adbd 回执", out.trim().take(200).ifBlank { "（空）" }))
             } finally {
                 client.close()
@@ -202,6 +209,20 @@ object AdbBootstrap {
      */
     fun reconnect(context: Context, log: (String) -> Unit = {}): Boolean {
         if (!wirelessEnabled(context)) return false
+        // 与 completePairing 互斥。两条路径都会 AdbKey.get() 与 AdbClient 连 adbd，
+        // 并发跑除了抢同一把密钥，还会让 AdbPairingService 的 busy 语义错乱。
+        if (!running.compareAndSet(false, true)) {
+            log("无线调试：已有一次引导在进行，跳过本次重连")
+            return false
+        }
+        try {
+            return reconnectLocked(context, log)
+        } finally {
+            running.set(false)
+        }
+    }
+
+    private fun reconnectLocked(context: Context, log: (String) -> Unit): Boolean {
         set(Phase.FINDING_CONNECT, "正在查找连接端口")
         val conn = waitEndpoint(context, AdbMdns.TLS_CONNECT, 12_000L)
         if (conn == null) {
@@ -221,7 +242,7 @@ object AdbBootstrap {
             val client = AdbClient(LOOPBACK, conn.port, AdbKey.get(context))
             try {
                 client.connect()
-                val out = client.shellCapture("sh '" + script.absolutePath + "'")
+                val out = client.shellCapture("sh " + shellQuote(script.absolutePath))
                 log("adbd 回执：" + out.trim().take(160).ifBlank { "（空）" })
             } finally {
                 client.close()
@@ -256,13 +277,21 @@ object AdbBootstrap {
      * （"New TLS connection" 紧跟 "read failed"），或者干脆 EOFException。
      *
      * 所以这里对每个候选端点做一次 TCP 探测，只有连得上的才算数。
+     *
+     * **配对端口是例外，绝不能探测。** AOSP 的 pairing_server 每次 accept 都算一次
+     * 尝试配额（constants.h 里 kMaxPairingAttempts = 20），连上即断也算：探测建连后
+     * 立刻关闭，服务端会走 SetupTlsConnection 失败 → NotifyResult(nullptr) → num_tries++。
+     * 累计 20 次后配对服务器直接关掉，用户面对的是「配对码正确但永远失败」，
+     * 只能关无线调试重开。而用户点「配对」、mDNS 报旧端口、反复重试都会烧配额，
+     * 触发频率比想象中高。配对端口存在即有效，真正的连接由 AdbPairing.pair() 自己建立。
      */
     private fun waitEndpoint(context: Context, type: String, timeoutMs: Long): AdbMdns.Endpoint? {
         val holder = java.util.concurrent.atomic.AtomicReference<AdbMdns.Endpoint?>(null)
         val latch = java.util.concurrent.CountDownLatch(1)
+        val probe = type != AdbMdns.TLS_PAIRING
         val handle = AdbMdns.discover(context, type, onFound = { ep ->
             if (holder.get() != null) return@discover
-            if (portAlive(ep.port) && holder.compareAndSet(null, ep)) latch.countDown()
+            if ((!probe || portAlive(ep.port)) && holder.compareAndSet(null, ep)) latch.countDown()
         })
         try {
             latch.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
@@ -272,6 +301,9 @@ object AdbBootstrap {
         return holder.get()
     }
 
+    /** POSIX shell 单引号转义。路径里出现单引号时不能直接拼。 */
+    private fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
+
     /** 端口是否真的有人在听。 */
     private fun portAlive(port: Int): Boolean = runCatching {
         java.net.Socket().use { s ->
@@ -280,12 +312,32 @@ object AdbBootstrap {
         }
     }.getOrDefault(false)
 
+    /**
+     * 等服务端自证就绪。
+     *
+     * 不能直接轮询 OneKeyShell.probe()：它内部走文件队列时单次最长阻塞 3 秒，
+     * 8 秒窗口理论上 32 次轮询实际只剩 2~3 次，而服务端 JVM 冷启动就要 300~600 ms，
+     * 首次探测很可能在 bind 之前就超时，后续两次也未必赶上。
+     *
+     * 所以先看抽象 socket 节点是否出现（start.sh 自己也是这么判的），
+     * 出现了再走一次真正的 probe 确认能执行命令。
+     */
     private fun waitShell(timeoutMs: Long): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
+        val name = runCatching {
+            val ctx = com.pyb110.onekey.shell.ShellRuntime.appContext ?: return@runCatching null
+            com.pyb110.onekey.shell.ShellSecrets.socketName(ctx)
+        }.getOrNull()
         while (System.currentTimeMillis() < deadline) {
+            if (name != null && socketNodeExists(name)) return OneKeyShell.probe()
             if (OneKeyShell.probe()) return true
             Thread.sleep(250L)
         }
         return false
     }
+
+    /** /proc/net/unix 里是否已有这个抽象 socket。读不到就返回 false（交给 probe 兜底）。 */
+    private fun socketNodeExists(name: String): Boolean = runCatching {
+        java.io.File("/proc/net/unix").readLines().any { it.endsWith("@" + name) }
+    }.getOrDefault(false)
 }

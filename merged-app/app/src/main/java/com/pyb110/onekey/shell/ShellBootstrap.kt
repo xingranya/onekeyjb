@@ -60,6 +60,10 @@ object ShellBootstrap {
             if (r == null) {
                 steps.add(Step.Fail("KernelSU 开机模块", "写入失败"))
             } else if (r) {
+                // 这里刻意不 return：装模块只是「下次开机自动起」，
+                // 当前这一次通道仍然没起来，还得继续走 L2 / Stellar 兜底。
+                // 返回 Outcome(true) 会让调用方以为通道现在就能用，
+                // 紧接着的执行必然失败。
                 steps.add(Step.Ok("KernelSU 开机模块", 0))
                 say("Shell：已安装开机自启模块，下次开机会自动就绪")
             } else {
@@ -76,7 +80,10 @@ object ShellBootstrap {
             com.pyb110.onekey.adb.AdbBootstrap.wirelessEnabled(context)
         }.getOrDefault(false)
         if (!wirelessOn) {
+            // 必须说一句：用户看到「全部引导失败」却不知道是无线调试没开，
+            // 会以为通道本身坏了。
             steps.add(Step.Fail("无线调试重连", "无线调试未打开"))
+            say("Shell：无线调试没打开，跳过自动重连（可在开发者选项里打开）")
         } else {
             say("Shell：无线调试已打开，尝试自动重连")
             val reconnected = runCatching {
@@ -111,6 +118,20 @@ object ShellBootstrap {
         runCatching { OneKeyShell.available() }.getOrDefault(false) ||
             runCatching { StellarShell.available() && StellarShell.hasPermission() }.getOrDefault(false)
 
+    /**
+     * 通道是否已经拿到 root。
+     *
+     * 开机自动越狱必须过这一关：uid 2000 的通道能执行命令，
+     * 但引擎里的 insmod / finit_module / 写 /proc 全部会失败，
+     * 然后 lastBootFailed() 会把「开机自动越狱」开关自动关掉 ——
+     * 用户看到的是「这功能自己关了」，实际只是通道还停在 shell 身份。
+     * 等 root 通道就绪比跑一次注定失败的链更有价值。
+     */
+    fun readyWithRoot(): Boolean {
+        val uid = runCatching { if (OneKeyShell.available()) OneKeyShell.serviceUid() else -1 }.getOrDefault(-1)
+        return uid == 0
+    }
+
     /** 用户可复制的一行命令。 */
     fun manual(context: Context): String {
         val script = ShellSecrets.ensureScript(context)
@@ -127,8 +148,28 @@ object ShellBootstrap {
             "/system/xbin/su",
         )
         val probe = candidates.joinToString("; ") { p -> "[ -x " + p + " ] && echo " + p }
-        // runDirect：此刻自研通道还没起来，走路由只会再失败一次
-        val r = StellarShell.runDirect("su -c 'id -u' 2>/dev/null; echo ---; " + probe, 10)
+
+        // 先用本进程的 ProcessBuilder 直接试。
+        // 不能只依赖 StellarShell.runDirect：引导阶梯的存在意义就是
+        // 「用户已经卸了 Stellar 也还能起通道」，而 su 探测走 Stellar
+        // 就把这条退路自己堵死了（root 明明在，却报「没有 su」）。
+        runCatching {
+            val p = ProcessBuilder("/system/bin/sh", "-c", "su -c 'id -u' 2>/dev/null; echo ---; " + probe)
+                .redirectErrorStream(true)
+                .start()
+            val out = p.inputStream.bufferedReader().use { it.readText() }
+            p.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
+            val ok = out.contains("uid=0") || out.lines().any { it.trim() == "0" }
+            if (ok) {
+                return out.lines().map { it.trim() }
+                    .firstOrNull { it.startsWith("/") && it.endsWith("/su") } ?: "su"
+            }
+        }
+
+        // 退回 Stellar：应用域可能被 SELinux 挡住 fork su，而 Stellar 通道不受影响。
+        // runDirect：此刻自研通道还没起来，走路由只会再失败一次。
+        val r = runCatching { StellarShell.runDirect("su -c 'id -u' 2>/dev/null; echo ---; " + probe, 10) }
+            .getOrNull() ?: return null
         if (r.output.contains("uid=0") || r.output.lines().any { it.trim() == "0" }) {
             return r.output.lines().map { it.trim() }.firstOrNull { it.startsWith("/") && it.endsWith("/su") }
                 ?: "su"

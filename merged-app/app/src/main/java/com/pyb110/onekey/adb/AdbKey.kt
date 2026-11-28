@@ -37,8 +37,11 @@ import javax.net.ssl.X509ExtendedTrustManager
  * 全部小端，后面接 " name\0"。n0inv 是 -1/n[0] mod 2^32，rr 是 R^2 mod n（R = 2^2048）。
  * 这不是标准格式，但 adbd 只认这个，所以必须自己算。
  *
- * 存储：私钥经 AndroidKeyStore 的 AES-GCM 包裹后落盘（base64 存 prefs），
- * 明文私钥不落盘 —— 虽然本机 adb 密钥泄露的后果有限，但没有理由留个明文。
+ * 存储：PKCS8 DER 明文落盘到 filesDir/adb-key.pk8（0600）。
+ * filesDir 是 0700，同用户其它 App 读不到；但 root/su 身份可读。
+ * 本机 adb 密钥泄露的后果仅限于「别人能连这台机器的 adbd」，
+ * 而拿到 root 的人本来就不需要它，所以不做额外包裹 —— 加了 AndroidKeyStore
+ * 也只是把明文换成「同一台机器上的 AES key」，收益抵不上每次签名都要解密的复杂度。
  */
 class AdbKey private constructor(
     private val privateKey: RSAPrivateKey,
@@ -57,7 +60,22 @@ class AdbKey private constructor(
         internal fun forTest(priv: RSAPrivateKey, pub: RSAPublicKey): AdbKey =
             AdbKey(priv, pub, selfSigned(priv, pub), "onekey")
 
-        /** 读取或生成密钥对。 */
+        /**
+         * 读取或生成密钥对。
+         *
+         * 必须整体加锁 + 原子写。并发调用的真实场景：开机时 BootReceiver 起
+         * AutoJailbreakService 走 reconnect()，而用户此刻可能同时点了「无线调试配对」。
+         * 两条线程同时进这里、文件又不存在时，会各生成一把 RSA 私钥并互相覆盖：
+         * 先返回的那个 AdbKey 对象仍持有**已被覆盖的旧私钥**，用它配对成功，
+         * adbd 的 adb_keys 里存的是旧公钥；下一次重连从文件读出**新私钥**，
+         * TLS 握手时 adbd 发现公钥不认识，立刻断连。
+         * 而错误提示会判成「还没配对过」，引导用户再配一次 —— 但文件里的新私钥
+         * 每次都会被同一路径读回，用户重复配对也只在 adb_keys 里堆条目，永远修不好。
+         *
+         * 原子写（tmp + rename）是为了防「写到一半进程被杀」留下半截 DER，
+         * 那样下次启动解析失败 → 又生成新 key → 又一次全设备重新配对。
+         */
+        @Synchronized
         fun get(context: Context): AdbKey {
             val f = storeFile(context)
             val pk = runCatching {
@@ -78,11 +96,31 @@ class AdbKey private constructor(
             val pub = kp.public as RSAPublicKey
             runCatching {
                 f.parentFile?.mkdirs()
-                f.writeBytes(priv.encoded)
-                f.setReadable(false, false)
-                f.setReadable(true, true)
+                val tmp = File(f.parentFile, f.name + ".tmp")
+                tmp.writeBytes(priv.encoded)
+                tmp.setReadable(false, false)
+                tmp.setReadable(true, true)
+                // rename 在同一文件系统内是原子的：要么看到完整新文件，要么还是旧文件，
+                // 不存在「半截 DER」这个中间态。
+                if (!tmp.renameTo(f)) {
+                    f.writeBytes(priv.encoded)
+                    f.setReadable(false, false)
+                    f.setReadable(true, true)
+                    runCatching { tmp.delete() }
+                }
             }
-            return AdbKey(priv, pub, selfSigned(priv, pub), "onekey")
+            // 回读校验：写盘失败（分区满、SELinux 拦住）时不要把一个
+            // 「下次启动就消失」的 key 当成已持久化交给调用方。
+            val persisted = runCatching {
+                KeyFactory.getInstance("RSA")
+                    .generatePrivate(PKCS8EncodedKeySpec(f.readBytes())) as RSAPrivateKey
+            }.getOrNull()
+            return if (persisted != null) {
+                val p2 = derivePublic(persisted)
+                AdbKey(persisted, p2, selfSigned(persisted, p2), "onekey")
+            } else {
+                AdbKey(priv, pub, selfSigned(priv, pub), "onekey")
+            }
         }
 
         internal fun derivePublic(priv: RSAPrivateKey): RSAPublicKey =
@@ -170,9 +208,17 @@ class AdbKey private constructor(
         }
     }
 
-    /** 回应 A_AUTH 的 token 挑战。 */
+    /**
+     * 回应 A_AUTH 的 token 挑战。
+     *
+     * 算法按 token 长度选，这不是遗留代码：AOSP 的 adb_auth_openssl.cpp
+     * 对 20 字节 token 用 EVP_sha1()、32 字节用 EVP_sha256()。
+     * 无线调试走 TLS 证书，几乎不会走到这里；但明文 USB 调试的 A_AUTH
+     * 挑战就是 20 字节，选错会被 adbd 直接拒绝。
+     */
     fun sign(token: ByteArray): ByteArray {
-        val s = Signature.getInstance("SHA1withRSA")
+        val algo = if (token.size >= 32) "SHA256withRSA" else "SHA1withRSA"
+        val s = Signature.getInstance(algo)
         s.initSign(privateKey)
         s.update(token)
         return s.sign()
@@ -215,14 +261,23 @@ class AdbKey private constructor(
     val sslContext: SSLContext by lazy {
         val km = object : X509ExtendedKeyManager() {
             private val alias = "key"
+            // keyTypes 在 TLS 1.3 下可能是 ["EC", "RSA"] 或 ["RSASSA-PSS"]，
+            // 精确比较 "RSA" 会在某些 ROM 上匹配不上，导致「no suitable client certificate」。
+            private fun wantsRsa(keyTypes: Array<out String>): Boolean =
+                keyTypes.any { it.contains("RSA", ignoreCase = true) }
+
             override fun chooseClientAlias(
                 keyTypes: Array<out String>, issuers: Array<out Principal>?, socket: java.net.Socket?,
-            ): String? = if (keyTypes.any { it == "RSA" }) alias else null
+            ): String? = if (wantsRsa(keyTypes)) alias else null
+            override fun chooseEngineClientAlias(
+                keyTypes: Array<out String>, issuers: Array<out Principal>?, engine: SSLEngine?,
+            ): String? = if (wantsRsa(keyTypes)) alias else null
             override fun getCertificateChain(alias: String?): Array<X509Certificate>? =
                 if (alias == this.alias) arrayOf(certificate) else null
             override fun getPrivateKey(alias: String?): PrivateKey? =
                 if (alias == this.alias) privateKey else null
-            override fun getClientAliases(keyType: String?, issuers: Array<out Principal>?): Array<String>? = null
+            override fun getClientAliases(keyType: String?, issuers: Array<out Principal>?): Array<String>? =
+                if (keyType == null || keyType.contains("RSA", ignoreCase = true)) arrayOf(alias) else null
             override fun getServerAliases(keyType: String, issuers: Array<out Principal>?): Array<String>? = null
             override fun chooseServerAlias(keyType: String, issuers: Array<out Principal>?, socket: java.net.Socket?): String? = null
         }
@@ -240,10 +295,16 @@ class AdbKey private constructor(
         }
     }
 
-    /** 密钥指纹，用于 UI 显示与排障。 */
+    /**
+     * 密钥指纹，用于 UI 显示与排障。
+     *
+     * 32 字节 → 95 个字符（16 进制 + 冒号）。不要截断成半截：
+     * 用户拿它去和另一台机器 / adb_keys 比对时，前缀相同但长度不同
+     * 会被判成「不匹配」，反而误导排障。
+     */
     val fingerprint: String by lazy {
         MessageDigest.getInstance("SHA-256").digest(publicKey.encoded)
-            .joinToString(":") { String.format("%02X", it) }.take(47)
+            .joinToString(":") { String.format("%02X", it) }
     }
 }
 

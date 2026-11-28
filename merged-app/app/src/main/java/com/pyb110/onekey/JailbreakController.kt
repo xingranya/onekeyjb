@@ -158,9 +158,16 @@ class JailbreakController private constructor(private val context: Context) {
         false
     }
 
-    /** 当前生效的通道名，供首页与抽屉显示。 */
+    /**
+     * 当前生效的通道名，供首页与抽屉显示。
+     *
+     * 用 snapshotAlive() 而不是 available()：后者最坏会阻塞 2.9 秒
+     * （socket 三轮重连 + 存活探测 + 文件心跳往返），
+     * 而本函数在 Compose 组合期被同步调用 —— 主线程卡满就是 ANR。
+     * 快照由每秒一次的采样循环刷新，界面上最多滞后一秒，够用。
+     */
     fun shellLabel(): String = when {
-        runCatching { com.pyb110.onekey.shell.OneKeyShell.available() }.getOrDefault(false) -> "自研通道"
+        com.pyb110.onekey.shell.OneKeyShell.snapshotAlive() -> "自研通道"
         StellarShell.available() -> "Stellar"
         else -> "未连接"
     }

@@ -167,6 +167,22 @@ class ShellProtocolTest {
     }
 
     @Test
+    fun authOkCarriesProof() {
+        val proof = ByteArray(32) { (it + 1).toByte() }
+        val back = ShellProtocol.decodeAuthOk(ShellProtocol.encodeAuthOk(0, proof))
+        assertEquals(0, back.uid)
+        assertArrayEquals(proof, back.proof)
+    }
+
+    @Test
+    fun authOkUidIsPreservedForShell() {
+        // 文件队列模式下客户端靠这个字段判断「有没有 root」，
+        // 2000 与 0 必须能区分开，否则开机自动越狱会在 shell 身份下开跑。
+        val back = ShellProtocol.decodeAuthOk(ShellProtocol.encodeAuthOk(2000, ByteArray(32)))
+        assertEquals(2000, back.uid)
+    }
+
+    @Test
     fun stringRoundTripWithSurrogates() {
         // 中文、emoji、换行都必须能过，否则日志里的中文会被截断
         val s = "失败：\u672a\u627e\u5230 su \uD83D\uDE3F\n第二行"

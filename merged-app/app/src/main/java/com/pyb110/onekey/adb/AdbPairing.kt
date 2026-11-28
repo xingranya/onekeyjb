@@ -59,6 +59,10 @@ object AdbPairing {
      * [code] 是设备屏幕上显示的 6 位数字（用户手抄）。
      */
     fun pair(host: String, port: Int, code: String, key: AdbKey): Result {
+        // 同 AdbClient：trust-all 的前提是「只连本机 adbd」。
+        if (host != "127.0.0.1" && host != "::1") {
+            return Result(false, "只允许连回环地址，收到：" + host)
+        }
         var sock: Socket? = null
         var tls: SSLSocket? = null
         try {
@@ -96,15 +100,33 @@ object AdbPairing {
 
             // 3. HKDF-SHA256 → AES-128-GCM
             val aesKey = hkdf(keyMaterial, HKDF_INFO.toByteArray(Charsets.US_ASCII), 16)
-            val enc = Cipher.getInstance("AES/GCM/NoPadding")
-            val dec = Cipher.getInstance("AES/GCM/NoPadding")
-            enc.init(Cipher.ENCRYPT_MODE, SecretKeySpec(aesKey, "AES"), GCMParameterSpec(128, nonce(0)))
-            dec.init(Cipher.DECRYPT_MODE, SecretKeySpec(aesKey, "AES"), GCMParameterSpec(128, nonce(0)))
+            val aes = SecretKeySpec(aesKey, "AES")
+            // 加密与解密各自独立的计数器（AOSP aes_128_gcm.h 里 enc_sequence_ / dec_sequence_）。
+            // 现在每条连接只发一帧，所以「都用 nonce(0)」也能跑通；但这是通用封装，
+            // 将来若在同一连接上多发一帧（比如配对后交换设备 GUID），nonce 重用
+            // 在 GCM 下等于密钥流重用，直接破密。计数器让语义从一开始就是对的。
+            var encSeq = 0L
+            var decSeq = 0L
+            fun encrypt(plain: ByteArray): ByteArray {
+                val c = Cipher.getInstance("AES/GCM/NoPadding")
+                c.init(Cipher.ENCRYPT_MODE, aes, GCMParameterSpec(128, nonce(encSeq++)))
+                return c.doFinal(plain)
+            }
+            fun decrypt(cipher: ByteArray): ByteArray {
+                val c = Cipher.getInstance("AES/GCM/NoPadding")
+                c.init(Cipher.DECRYPT_MODE, aes, GCMParameterSpec(128, nonce(decSeq++)))
+                return c.doFinal(cipher)
+            }
 
             // 4. 交换 PeerInfo（我方先发）
-            writePacket(output, TYPE_PEER_INFO, enc.doFinal(peerInfo(key)))
-            val (_, peerCipher) = readPacket(input) ?: return Result(false, "对端没有回送 PeerInfo")
-            runCatching { dec.doFinal(peerCipher) }
+            writePacket(output, TYPE_PEER_INFO, encrypt(peerInfo(key)))
+            val peer = readPacket(input) ?: return Result(false, "对端没有回送 PeerInfo")
+            // 必须校验对端包类型：若拿到的其实是 SPAKE2 帧（协议错乱或中间人），
+            // 解密必然失败，然后被误报成「配对码可能不对」，把协议错误误导成用户输入错误。
+            if (peer.first != TYPE_PEER_INFO) {
+                return Result(false, "对端 PeerInfo 类型不对：" + peer.first)
+            }
+            runCatching { decrypt(peer.second) }
                 .getOrElse { return Result(false, "PeerInfo 解密失败，配对码可能不对") }
 
             return Result(true)
@@ -151,10 +173,13 @@ object AdbPairing {
     }
 
     private fun readPacket(input: DataInputStream): Pair<Int, ByteArray>? {
+        // 三个字段都包 runCatching：adbd 在配对中途断连（用户关掉配对对话框）时
+        // 这里抛 EOFException，裸调会被 pair() 的 catch 兜成一句「EOFException」，
+        // 用户看不懂。
         val version = runCatching { input.readUnsignedByte() }.getOrNull() ?: return null
         if (version != HEADER_VERSION) return null
-        val type = input.readUnsignedByte()
-        val size = input.readInt()
+        val type = runCatching { input.readUnsignedByte() }.getOrNull() ?: return null
+        val size = runCatching { input.readInt() }.getOrNull() ?: return null
         if (size <= 0 || size > MAX_PAYLOAD) return null
         val buf = ByteArray(size)
         input.readFully(buf)
@@ -206,6 +231,7 @@ object AdbPairing {
         is javax.net.ssl.SSLException -> "TLS 握手失败：" + (e.message ?: "未知原因")
         is java.net.SocketTimeoutException -> "配对超时，请确认配对窗口仍开着"
         is java.net.ConnectException -> "连不上配对端口，配对窗口可能已关闭"
+        is java.io.EOFException -> "配对连接被对端关闭，配对窗口可能已超时"
         else -> e.message ?: e.javaClass.simpleName
     }
 }

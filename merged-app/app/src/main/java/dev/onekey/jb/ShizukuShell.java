@@ -119,9 +119,24 @@ public final class ShizukuShell {
     /** Long-lived process with a background line reader (perf_cred / v42). */
     public static final class LineProc {
         public final Process proc;
+        /** 走自研通道时的底层句柄；走 Stellar 时为 null。 */
+        private final com.pyb110.onekey.shell.OneKeyShell.LineProc ok;
         public final List<String> lines = new ArrayList<>();
+
+        /**
+         * 包装自研通道的句柄。
+         *
+         * 两条通道的长驻句柄类型不同（一个 java.lang.Process、一个是 socket 上的执行 id），
+         * 这里用组合而不是继承来抹平，调用方只认 LineProc 这一种。
+         */
+        LineProc(com.pyb110.onekey.shell.OneKeyShell.LineProc p, LineSink sink) {
+            this.proc = null;
+            this.ok = p;
+        }
+
         LineProc(Process p, LineSink sink) {
             this.proc = p;
+            this.ok = null;
             java.util.concurrent.atomic.AtomicReference<Exception> error = new java.util.concurrent.atomic.AtomicReference<>();
             java.util.function.Consumer<String> collect = line -> {
                 synchronized (lines) {
@@ -135,14 +150,19 @@ public final class ShizukuShell {
             try { p.getOutputStream().close(); } catch (IOException ignored) { }
         }
 
-        public boolean isRunning() { return ProcessRunner.isAlive(proc); }
+        public boolean isRunning() {
+            if (ok != null) return ok.isRunning();
+            return ProcessRunner.isAlive(proc);
+        }
 
         /** 进程已退出时返回退出码，仍在运行返回 null。 */
         public Integer exitCode() {
+            if (ok != null) return ok.exitCode();
             try { return proc.exitValue(); } catch (IllegalThreadStateException e) { return null; }
         }
 
         public String waitFor(String needle, long timeoutSec) throws InterruptedException {
+            if (ok != null) return ok.waitFor(needle, timeoutSec);
             long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSec);
             while (System.nanoTime() < end) {
                 synchronized (lines) {
@@ -155,6 +175,7 @@ public final class ShizukuShell {
         }
 
         public String tail(int n) {
+            if (ok != null) return ok.tail(n);
             StringBuilder sb = new StringBuilder();
             synchronized (lines) {
                 for (int i = Math.max(0, lines.size() - n); i < lines.size(); i++) {
@@ -165,11 +186,29 @@ public final class ShizukuShell {
         }
 
         public void destroy() {
+            if (ok != null) { ok.destroy(); return; }
             ProcessRunner.stop(proc);
         }
     }
 
+    /**
+     * 长驻流式执行。
+     *
+     * 与 run/stageBytes 一样先看自研通道：三条对外入口必须口径一致，
+     * 否则「用户卸了 Stellar」时 run 走自研、start 却去打 Stellar 的 binder，
+     * 表现为引擎启动即抛异常，而环境诊断看起来一切正常 —— 极难定位。
+     */
     public static LineProc start(String script, LineSink sink) throws Exception {
+        if (selfRouted()) {
+            return new LineProc(com.pyb110.onekey.shell.OneKeyShell.INSTANCE.start(
+                    script, new kotlin.jvm.functions.Function1<String, kotlin.Unit>() {
+                        @Override
+                        public kotlin.Unit invoke(String line) {
+                            if (sink != null) sink.line(line);
+                            return kotlin.Unit.INSTANCE;
+                        }
+                    }), sink);
+        }
         return new LineProc(shell(script), sink);
     }
 
@@ -209,28 +248,6 @@ public final class ShizukuShell {
             return new Result(result.code, result.code == 0 ? "已投放 " + dest : "投放失败：" + result.output);
         } catch (Exception e) {
             return new Result(-1, "投放失败：" + dest + " " + e);
-        }
-    }
-
-    /** Stage bytes through the already-running rootd process (same mount namespace). */
-    public static Result stageThroughRootd(byte[] data, String dest, int mode) {
-        String script = stageScript(dest, mode, data.length);
-        try (InputStream in = new ByteArrayInputStream(data)) {
-            Process p = newProcess(
-                    new String[]{"/data/local/tmp/pc98260_su", "-i", "-c", script},
-                    env(), TMP);
-            ProcessRunner.Result result = ProcessRunner.await(p, in, 60, null);
-            java.util.regex.Matcher m = java.util.regex.Pattern
-                    .compile("@@PC98260_STATUS:(-?\\d+):(\\d+)@@")
-                    .matcher(result.output);
-            int code = -1;
-            if (m.find()) {
-                try { code = Integer.parseInt(m.group(1)); } catch (Exception ignored) { }
-            }
-            if (code == 0) return new Result(0, "已通过 rootd 投放 " + dest);
-            return new Result(code, "rootd 投放失败：status=" + code + " " + result.output);
-        } catch (Exception e) {
-            return new Result(-1, "rootd 投放失败：" + dest + " " + e);
         }
     }
 

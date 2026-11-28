@@ -21,9 +21,31 @@ object ShellSecrets {
     private const val DIR = "onekey-shell"
     private const val TOKEN_CHARS = 64
 
+    /**
+     * 通道目录。
+     *
+     * 落点必须在两次调用之间保持稳定：token、start.sh、q/、r/ 全在这里，
+     * 一旦目录漂移，客户端和服务端会各看各的 token（鉴权全失败）
+     * 且各看各的队列（请求投进没人读的目录）。
+     *
+     * 漂移的真实场景：外部存储没挂载（开机早期、USB 挂载到电脑、用户手动卸载），
+     * getExternalFilesDir 返回 null 或不可写，于是退回 filesDir；
+     * 等外部存储挂载好了，下一次调用又跳回外部目录。
+     *
+     * 所以一旦选定就钉住：用 <filesDir>/onekey-shell.pin 记住选过哪个根。
+     * 钉住的目录后来不可写时不再换，宁可报错让上层显式重建 ——
+     * 静默切换会让「通道时好时坏」变成无法复现的玄学。
+     */
     fun dir(context: Context): File {
+        val pin = File(context.filesDir, DIR + ".pin")
+        val pinned = runCatching { pin.readText().trim() }.getOrDefault("")
+        if (pinned.isNotEmpty()) {
+            val d = File(pinned, DIR)
+            if (d.isDirectory || d.mkdirs()) return d
+        }
         val ext = runCatching { context.getExternalFilesDir(null) }.getOrNull()
-        val base = if (ext != null && (ext.exists() || ext.mkdirs())) ext else context.filesDir
+        val base = if (ext != null && (ext.exists() || ext.mkdirs()) && ext.canWrite()) ext else context.filesDir
+        runCatching { pin.writeText(base.absolutePath) }
         val d = File(base, DIR)
         if (!d.exists()) d.mkdirs()
         return d

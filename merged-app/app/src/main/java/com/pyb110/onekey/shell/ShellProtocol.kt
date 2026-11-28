@@ -178,6 +178,33 @@ object ShellProtocol {
 
     class Hello(val version: Int, val uid: Int, val nonce: ByteArray)
 
+    /**
+     * AUTH_OK = [uid:int][proofLen:1][proof]。
+     *
+     * proof 是服务端用同一把 token 对「本次 nonce + 方向标记」算的 HMAC。
+     * 单向鉴权不够：socket 名由 token 前 16 个十六进制字符派生，
+     * 而它出现在 /proc/net/unix 里（同设备任意进程可读），
+     * 于是 64 bit 的前缀是公开的。攻击者只要在真服务端起来之前
+     * 抢先 bind 同名 socket，就能冒充服务端接收我们的脚本并回放假输出。
+     * 加上 proof 后，冒充者算不出正确 HMAC，客户端直接断开。
+     */
+    fun encodeAuthOk(uid: Int, proof: ByteArray): ByteArray = pack {
+        writeInt(uid)
+        writeByte(proof.size)
+        write(proof)
+    }
+
+    class AuthOk(val uid: Int, val proof: ByteArray)
+
+    fun decodeAuthOk(body: ByteArray): AuthOk {
+        val din = parser(body)
+        val uid = din.readInt()
+        val n = din.readUnsignedByte()
+        val proof = ByteArray(n)
+        din.readFully(proof)
+        return AuthOk(uid, proof)
+    }
+
     fun decodeHello(body: ByteArray): Hello {
         val din = parser(body)
         val ver = din.readShort().toInt()

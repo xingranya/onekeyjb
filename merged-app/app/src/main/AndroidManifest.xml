@@ -14,6 +14,10 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- 自研 Shell 通道的 L2 引导（无线调试自配对）需要改系统设置；首次 root 后由 su 授予 -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <!-- mDNS 发现 _adb-tls-connect._tcp：部分 OEM 的省电策略会丢掉未声明组播的 App 的应答 -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <queries>
         <package android:name="roro.stellar.manager" />

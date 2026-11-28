@@ -69,12 +69,13 @@ class AdbMessage(
             val len = buf.int
             val crc = buf.int
             val magic = buf.int
-            val data = if (len > 0) {
-                if (len > 1024 * 1024) throw IllegalStateException("ADB 消息过大: " + len)
-                ByteArray(len).also { input.readFully(it) }
-            } else {
-                null
+            // 上下界一起判：len 是 int，错位时可能读到负数（如 0xFFFFFFFF）。
+            // 只判上界会让负长度静默变成 null data、dataLength 带着负值往下传，
+            // 下游把它当空帧回 A_OKAY，与 adbd 的状态机彻底错位。
+            if (len < 0 || len > 1024 * 1024) {
+                throw IllegalStateException("ADB 帧长度非法: " + len)
             }
+            val data = if (len > 0) ByteArray(len).also { input.readFully(it) } else null
             return AdbMessage(command, arg0, arg1, len, crc, magic, data)
         }
 

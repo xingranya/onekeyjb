@@ -36,6 +36,9 @@ object OneKeyShell {
     private const val HEARTBEAT_STALE_MS = 8_000L
     private const val PING_TIMEOUT_MS = 1_500L
 
+    /** 单次执行保留的输出上限（字符）。长驻引擎会连续吐几十 MB，不设上限就是 OOM。 */
+    private const val MAX_ACC_CHARS = 256 * 1024
+
     private val execSeq = AtomicInteger(1)
     private val lock = Any()
 
@@ -56,6 +59,8 @@ object OneKeyShell {
 
         fun shutdown() {
             alive = false
+            // 显式关 fd：只置 alive=false 会让 socket 靠 GC 回收，
+            // 反复重连时 fd 越积越多，最终 connect 报 EMFILE。
             runCatching { socket.close() }
         }
     }
@@ -68,11 +73,19 @@ object OneKeyShell {
     private fun bootId(): String =
         runCatching { File("/proc/sys/kernel/random/boot_id").readText().trim() }.getOrDefault("")
 
-    private fun hmac(key: ByteArray, nonce: ByteArray): ByteArray {
+    /**
+     * 鉴权用的 HMAC。
+     *
+     * dir = "C" 是客户端证明，dir = "S" 是服务端证明。
+     * 必须分开：同一个值的话，能观察流量的人可以把客户端的 AUTH 帧
+     * 原样当成服务端的 AUTH_OK 回放，双向证明就退化成单向。
+     */
+    private fun hmac(key: ByteArray, nonce: ByteArray, dir: String): ByteArray {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(key, "HmacSHA256"))
         mac.update(nonce)
         mac.update(bootId().toByteArray(Charsets.UTF_8))
+        mac.update(dir.toByteArray(Charsets.UTF_8))
         return mac.doFinal()
     }
 
@@ -91,13 +104,21 @@ object OneKeyShell {
             val h = ShellProtocol.decodeHello(hello.body)
             if (h.version != ShellProtocol.VERSION) throw IllegalStateException("{{TERM_2y25qziz}}版本不符: " + h.version)
 
-            ShellProtocol.write(out, ShellProtocol.T_AUTH, hmac(tokenBytes(context), h.nonce))
+            ShellProtocol.write(out, ShellProtocol.T_AUTH, hmac(tokenBytes(context), h.nonce, "C"))
             val auth = ShellProtocol.read(input) ?: throw IllegalStateException("无鉴权回应")
             if (auth.type != ShellProtocol.T_AUTH_OK) throw IllegalStateException("鉴权被拒绝")
+            // 必须验服务端的 proof：socket 名由 token 前 64 bit 派生，
+            // 而 /proc/net/unix 对同设备任意进程可读 —— 攻击者可以抢先 bind
+            // 同名 socket 冒充服务端，接收我们的脚本再回放假输出。
+            // 它算不出 HMAC，所以这一验就把冒充挡住了。
+            val ok = runCatching { ShellProtocol.decodeAuthOk(auth.body) }.getOrNull()
+                ?: throw IllegalStateException("鉴权回应格式非法")
+            if (!java.security.MessageDigest.isEqual(ok.proof, hmac(tokenBytes(context), h.nonce, "S")))
+                throw IllegalStateException("服务端未通过身份校验")
 
             s.soTimeout = 0
             val c = Conn(s)
-            c.uid = h.uid
+            c.uid = ok.uid
             val t = Thread({ readerLoop(c) }, "okshell-reader")
             t.isDaemon = true
             c.reader = t
@@ -154,14 +175,22 @@ object OneKeyShell {
                     }
                     ShellProtocol.T_EXIT -> {
                         val e = ShellProtocol.decodeExit(f.body)
-                        c.execs[e.id]?.finish(e.code)
+                        // 结束就摘掉：不摘的话长驻连接（引擎一轮几十次执行、
+                        // 每秒的成功率采样、UI 反复探测）会把 execs 越堆越大，
+                        // 每个 Exec 还各自留着 256 KiB 输出缓冲 —— 典型的慢性 OOM。
+                        // 客户端已经通过 LineProc 持有引用，摘掉不影响读取。
+                        c.execs.remove(e.id)?.finish(e.code)
                     }
                     else -> Unit
                 }
             }
         } catch (_: Throwable) {
         } finally {
-            c.alive = false
+            // 必须真的关掉 fd：只置 alive=false 的话，
+            // socket 要等 GC 才回收，而每次重连都会新建一个 ——
+            // 引擎一轮几十次执行加上每秒采样，fd 很快就耗尽（EMFILE），
+            // 表现是「通道莫名其妙再也连不上」。
+            c.shutdown()
             for (e in c.execs.values) e.finish(-1)
             c.execs.clear()
         }
@@ -179,8 +208,18 @@ object OneKeyShell {
         @Volatile var killed = false
 
         fun feed(bytes: ByteArray) {
-            val text = String(bytes, Charsets.UTF_8)
-            synchronized(acc) { acc.append(text) }
+            // 服务端按 8 KiB 或 40 ms 切块，切点落在多字节字符中间是常态。
+            // 直接 String(bytes, UTF_8) 会把半个汉字解成 U+FFFD，
+            // 而日志里到处是中文（「连续 N 次尝试未命中」），
+            // 于是每 8 KiB 就多一个乱码字符，看起来像引擎吐了脏数据。
+            // 这里保留不完整尾字节，拼到下一块再解。
+            val text = decodeChunk(bytes)
+            synchronized(acc) {
+                acc.append(text)
+                // 长驻引擎会连续吐几十 MB 日志，不设上限就是 OOM。
+                // 保留尾部 256 KiB 足够给 output() 与失败诊断用。
+                if (acc.length > MAX_ACC_CHARS) acc.delete(0, acc.length - MAX_ACC_CHARS)
+            }
             // 提到局部变量：sink 是构造属性，跨 synchronized 块后编译器不再做智能转换
             val cb = sink ?: return
             val out = ArrayList<String>()
@@ -212,6 +251,38 @@ object OneKeyShell {
             done = true
         }
 
+        /**
+         * 跨块安全的 UTF-8 解码。
+         *
+         * 保留末尾 1~3 个「可能是多字节字符前半段」的字节，
+         * 下次 feed 时拼在前面。判据是首字节的高位 1 的个数：
+         * 0xxxxxxx = 1 字节、110xxxxx = 2、1110xxxx = 3、11110xxx = 4。
+         */
+        private fun decodeChunk(bytes: ByteArray): String {
+            val pending = carry
+            val all = if (pending.isEmpty()) bytes else pending + bytes
+            var cut = all.size
+            var i = all.size - 1
+            var back = 0
+            while (i >= 0 && back < 4) {
+                val b = all[i].toInt() and 0xFF
+                if (b and 0xC0 == 0x80) { i--; back++; continue }
+                val need = when {
+                    b and 0x80 == 0x00 -> 1
+                    b and 0xE0 == 0xC0 -> 2
+                    b and 0xF0 == 0xE0 -> 3
+                    b and 0xF8 == 0xF0 -> 4
+                    else -> 1
+                }
+                if (all.size - i < need) cut = i
+                break
+            }
+            carry = if (cut < all.size) all.copyOfRange(cut, all.size) else ByteArray(0)
+            return String(all, 0, cut, Charsets.UTF_8)
+        }
+
+        private var carry: ByteArray = ByteArray(0)
+
         fun text(): String = synchronized(acc) { acc.toString().trim() }
 
         fun snapshot(): List<String> = synchronized(history) { ArrayList(history) }
@@ -222,7 +293,12 @@ object OneKeyShell {
             val end = System.nanoTime() + timeoutSec * 1_000_000_000L
             while (System.nanoTime() < end) {
                 synchronized(history) { for (l in history) if (l.contains(needle)) return l }
-                if (done) return null
+                // done 之后要再扫一遍：标记可能正好在最后一批输出里，
+                // 而上一轮扫描发生在它落地之前 —— 直接 return null 会把成功判成失败。
+                if (done) {
+                    synchronized(history) { for (l in history) if (l.contains(needle)) return l }
+                    return null
+                }
                 runCatching { Thread.sleep(50) }
             }
             return null
@@ -251,7 +327,16 @@ object OneKeyShell {
             return !f.done
         }
 
-        fun exitCode(): Int? = exec?.code ?: file?.code
+        fun exitCode(): Int? {
+            val e = exec
+            if (e != null) return e.code
+            val f = file ?: return null
+            // 文件模式必须顺手 poll：rc 文件是拉取模型，
+            // 调用方常常「先看 isRunning 再读 exitCode」，
+            // 若这里不推进，最后一次 poll 之后落盘的 rc 永远读不到，返回 null 被当成失败。
+            f.poll()
+            return f.code
+        }
 
         fun waitFor(needle: String, timeoutSec: Long): String? =
             exec?.waitFor(needle, timeoutSec) ?: file?.waitFor(needle, timeoutSec)
@@ -279,7 +364,11 @@ object OneKeyShell {
             if (e != null && c != null) {
                 e.killed = true
                 runCatching {
-                    ShellProtocol.write(c.out, ShellProtocol.T_KILL, ShellProtocol.pack { writeInt(e.id) })
+                    // 必须与 submit() 用同一把锁：T_KILL 与 T_EXEC 并发写同一个流，
+                    // 5 字节头和 body 会交错，readerLoop 解出垃圾长度后整条连接报废。
+                    synchronized(c.out) {
+                        ShellProtocol.write(c.out, ShellProtocol.T_KILL, ShellProtocol.pack { writeInt(e.id) })
+                    }
                 }
                 e.finish(-1)
             }
@@ -368,8 +457,11 @@ object OneKeyShell {
                         ShellProtocol.ExecRequest(id, 5, emptyList(), "/", "id -u")
                     ))
                 }
-                val end = System.currentTimeMillis() + 2500
-                while (!exec.done && System.currentTimeMillis() < end) Thread.sleep(50)
+                // 只等 600 ms：这是存活探测，不是执行。
+                // 原来等 2500 ms，而 available() 被 46 处调用点反复调用
+                // （含 Compose 组合期的 shellLabel()），每次 TTL 过期都要卡满 2.5 秒。
+                val end = System.currentTimeMillis() + 600
+                while (!exec.done && System.currentTimeMillis() < end) Thread.sleep(25)
                 exec.done
             } else {
                 fileModeUsable(ctx)
@@ -379,6 +471,15 @@ object OneKeyShell {
         lastAvailCheck = now
         return ok
     }
+
+    /**
+     * 只读快照，绝不做 IO。
+     *
+     * 供 Compose 组合期调用：available() 最坏会阻塞 2.9 秒
+     * （socket 三轮重连 400 ms + 存活探测 600 ms + 文件心跳往返 1.5 s），
+     * 主线程同步调用必然 ANR。
+     */
+    fun snapshotAlive(): Boolean = conn?.alive == true || lastAvail
 
     /** 当前是否走文件队列（供 UI 显示通道质量）。 */
     fun usingFileTransport(): Boolean = fileMode
@@ -407,7 +508,13 @@ object OneKeyShell {
     fun serviceUid(): Int {
         conn?.let { return it.uid }
         val ctx = ShellRuntime.appContext ?: return -1
-        return if (fileMode || fileModeUsable(ctx)) 2000 else -1
+        if (!(fileMode || fileModeUsable(ctx))) return -1
+        // 文件模式没有握手，真实 uid 由服务端写在 <root>/uid。
+        // 不能一律报 2000：开机自动越狱靠它判断「有没有 root」，
+        // 2000 跑引擎必然失败，然后开关会被自动关掉。
+        return runCatching {
+            File(ShellSecrets.dir(ctx), "uid").readText().trim().toInt()
+        }.getOrDefault(2000)
     }
 
     fun requestPermission(code: Int) {
@@ -455,22 +562,57 @@ object OneKeyShell {
 
     fun quote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
 
-    /** 把字节写到 dest（走 base64 heredoc，避免二进制穿过 shell 引号层）。 */
+    /**
+     * 把字节写到 dest。
+     *
+     * 必须分片：整个 base64 塞进一次 exec 会撞上 MAX_FRAME（4 MiB），
+     * 而我们的资产 base64 后分别是 16.87 MB（ksud-universal）、4.61 MB、
+     * 4.34 MB、521 KB、623 KB —— 前三个全超限。
+     * 超限时 ShellProtocol.write 抛 IllegalArgumentException，
+     * 被 submit 的 catch 吞掉并把连接置为 dead，
+     * 结果不只是这次写失败，还会打断正在跑的长驻引擎连接。
+     *
+     * 每片 2 MiB 原始字节（base64 后约 2.7 MB），逐片追加写同一个临时文件，
+     * 最后一次性 chmod + mv，保证 dest 要么是完整文件要么不存在。
+     */
     fun stageBytes(data: ByteArray, dest: String, mode: Int = 755): Result {
-        val b64 = java.util.Base64.getEncoder().encodeToString(data)
         val dir = dest.substringBeforeLast('/', "/data/local/tmp")
-        val script = buildString {
-            append("set -e; mkdir -p ").append(quote(dir)).append("; ")
-            append("tmp=").append(quote(dest)).append(".tmp.$$").append("; ")
-            append("trap 'rm -f \"\$tmp\"' EXIT; ")
-            append("base64 -d > \"\$tmp\" <<'OKXEOF'\n")
-            append(b64)
-            append("\nOKXEOF\n")
-            append("chmod ").append(mode).append(" \"\$tmp\"; ")
-            append("mv -f \"\$tmp\" ").append(quote(dest)).append("; ")
-            append("trap - EXIT; echo OKX_STAGED=").append(dest)
+        val tag = "okx" + Integer.toHexString(System.nanoTime().toInt()) + "_" + dest.hashCode().toUInt()
+        val tmp = dir + "/." + tag + ".part"
+        // 2 MiB 原始字节 → base64 后约 2.7 MB，留足余量给帧头与脚本外壳（上限 4 MiB）。
+        val chunk = 2 * 1024 * 1024
+        val pieces = maxOf(1, (data.size + chunk - 1) / chunk)
+
+        val prep = "set -e; mkdir -p " + quote(dir) + "; : > " + quote(tmp)
+        val r0 = run(prep, 20)
+        if (r0.code != 0) return Result(r0.code, "准备临时文件失败：" + r0.output.take(200))
+
+        var off = 0
+        var index = 0
+        while (off < data.size) {
+            val n = minOf(chunk, data.size - off)
+            val slice = if (off == 0 && n == data.size) data else data.copyOfRange(off, off + n)
+            val b64 = java.util.Base64.getEncoder().encodeToString(slice)
+            // 每片单独一次 exec：把 7 片拼进同一个 script 会让整帧超过 4 MiB，
+            // 等于没解决「帧过大」这个根因，只是把报错推迟到更靠后的地方。
+            val piece = buildString {
+                append("base64 -d >> ").append(quote(tmp)).append(" <<'OKXEOF'\n")
+                append(b64).append("\nOKXEOF\n")
+            }
+            val r = run(piece, 90)
+            if (r.code != 0) {
+                runCatching { run("rm -f " + quote(tmp), 10) }
+                return Result(r.code, "写入第 " + (index + 1) + "/" + pieces + " 片失败：" + r.output.take(200))
+            }
+            off += n
+            index += 1
         }
-        return run(script, 120)
+
+        val fin = "set -e; chmod " + mode + " " + quote(tmp) + "; mv -f " + quote(tmp) + " " + quote(dest) +
+            "; echo OKX_STAGED=" + dest
+        val rf = run(fin, 30)
+        if (rf.code != 0) runCatching { run("rm -f " + quote(tmp), 10) }
+        return rf
     }
 
     fun stageAsset(context: Context, asset: String, dest: String, mode: Int = 755): Result {
