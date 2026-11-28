@@ -121,7 +121,15 @@ class JailbreakController private constructor(private val context: Context) {
     /** 本次开机是否已成功越狱（与 boot_id 绑定，重启后自动失效）。 */
     var rootedThisBoot: Boolean by mutableStateOf(false); private set
     /** 当前成功率评估（每秒刷新一次）。 */
-    var successRate: RateResult by mutableStateOf(SuccessRate.evaluate(-1, -1, -1.0)); private set
+    var successRate: RateResult by mutableStateOf(
+        SuccessRate.evaluate(
+            Env.EMPTY,
+            BootClass.COLD_FIRST,
+            emptyList(),
+            SuccessRate.budgetFor(""),
+            true,
+        )
+    ); private set
     /** 历史成功率统计。 */
     var historyStats: HistoryStore.Stats by mutableStateOf(HistoryStore.Stats(0, 0, 0, 0)); private set
 
@@ -151,15 +159,113 @@ class JailbreakController private constructor(private val context: Context) {
     private fun startRateSampler() {
         scope.launch {
             while (true) {
-                val r = SuccessRate.sample()
-                successRate = r
+                refreshRate()
                 delay(SuccessRate.SAMPLE_MS)
             }
         }
     }
 
+    /** 读电量百分比；读不到返回 -1。读电量不需要任何权限。 */
+    private fun readBattery(): Int = runCatching {
+        val bm = context.getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager
+        val v = bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        if (v in 0..100) v else -1
+    }.getOrDefault(-1)
+
+    /**
+     * 重算成功率。
+     *
+     * 关键点：百分比不是从环境读数推出来的，而是从历史实测样本推出来的；
+     * 环境只做 ±30% 的修正。这样即使某个量读不到，数字也不会变成假值。
+     */
+    fun refreshRate() {
+        val env = SuccessRate.sample(readBattery())
+        val kmi = profile?.kmi ?: ""
+        val budget = SuccessRate.budgetFor(kmi)
+        val slabRelevant = kmi.contains("6.12")
+        runCatching {
+            successRate = SuccessRate.evaluate(
+                env = env,
+                bootClass = currentBootClass(),
+                samples = cachedSamples(),
+                budgetMs = budget,
+                slabRelevant = slabRelevant,
+            )
+        }
+    }
+
+    /**
+     * 样本缓存。
+     *
+     * 采样每秒一次，而样本文件只在一次运行结束后才变；每秒读盘毫无意义。
+     * 缓存 15 秒，运行结束时由 [invalidateSamples] 立刻作废。
+     */
+    private var samplesCache: List<RunSample> = emptyList()
+    private var samplesAt = 0L
+    private val samplesLock = Any()
+
+    private fun cachedSamples(): List<RunSample> = synchronized(samplesLock) {
+        val now = System.currentTimeMillis()
+        if (now - samplesAt > 15_000L) {
+            samplesCache = runCatching { RunStats.read(context) }.getOrDefault(emptyList())
+            samplesAt = now
+        }
+        samplesCache
+    }
+
+    private fun invalidateSamples() = synchronized(samplesLock) {
+        samplesAt = 0L
+        samplesCache = emptyList()
+    }
+
+    /** 当前 boot 桶：脏 boot / 同 boot 重跑 / 首次。 */
+    private fun currentBootClass(): BootClass = RunStats.classifyBoot(
+        currentBootId = localBootId(),
+        lastSuccessBootId = prefs.getString("success_boot_id", "").orEmpty(),
+        failedBootId = prefs.getString("failed_boot_id", "").orEmpty(),
+        ranThisBoot = rootedThisBoot,
+    )
+
     fun refreshStats() {
         historyStats = runCatching { HistoryStore.stats(context) }.getOrDefault(HistoryStore.Stats(0, 0, 0, 0))
+    }
+
+    /**
+     * 把一次运行落成统计样本。
+     *
+     * 只有引擎真的跑过 attempt 才记录：中途因权限、设备不匹配等原因早退的运行
+     * 没有任何 attempt，记进去会把命中率稀释成假数据。
+     */
+    private fun recordRunSample(t: EngineTelemetry, ok: Boolean, bootId: String, t0: Long) {
+        if (t.attempts <= 0) return
+        val env = successRate
+        val budget = successRate.budgetMs
+        RunStats.append(
+            context,
+            RunSample(
+                ts = System.currentTimeMillis(),
+                boot = bootId.take(8),
+                bootClass = currentBootClass(),
+                attempts = t.attempts,
+                hits = t.hits,
+                msPerAttempt = if (t.avgMs > 0) t.avgMs else RunStats.DEFAULT_MS_PER_ATTEMPT,
+                totalMs = System.currentTimeMillis() - t0,
+                ok = ok,
+                failKind = t.failKind,
+                budgetMs = if (t.budgetMs > 0) t.budgetMs else budget,
+                procsRunning = env.procsRunning,
+                load1 = env.load1,
+                tempMilliC = env.tempMilliC,
+                battery = env.battery,
+            )
+        )
+        addLog(
+            RunLog.info(
+                "本次运行已计入统计",
+                "尝试 " + t.attempts + " 次、命中 " + t.hits + " 次、单次约 " +
+                    (if (t.avgMs > 0) t.avgMs else 0L) + "ms"
+            )
+        )
     }
 
     private fun refreshRootedFlag() {
@@ -896,18 +1002,34 @@ class JailbreakController private constructor(private val context: Context) {
                 )
             )
         }
-        val preRate = SuccessRate.sample()
-        successRate = preRate
+        // 开跑前重算一次：boot 桶、电量、线程数都要取"这一刻"的值。
+        refreshRate()
+        val preRate = successRate
         addLog(
             RunLog.info(
-                "开跑前成功率预估",
-                "约 " + String.format(Locale.US, "%.0f%%", preRate.score) + "（" + preRate.advice() + "）"
+                "开跑前成功率",
+                if (preRate.displayable) {
+                    String.format(Locale.US, "%.0f%%（区间 %.0f~%.0f%%，样本 %d 次尝试）", preRate.probability, preRate.low, preRate.high, preRate.samples)
+                } else {
+                    preRate.rangeText + " · " + preRate.advice()
+                }
+            )
+        )
+        addLog(
+            RunLog.info(
+                "运行条件",
+                preRate.bootText + " · 预计 " + preRate.attemptsPlanned + " 次尝试 · 单次约 " +
+                    String.format(Locale.US, "%.1f", preRate.msPerAttempt / 1000.0) + " 秒 · 预算 " +
+                    (preRate.budgetMs / 1000L) + " 秒 · " + preRate.envNote
             )
         )
         val t0 = System.currentTimeMillis()
         scope.launch { while (running) { elapsedSeconds = (System.currentTimeMillis() - t0) / 1000L; delay(1000L) } }
         scope.launch {
             var ok = false
+            // 引擎遥测：本次运行真实跑了几次 attempt、命中几次、单次多久。
+            // 成功率的统计样本就来自这里，而不是任何推断。
+            var runTelemetry = EngineTelemetry()
             try {
                 if (!ensurePermission()) { stage = "未获得权限"; return@launch }
                 val chosen = managers.firstOrNull { it.kind == runKind } ?: run {
@@ -965,7 +1087,9 @@ class JailbreakController private constructor(private val context: Context) {
                             },
                             { progress = it / 100f },
                             susfsEnabled, vfsEnabled, unloadKernelGuard, antiRootGuard,
-                            universalModuleEnabled
+                            universalModuleEnabled,
+                            budgetMs = SuccessRate.budgetFor(runner.kmi),
+                            onTelemetry = { t -> runTelemetry = t },
                         )
                     }
                     else -> {
@@ -1064,10 +1188,15 @@ class JailbreakController private constructor(private val context: Context) {
                     addLog(RunLog.warn("下次运行前需要重启手机", "本次已写入内核但未拿到 root"))
                 }
                 HistoryStore.finish(ok, stage, elapsedSeconds)
+                // 把本次真实 attempt / 命中落成统计样本：成功率从此有实测出处。
+                runCatching { recordRunSample(runTelemetry, ok, startBootId, t0) }
+                invalidateSamples()
                 // 走到这里说明本进程活到了收尾：墓碑使命完成，清掉，
                 // 否则下次启动会把"正常结束"误报成"死在某个阶段"。
                 RunTrace.clear(context)
                 refreshStats()
+                refreshRootedFlag()
+                refreshRate()
                 refreshState()
             }
         }

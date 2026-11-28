@@ -1,6 +1,6 @@
 # OneKey 知识库（合集）
 
-> 版本 2.23.1 / 222。不含任何密钥、口令或签名文件内容。
+> 版本 2.24.0 / 223。不含任何密钥、口令或签名文件内容。
 
 
 
@@ -28,8 +28,9 @@
 | [09-新系统17.0.1.201适配.md](09-新系统17.0.1.201适配.md) | 新内核差异与适配点 | 换机/换系统的人 |
 | [10-98260执行引擎.md](10-98260执行引擎.md) | 引擎调用协议、输出→阶段映射、成功证据 | 想懂执行链的人 |
 | [11-热切换与通用模块.md](11-热切换与通用模块.md) | 通用模块前提、加载器替换、切换协议、已知行为 | 用热切换的人 |
-| [12-版本变更史.md](12-版本变更史.md) | 2.18.0 → 2.19.3 逐版变更 | 想知道某版改了什么的人 |
+| [12-版本变更史.md](12-版本变更史.md) | 2.18.0 → 2.24.0 逐版变更 | 想知道某版改了什么的人 |
 | [13-踩坑与修复记录.md](13-踩坑与修复记录.md) | 症状 → 根因 → 修法（含"以为坏了其实正常"） | 所有人，**建议先读** |
+| [15-成功率模型.md](15-成功率模型.md) | 为什么旧算法不可用、Beta 后验公式、boot 分桶、遥测解析 | 想懂百分比怎么来的、要改模型的人 |
 | [14-验证清单.md](14-验证清单.md) | 发版前检查、真机回归、已知未验证项 | 发版、验收的人 |
 
 ## 三分钟速览
@@ -955,7 +956,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 ---
 
-# 12 · 版本变更史（2.18.0 → 2.23.1）
+# 12 · 版本变更史（2.18.0 → 2.24.0）
 
 只记录对外发布过的版本；每条对应 GitHub Release 上的 tag。
 
@@ -963,6 +964,7 @@ root 写 `/proc/kernelsu_manager`：`<包名> <uid> <base.apk 路径>`（≤ 512
 
 | 版本 | code | 主题 | 关键内容 |
 | --- | --- | --- | --- |
+| **2.24.0** | 223 | 成功率改为实测概率模型 | ① **整体替换评分逻辑**：2.23.x 的「slab × 温度 × 负载」三因子乘积里，slab 读的 posix_timers_cache 只对 6.12 链有意义（strings onekey-98260 里 posix_timers 命中 0），三张阈值表（340/430/540/660/900、38/43/48/56/65°C、per-core 1/2/3.5/6）无任何实测出处；现改为 **Beta 后验**：每次运行的真实 attempt / hit / 单次耗时落盘 files/run-stats.tsv（14 列 TSV，保留 200 条），Beta(1+hits, 20+misses) 给单次命中率，先验均值 4.76% 出自 docs 的 3%/attempt 量级；② **概率含中止闸门**：P = min(92, 1-(1-p)^k)，k = min(ABORT_AFTER, budgetMs/msPerAttempt)——旧实现漏算中止阈值，4 次把真实上限压到 11.5% 而界面显示 92%；③ **预算对齐引擎**：引擎内建 --auto240（240 秒）并自报 SLIDE=… BUDGET=…s，旧实现写死 90 秒等于只给 37% 预算；改为 budgetMs 参数，6.18 给 300 秒、6.12 给 180 秒，中止阈值 4→6；④ **boot 分桶**：实测同一开机内第二次运行命中率崩塌（0/60~0/248，因 6.18 runner 无 min_drain 脏基线保护），新增 BootClass（COLD_FIRST / COLD_RERUN / DIRTY），各自独立后验，重跑桶无样本时用首次桶均值 × 0.25；⑤ **引擎遥测**：新增 EngineTelemetryParser，首次把 UAF mode=… ms=… rc=…、LEAK_TASK attempt=…、RECLAIM_WRITES=… HIT=…、BUDGET=…s、FAIL=… 解析成结构化数据，成为成功率的唯一事实来源；⑥ **硬闸分层**：脏 boot / 电量 <30% / procs_running > 64 任一命中就不显示百分比，只显示原因；样本 <5 次 attempt 显示「样本不足（n=x）」；⑦ **环境修正反直觉**：procs_running ≤ 8 是**扣分项**（实测 8 候选第 10 次命中 vs 1 候选 212 次零命中），修正系数锁在 [0.70, 1.10]；⑧ **界面**：主数字带区间，依据行显示「本次开机首次运行 · 预计 6 次尝试 · 单次约 6.2 秒」；6.18 设备去掉「内存占用」格（该链不读 slabinfo），改为「CPU 温度 / 线程运行 / 电量」；RunConfirmDialog 拦截条件改为「概率 <40%」或「同 boot 重跑」 |
 | **2.23.1** | 222 | 弹窗统一 + 五处回归修复 | ① **日志页闪退**：`CouiShape(radius, cornerWeight)` 构造期 `require(weight >= 2f)`，日志页两处写了 1f 直接抛异常，改 2f；② **弹窗退场动画**：COUI 靠 `visible` + 内部 `retained` 保留窗口，调用方 `if (show)` 会在同一帧摘子树，新增 `DialogSlot` 让九个弹窗常驻组合、隐藏后多留 320ms；③ **四个抽屉点了没反应**：`WindowBottomSheet` 首帧 `visible` 仍为 false 就触发 `onDismissFinished`，加 `everShown` 门控 + 收起延迟；④ **弹窗左右缩进三套**：环境诊断 16dp、第三方 24dp、用户手册 24+14dp，统一为 `DialogInset = 16.dp`，手册分节去掉 Card 改扁平排版；⑤ **按钮并排与红字**：COUI `horizontal = (neutralAction == null && dismissAction != null)`，次要动作塞进 neutral 槽强制纵向堆叠，并自供 `CouiDialogActionColors` 去掉破坏性红字；⑥ **内存/温度/负载读不到**：普通 App 域被 SELinux 挡在 `proc_loadavg` 与 sysfs 之外，改走 Stellar 特权通道一次读齐三量（3 秒降频），温度加 `dumpsys thermalservice` 兜底；⑦ **历史页幽灵记录与「64560 稳定链」**：`append` 无 activeId 时凭空 start 记录改为直接 return，`title` 的 else 兜底把废案复活改为固定「98260 运行链」 |
 | **2.23.0** | 221 | 日志分级 + 成功率 + COUI alpha17 | ① **日志全面重写**：新增 RunLog，四档中文等级（信息/成功/警告/失败），一行一条，落盘格式 `HH:mm:ss  [标签] 标题 · 详情 · 1.2s`，解析旧格式靠关键字兜底；Runner 的 `EV|v=1|phase=` 结构化行首次被解析成中文阶段；② **阶段墓碑 RunTrace**：软重启会连根拔掉进程，finally 里的归因代码一行都跑不到，因此每进一个阶段就往 `files/onekey-run-trace.json` 写墓碑（stage/boot/ts/intent）并 fsync，下次启动比对 boot_id 指出重启发生在哪一步之后；intent 位区分「用户开的软重启」与「异常重启」；③ **历史页幽灵记录根治**：`HistoryStore.append` 原本在无 activeId 时 凭空 start 一条 unknown 记录，导致每次开 App、每次拨开关都多一条「未完成 0.00s」；改为直接 return，并新增 `abandon()` 把残留 running 标成异常中断、`stats()` 只统计跑完的记录；④ **成功率 SuccessRate**：读 `/proc/slabinfo` 的 posix_timers_cache、`/proc/loadavg`、`thermal_zone0/temp` 三路采样，按 slab/温度/负载三因子乘积给分，上限 **92%**（永不承诺 100%），建议线 55%；首页参数区三格实时显示，低于阈值时开始前弹窗拦一次并指出瓶颈；⑤ **BootWatch 归因**：在每个可能触发重启的动作前后快照 boot_id / system_server pid / zygote 状态，命中就把重启点名到具体动作；⑥ **COUI 升级 alpha11→alpha17**：抽屉换用库原生 BottomSheet（`com.itos.coui.sheet`），获得拖拽手柄与原生回弹；alpha17 要求 `minCompileSdk=37 + minCompileMinorSdk=1`，compileSdk 提到 **37.2**；⑦ 构建链路改走阿里云镜像前置 + 本地 `libs/coui-repo` 离线镜像（Google Maven 直连 reset）；⑧ 新增 20 个单元测试（RunLogTest），覆盖日志格式往返、真实日志行归类回归、成功率因子单调性与边界 |
 | **2.22.1** | 220 | 适配 YukiSU 与 SukiSU Nova | ① 管理器清单 5→**7 家**：yukisu(org.rouyashiki.yukisu) 与 sukisu_nova(com.sukisu.nova)；② 证书从官方 APK 实测提取：YukiSU v1.9.0 = 45bd30fe...，Nova v3.0.0 = 947ae944...；③ **关键修复**：Nova 与 SukiSU Ultra 共用同一签名证书，原按证书分组 + maxByOrNull 会挑错管理器，改为优先按包名精确命中再退回证书候选；④ 下载源 Rouyashiki/YukiSU 与 SukiSU-Nova/SukiSU-Nova（abi=arm64-v8a）；⑤ 执行器侧短名 yukisu / sukisu_nova 与内部 manager_pkg 表一致，无需改 runner |
@@ -1539,6 +1541,64 @@ content 槽没有内边距，加了就比库自带的 `Item` 多缩进一圈。
 **教训**：`if/else` 的 else 分支不是「兜底」，是「默认值」——默认值必须跟着产品演进一起改，
 否则它会把已经删掉的东西重新显示出来。
 
+### 41. 成功率是编的：三个阈值表没有任何实测出处
+
+**现象**：首页百分比看起来会随温度、负载变化，但用户实测发现它跟真实成败毫无关系；同一台机器同一状态下，跑成功与跑失败显示的概率一样。
+
+**根因**：2.23.x 的 `slabFactor` / `tempFactor` / `loadFactor` 三张阈值表（340/430/540/660/900、38/43/48/56/65°C、per-core 1/2/3.5/6）是凭感觉写的，仓库与 fullchain docs 里零对应。更严重的是 `readSlab()` 读的 `posix_timers_cache` 只对 6.12 链有意义——`strings onekey-98260 | grep -c posix_timers` = **0**，6.18 引擎根本不读 slabinfo，主力机 PYB110 上权重最大的因子读的是无关计数器。
+
+**修法**：删掉三张表，改成「实测 Beta 后验」——每次运行的真实 attempt / hit / 耗时落盘成 `run-stats.tsv`，用 Beta(1+hits, 20+misses) 给单次命中率，再按预算能跑几次折算整体成功率。环境只做 ±30% 修正，不再是主因子。
+
+**教训**：一个会随输入变化的数字，不等于一个有依据的数字。写任何「系数」之前先问：这个系数的每个断点，是从哪次实测里读出来的？答不出来就是编的。
+
+---
+
+### 42. 引擎给了 240 秒预算，App 90 秒就判死
+
+**现象**：真机上经常「引擎超时，已终止」，而同一台机器用 adb 手工跑引擎能成功。
+
+**根因**：引擎 usage 含 `--budget <sec>`、内建 `--auto240`（240 秒），运行时会打印 `SLIDE=%#lx BUDGET=%llds`；而 `OneKeyEngine.kt` 的等待循环写死 `System.currentTimeMillis() + 90_000`。fullchain docs 实测「每 3~5 分钟一次命中」，90 秒只给了引擎 37% 的时间。
+
+**修法**：`run()` 增加 `budgetMs` 参数，`SuccessRate.budgetFor(kmi)` 按内核给 300 秒（6.18）/ 180 秒（6.12）；超时文案带上累计 attempt 与命中数。
+
+**教训**：超时值是产品决策，不是随手写的常数。它必须大于「正常路径的最坏耗时」，而这个数只能从实测分布里取。
+
+---
+
+### 43. 4 次中止把成功率天花板压到 11.5%，界面却在显示 92%
+
+**现象**：明明每次尝试有百分之几的命中率，整体却几乎从不成功。
+
+**根因**：`failedStageSignals >= 4` 就中止。按 docs 的 3%/attempt，4 次独立尝试的真实成功率 = 1-(1-0.03)^4 ≈ **11.5%**。这个上限从来没人算过，界面却按「三因子乘积」显示 92%。
+
+**修法**：阈值抬到 6（→16.6%），并且把 k 直接写进成功率公式：`P = 1-(1-p)^k`，`k = min(ABORT_AFTER, budgetMs/msPerAttempt)`。界面同时显示「预计 N 次尝试」，让上限来源可见。
+
+**教训**：概率模型必须包含所有会让过程提前结束的闸门。漏掉一个中止条件，模型给出的数字就比没有还糟——它会让人以为还有希望。
+
+---
+
+### 44. 同一开机内重复运行的成功率崩塌，环境读数完全看不出来
+
+**现象**：第一次跑失败，再点一次几乎必然失败；重启手机后又好了。
+
+**根因**：fullchain docs 实测：干净 cache 单步写 **15 次**命中；同一 boot 内第二次不设 `min_drain` → **0/60 ~ 0/248 全部浪费**。而 6.18 runner `strings | grep -c min_drain` = **0**，没有脏基线保护。这个变量在 slab / 温度 / 负载三个读数上完全不可见。
+
+**修法**：新增 boot 分桶 `BootClass`（COLD_FIRST / COLD_RERUN / DIRTY），各自独立 Beta 后验；重跑桶无样本时用首次桶均值 × 0.25（`RERUN_PENALTY`）作文档化先验惩罚；重跑时 `RunConfirmDialog` 直接拦一次并建议重启。
+
+**教训**：决定成败的变量不一定出现在仪表盘上。建模前先问「上一次运行的残留会不会影响这一次」，答案通常是会。
+
+---
+
+### 45. 写模型前先把「读数」和「依据」分开
+
+**现象**：三物理量加权那套代码本身没有 bug，编译通过、单测也过，但结论毫无价值。
+
+**根因**：把「能读到的量」直接当成「决定结果的量」。slab / 温度 / 负载能读到，于是被当成因子；boot 新鲜度读不到，于是被忽略——而后者才是决定性的。
+
+**修法**：模型分两层。第一层是硬闸（二值判断，任一命中就不给数字）；第二层才是概率，且概率只来自实测样本。环境读数降级为修正系数，并锁死上下界。
+
+**教训**：可观测不等于因果。先列「哪些变量决定结果」，再问「哪些我能量到」；两者不重合时，缺的那个必须靠分桶或硬闸补上，不能假装它不存在。
+
 ## 踩过的"以为坏了其实正常"
 
 | 现象 | 结论 |
@@ -1604,3 +1664,111 @@ content 槽没有内边距，加了就比库自带的 `Item` 多缩进一圈。
 3. 历史 → 详情（含当次完整日志，可复制/导出）；
 4. `/proc/modules` 里 `kernelsu` 是否已存在（已存在说明本次开机没机会换模块）；
 5. `/proc/kernelsu_manager` 是否存在与内容（`primary` 判据）。
+
+
+---
+
+# 15 · 成功率模型
+
+## 一、为什么旧实现不可用（已查证）
+
+2.23.x 的成功率是「slab × 温度 × 负载」三因子乘积。查证后发现三处硬伤：
+
+| 硬伤 | 证据 |
+| --- | --- |
+| slab 指标对 PYB110 无关 | `onekey-98260`（6.18 runner）里 `slabinfo` 命中 **0**、`posix_timers` 命中 **0**，cache 名只有 `kmem_cache_alloc`；它只做 `RECLAIM_MODE=tile off=%#x target=%lx` 与 `RECLAIM_MODE=cred node=%lx off=%#x blob=%#x`。`posix_timers_cache` 只存在于 `onekey-98260-61269`（6.12） |
+| 三个阈值表无出处 | 340/430/540/660/900、38/43/48/56/65°C、per-core 1/2/3.5/6 全部是编的，仓库与 fullchain docs 里零对应 |
+| 预算被砍到 37% | 引擎 usage 含 `--budget <sec>`、内建 `--auto240`（240 秒），运行时会打印 `SLIDE=%#lx BUDGET=%llds`；而 `OneKeyEngine.kt` 写死 `90_000`。docs 实测「每 3~5 分钟一次命中」 |
+
+另有两处结构性缺陷：
+
+- **真正的天花板是中止阈值**：旧值 `failedStageSignals >= 4`。按 docs 的 3%/attempt，4 次尝试的真实成功率 = 1-(1-0.03)^4 ≈ **11.5%**，界面却敢显示 92%。
+- **boot 新鲜度完全没进模型**：docs 实测干净 cache 单步写 15 次命中；同一 boot 内第二次不设 `min_drain` → 0/60 ~ 0/248 全废；而 6.18 runner `min_drain` 命中 **0**（无脏基线保护）。
+
+参考 APK（荣耀一键越狱）经解包确认与我们同源同病：同样 `grep posix_timers /proc/slabinfo` + `/proc/loadavg` + `thermal_zone0/temp` 三物理量加权，同样没有实测校准。
+
+## 二、模型
+
+```
+p_attempt = Beta(α, β) 均值 × envFactor          // 单次尝试命中率
+k         = min(ABORT_AFTER, budgetMs / msPerAttempt)
+P         = min(92, 1 - (1 - p_attempt)^k)       // 本次运行成功率
+```
+
+| 参数 | 取值 | 出处 |
+| --- | --- | --- |
+| 先验 α / β | 1.0 / 20.0 → 均值 4.76% | docs/150、151、161 的 3%/attempt 量级；等价 21 次伪观测，真实 50 次 attempt 后先验权重 <30% |
+| `ABORT_AFTER` | 6（原 4） | 4 次把上限压到 11.5%，且样本太少无法标定 |
+| `budgetFor(6.18)` | 300 秒 | 引擎 `--auto240` = 240 秒设计，实测命中间隔 3~5 分钟 |
+| `budgetFor(6.12)` | 180 秒 | 6.12 链单次更快，但仍需覆盖多轮 chase |
+| `DEFAULT_MS_PER_ATTEMPT` | 6000ms | docs「每次 attempt 约 6~8 秒」取低端 |
+| `RERUN_PENALTY` | 0.25 | 同 boot 第二次实测 0/60~0/248 |
+| `ENV_MIN/MAX` | 0.70 / 1.10 | 环境只是修正，不允许把概率放大到失真 |
+| `CEILING` | 92.0 | 永不承诺 100% |
+| `RECOMMEND_MIN` | 40.0 | 低于此值开始前拦一次 |
+| `MIN_SAMPLES` | 5 | 少于 5 次 attempt 不显示数字 |
+| `BATTERY_MIN` | 30% | docs「跑之前保证电量 >50%」，取 30% 为硬底 |
+
+**envFactor 的 busy 分档（反直觉，必须记住）**
+
+| procs_running | 系数 | 理由 |
+| --- | --- | --- |
+| ≤ 8 | 0.75 | **太静反而零命中**：docs 实测 8 候选第 10 次命中，1 候选 212 次零命中 |
+| 9 ~ 24 | 1.00 | 合适区间 |
+| 25 ~ 64 | 0.85 | 偏忙 |
+| > 64 | 走硬闸 | 开机负载未退 |
+
+温度：≤45°C → 1.00；45~52°C → 0.92；>52°C → 0.80。
+
+**boot 分桶**（各自独立 Beta 后验，互不污染）
+
+| 桶 | 判定 | 处理 |
+| --- | --- | --- |
+| `COLD_FIRST` | 本次开机首次运行 | 用本桶后验 |
+| `COLD_RERUN` | 同 boot 已成功过（`success_boot_id == 当前 boot` 或 `rootedThisBoot`） | 本桶无样本时用首次桶均值 × 0.25 |
+| `DIRTY` | `failed_boot_id == 当前 boot` | 硬闸，拒绝运行 |
+
+## 三、数据落盘
+
+`files/run-stats.tsv`，14 列 TSV，append-only，保留最近 200 条：
+
+```
+ts  boot  bootClass  attempts  hits  msPerAttempt  totalMs  ok  failKind  budgetMs  procsRunning  load1  tempMilliC  battery
+```
+
+用 TSV 而不是 JSON：单元测试里 `org.json` 是 stub 会直接抛异常，且字段全是数字与短标识，切 tab 就够。坏行逐行跳过，不让一行损坏整份统计。
+
+## 四、引擎遥测解析
+
+`EngineTelemetryParser` 从引擎输出里抽实测值，成为成功率的唯一事实来源：
+
+| 引擎输出 | 抽取 |
+| --- | --- |
+| `UAF mode=tile ms=558 rc=0` | attempts+1；rc==0 → hits+1；累计 ms |
+| `LEAK_TASK ptr=… attempt=5` | 校正 attempts（引擎自报更权威） |
+| `RECLAIM_WRITES=4096 HIT=1 base=…` | 无 UAF 行时补记一次命中 |
+| `SLIDE=auto BUDGET=240s` | budgetMs = 240000 |
+| `FAIL=cred REASON=…` | failKind = cred |
+
+## 五、界面
+
+- 主数字：`probability%` + 区间 `low~high%`；样本 <5 显示 `--` 与「样本不足（n=x）」
+- 依据行：「本次开机首次运行 · 预计 6 次尝试 · 单次约 6.2 秒」
+- 三格：6.18 显示「CPU 温度 / 线程运行 / 电量」，**不显示内存占用**（该链不读 slabinfo）；6.12 显示「内存占用 / CPU 温度 / 线程运行」
+- 硬闸未过：整块换成原因列表，不给任何数字
+- `RunConfirmDialog` 拦截条件从「分数 < 55」改为「概率 < 40」或「同 boot 重跑」
+
+## 六、验收数据（真机待补）
+
+| 检查项 | 期望 |
+| --- | --- |
+| `run-stats.tsv` 行数 | 每次运行 +1，字段与日志 `UAF mode=` 行数一致 |
+| 界面区间覆盖率 | 连续 5 次运行里，实际结果落在区间内 ≥4 次 |
+| 同 boot 第二次 | `bootClass=COLD_RERUN`，提示语出现 |
+| 6.18 设备 | 不出现「内存占用」格 |
+
+## 七、改不动的边界
+
+- 6.18 链**没有** slab 概念，不补指标 —— 硬凑只会再次变成假数字。
+- 不把 `CEILING` 抬到 100。
+- 引擎 `--auto240` 与 `run` 子命令的关系待真机 `BUDGET=` 行确认；当前只做「读它自报的预算」，解析不到才用档案默认值。

@@ -163,60 +163,260 @@ class RunLogTest {
         assertTrue(fail.detail.isNotBlank())
     }
 
+    // ------------------------------------------------------------ 成功率模型
+
+    private fun sample(
+        bootClass: BootClass,
+        attempts: Int,
+        hits: Int,
+        ms: Long = 6000L,
+    ) = RunSample(
+        ts = 0L,
+        boot = "a1b2c3d4",
+        bootClass = bootClass,
+        attempts = attempts,
+        hits = hits,
+        msPerAttempt = ms,
+        totalMs = ms * attempts,
+        ok = hits > 0,
+        failKind = "",
+        budgetMs = 300_000L,
+        procsRunning = 14,
+        load1 = 2.0,
+        tempMilliC = 41000,
+        battery = 70,
+    )
+
     @Test
-    fun successRateFactors() {
-        // 理想条件：slab 300、35℃、空载 → 只受上限约束
-        val ideal = SuccessRate.evaluate(300, 35000, 0.5, 8)
-        assertEquals(SuccessRate.CEILING, ideal.score, 0.001)
-        assertEquals(0, ideal.level)
+    fun estimateUsesBetaPosterior() {
+        // 无样本：退回先验均值 1/(1+20) ≈ 4.76%
+        val none = RunStats.estimate(emptyList(), BootClass.COLD_FIRST)
+        assertEquals(RunStats.priorMean(), none.pAttempt, 1e-9)
+        assertEquals(0, none.samples)
 
-        // slab 极差 + 过热 + 过载 → 分档到底
-        val bad = SuccessRate.evaluate(950, 70000, 20.0, 8)
-        assertTrue(bad.score < 5.0)
-        assertEquals(4, bad.level)
+        // 21 次全失败：后验 (1+0)/(1+20+21) = 1/42 ≈ 2.38%
+        val allFail = RunStats.estimate(listOf(sample(BootClass.COLD_FIRST, 21, 0)), BootClass.COLD_FIRST)
+        assertEquals(1.0 / 42.0, allFail.pAttempt, 1e-9)
+        assertEquals(21, allFail.samples)
 
-        // 三个物理量全读不到：valid=false，界面显示「等待采样」而不是一个假百分比
-        val none = SuccessRate.evaluate(-1, -1, -1.0, 8)
-        assertFalse(none.valid)
-        assertEquals("等待采样…", none.advice())
-
-        // 只要有一个读到了就算有效采样
-        assertTrue(SuccessRate.evaluate(300, -1, -1.0, 8).valid)
+        // 21 次全命中：后验 (1+21)/(1+20+21) = 22/42 ≈ 52.4%
+        val allHit = RunStats.estimate(listOf(sample(BootClass.COLD_FIRST, 21, 21)), BootClass.COLD_FIRST)
+        assertEquals(22.0 / 42.0, allHit.pAttempt, 1e-9)
     }
 
     @Test
-    fun successRateNeverReachesHundred() {
-        for (slab in intArrayOf(1, 100, 300, 340)) {
-            for (t in intArrayOf(20000, 30000, 38000)) {
-                val r = SuccessRate.evaluate(slab, t, 0.0, 8)
-                assertTrue(r.score <= SuccessRate.CEILING)
-            }
+    fun estimateBucketsAreIndependent() {
+        // 首次桶 100 次全失败，重跑桶 20 次全命中：两桶互不污染
+        val samples = listOf(
+            sample(BootClass.COLD_FIRST, 100, 0),
+            sample(BootClass.COLD_RERUN, 20, 20),
+        )
+        val first = RunStats.estimate(samples, BootClass.COLD_FIRST)
+        val rerun = RunStats.estimate(samples, BootClass.COLD_RERUN)
+        assertTrue(first.pAttempt < 0.05)
+        assertTrue(rerun.pAttempt > 0.5)
+    }
+
+    @Test
+    fun rerunPenaltyAppliesWithoutOwnSamples() {
+        // 重跑桶没有样本时，不退回先验，而是首次桶均值 × 0.25
+        val samples = listOf(sample(BootClass.COLD_FIRST, 40, 8))
+        val first = RunStats.estimate(samples, BootClass.COLD_FIRST)
+        val rerun = RunStats.estimate(samples, BootClass.COLD_RERUN)
+        assertEquals(first.pAttempt * RunStats.RERUN_PENALTY, rerun.pAttempt, 1e-9)
+        assertEquals(0, rerun.samples)
+    }
+
+    @Test
+    fun betaQuantileBracketsMean() {
+        // Beta(2,10) 的中位数应落在 5% 与 95% 分位之间，且分位单调
+        val lo = RunStats.betaQuantile(2.0, 10.0, 0.05)
+        val mid = RunStats.betaQuantile(2.0, 10.0, 0.5)
+        val hi = RunStats.betaQuantile(2.0, 10.0, 0.95)
+        assertTrue(lo < mid)
+        assertTrue(mid < hi)
+        // 均值 2/12 ≈ 0.1667，中位数应在其附近
+        assertTrue(mid > 0.05 && mid < 0.30)
+    }
+
+    @Test
+    fun probabilityNeverExceedsCeiling() {
+        // 单次 90% 命中、跑 20 次：1-0.1^20 ≈ 100%，但必须被 92 截断
+        assertEquals(SuccessRate.CEILING, SuccessRate.runProbability(0.9, 20), 1e-9)
+        // 单次 5%、跑 6 次：1-0.95^6 ≈ 26.5%
+        assertEquals(26.49, SuccessRate.runProbability(0.05, 6), 0.02)
+        // k=0 不产生概率
+        assertEquals(0.0, SuccessRate.runProbability(0.5, 0), 1e-9)
+    }
+
+    @Test
+    fun probabilityMonotonicInK() {
+        var prev = -1.0
+        for (k in 1..10) {
+            val p = SuccessRate.runProbability(0.03, k)
+            assertTrue("k=" + k + " 应严格递增", p > prev)
+            prev = p
         }
     }
 
     @Test
-    fun successRateMonotonic() {
-        // 同一温度与负载下，slab 越高分越低
-        val a = SuccessRate.evaluate(300, 40000, 1.0, 8).score
-        val b = SuccessRate.evaluate(500, 40000, 1.0, 8).score
-        val c = SuccessRate.evaluate(800, 40000, 1.0, 8).score
-        assertTrue(a > b)
-        assertTrue(b > c)
+    fun attemptsPlannedRespectsBudgetAndAbort() {
+        // 预算 300 秒、单次 6 秒 → 50 次，但被中止阈值 6 封顶
+        assertEquals(SuccessRate.ABORT_AFTER, SuccessRate.attemptsPlanned(300_000L, 6_000L))
+        // 预算 30 秒、单次 6 秒 → 5 次，低于中止阈值
+        assertEquals(5, SuccessRate.attemptsPlanned(30_000L, 6_000L))
+        // 预算再小也至少给 1 次
+        assertEquals(1, SuccessRate.attemptsPlanned(1_000L, 6_000L))
     }
 
     @Test
-    fun successRateAdvice() {
-        assertEquals("等待采样…", RateResult(false, -1, -1, -1.0, 0.5, 0.5, 0.5, 0.0, 15.0, 4).advice())
-        val good = SuccessRate.evaluate(300, 35000, 0.5, 8)
-        assertTrue(good.advice().contains("有把握"))
+    fun budgetForKernel() {
+        // 6.18 走 300 秒，6.12 走 180 秒：引擎按 --auto240 设计，旧实现写死 90 秒是错的
+        assertEquals(300_000L, SuccessRate.budgetFor("android17-6.18"))
+        assertEquals(180_000L, SuccessRate.budgetFor("android16-6.12"))
+        assertEquals(300_000L, SuccessRate.budgetFor(""))
     }
 
     @Test
-    fun panicRiskBounds() {
-        // slab 极差 72 分，叠加过热 +10 → 82，仍未触顶
-        assertEquals(82.0, SuccessRate.panicRisk(2000, 90000), 0.001)
-        // slab 极差 + 过热 60℃ 以上 + 再多也不越 95
-        assertTrue(SuccessRate.panicRisk(5000, 120000) <= 95.0)
-        assertTrue(SuccessRate.panicRisk(300, 30000) < SuccessRate.panicRisk(700, 30000))
+    fun envFactorPenalizesBothExtremes() {
+        // 太静是扣分项：实测 8 候选第 10 次命中，1 候选 212 次零命中
+        assertEquals(0.75, SuccessRate.envFactor(4, 41000), 1e-9)
+        // 合适区间是满分
+        assertEquals(1.0, SuccessRate.envFactor(14, 41000), 1e-9)
+        // 过热扣分
+        assertEquals(0.80, SuccessRate.envFactor(14, 60000), 1e-9)
+        // 乘积被锁在 [0.70, 1.10]
+        assertTrue(SuccessRate.envFactor(4, 60000) >= SuccessRate.ENV_MIN)
+        assertTrue(SuccessRate.envFactor(14, 41000) <= SuccessRate.ENV_MAX)
+        // 读不到不惩罚
+        assertEquals(1.0, SuccessRate.envFactor(-1, -1), 1e-9)
+    }
+
+    @Test
+    fun classifyBoot() {
+        assertEquals(BootClass.DIRTY, RunStats.classifyBoot("b1", "", "b1", false))
+        assertEquals(BootClass.COLD_RERUN, RunStats.classifyBoot("b1", "", "", true))
+        assertEquals(BootClass.COLD_RERUN, RunStats.classifyBoot("b1", "b1", "", false))
+        assertEquals(BootClass.COLD_FIRST, RunStats.classifyBoot("b1", "b0", "", false))
+        // 脏 boot 的优先级高于重跑
+        assertEquals(BootClass.DIRTY, RunStats.classifyBoot("b1", "b1", "b1", true))
+    }
+
+    @Test
+    fun samplesBelowFiveAreNotDisplayable() {
+        val env = Env(300, 41000, 2.0, 14, 70, 8)
+        val four = listOf(sample(BootClass.COLD_FIRST, 4, 1))
+        val r4 = SuccessRate.evaluate(env, BootClass.COLD_FIRST, four, 300_000L, true)
+        assertFalse(r4.displayable)
+        assertEquals("样本不足（n=4）", r4.rangeText)
+
+        val five = listOf(sample(BootClass.COLD_FIRST, 5, 1))
+        val r5 = SuccessRate.evaluate(env, BootClass.COLD_FIRST, five, 300_000L, true)
+        assertTrue(r5.displayable)
+        assertTrue(r5.rangeText.contains("~"))
+    }
+
+    @Test
+    fun blockersSuppressEverything() {
+        val env = Env(300, 41000, 2.0, 14, 10, 8) // 电量 10%
+        val samples = listOf(sample(BootClass.COLD_FIRST, 20, 2))
+        val r = SuccessRate.evaluate(env, BootClass.COLD_FIRST, samples, 300_000L, true)
+        assertFalse(r.valid)
+        assertFalse(r.displayable)
+        assertTrue(r.blockers.isNotEmpty())
+        assertTrue(r.blockers.first().contains("电量"))
+
+        // 脏 boot 也是硬闸
+        val dirty = SuccessRate.evaluate(env.copy(battery = 80), BootClass.DIRTY, samples, 300_000L, true)
+        assertFalse(dirty.valid)
+        assertTrue(dirty.blockers.first().contains("重启"))
+    }
+
+    @Test
+    fun telemetryParseUafLine() {
+        var acc = EngineTelemetry()
+        acc = EngineTelemetryParser.parse("UAF mode=tile ms=558 rc=0", acc)
+        assertEquals(1, acc.attempts)
+        assertEquals(1, acc.hits)
+        assertEquals(558L, acc.avgMs)
+        assertEquals(558L, acc.lastMs)
+        assertTrue(acc.valid)
+
+        acc = EngineTelemetryParser.parse("UAF mode=tile ms=538 rc=-1", acc)
+        assertEquals(2, acc.attempts)
+        assertEquals(1, acc.hits)
+        assertEquals((558L + 538L) / 2, acc.avgMs)
+    }
+
+    @Test
+    fun telemetryParseFailAndBudget() {
+        var acc = EngineTelemetry()
+        acc = EngineTelemetryParser.parse("FAIL=cred REASON=no-slide T=1234ms", acc)
+        assertEquals("cred", acc.failKind)
+        assertEquals(0, acc.attempts)
+
+        acc = EngineTelemetryParser.parse("SLIDE=auto BUDGET=240s", acc)
+        assertEquals(240_000L, acc.budgetMs)
+
+        acc = EngineTelemetryParser.parse("SLIDE=0x7f00 BUDGET=180s", acc)
+        assertEquals(180_000L, acc.budgetMs)
+    }
+
+    @Test
+    fun telemetryLeakTaskOverridesCount() {
+        // 引擎自报的 attempt 序号比逐行数 rc 更权威
+        var acc = EngineTelemetry()
+        acc = EngineTelemetryParser.parse("LEAK_TASK ptr=ffff8880 attempt=5 child=1", acc)
+        assertEquals(5, acc.attempts)
+
+        // 后续 UAF 行不该把序号退回去
+        acc = EngineTelemetryParser.parse("UAF mode=tile ms=600 rc=0", acc)
+        assertEquals(6, acc.attempts)
+        assertEquals(1, acc.hits)
+    }
+
+    @Test
+    fun telemetryIgnoresNoise() {
+        val noise = listOf(
+            "[1/4] run plant (in-process preflight + auto slide)",
+            "MODULE_LOADED",
+            "SU_ID_RC=0",
+            "DONE",
+            "",
+        )
+        val acc = EngineTelemetryParser.parseAll(noise)
+        assertEquals(0, acc.attempts)
+        assertEquals(0, acc.hits)
+        assertEquals(0L, acc.budgetMs)
+        assertFalse(acc.valid)
+    }
+
+    @Test
+    fun sampleRoundTripThroughTsv() {
+        // TSV 落盘必须无损往返：字段顺序错一位，统计就会静默错
+        val dir = java.nio.file.Files.createTempDirectory("runstats").toFile()
+        val f = java.io.File(dir, "run-stats.tsv")
+        val s = sample(BootClass.COLD_RERUN, 7, 2, 6200L)
+        RunStats.append(f, s)
+        val back = RunStats.read(f)
+        assertEquals(1, back.size)
+        assertEquals(s.attempts, back[0].attempts)
+        assertEquals(s.hits, back[0].hits)
+        assertEquals(s.msPerAttempt, back[0].msPerAttempt)
+        assertEquals(BootClass.COLD_RERUN, back[0].bootClass)
+        assertEquals(s.battery, back[0].battery)
+        assertEquals(s.load1, back[0].load1, 1e-9)
+        dir.deleteRecursively()
+    }
+
+    @Test
+    fun medianMsPerAttempt() {
+        assertEquals(RunStats.DEFAULT_MS_PER_ATTEMPT, RunStats.medianMsPerAttempt(emptyList()))
+        val v = listOf(
+            sample(BootClass.COLD_FIRST, 1, 0, 5000L),
+            sample(BootClass.COLD_FIRST, 1, 0, 6000L),
+            sample(BootClass.COLD_FIRST, 1, 0, 7000L),
+        )
+        assertEquals(6000L, RunStats.medianMsPerAttempt(v))
     }
 }

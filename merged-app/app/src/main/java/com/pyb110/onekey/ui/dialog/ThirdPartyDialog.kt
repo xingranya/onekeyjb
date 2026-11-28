@@ -59,8 +59,9 @@ internal fun ThirdPartyDialog(show: Boolean = true, onDismiss: () -> Unit) {
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "首页显示的百分比由本应用按内存占用、CPU 温度、系统负载实时估算，上限 92%，" +
-                    "不构成对结果的保证；历史成功率只统计真正跑完的记录，强退与重启中断不计入。",
+                "首页显示的百分比来自本机实测：每次运行真实跑了几次尝试、命中几次、单次耗时，全部落盘，" +
+                    "再按 Beta 后验折算成「这次能成功」的概率，上限 92%，不构成对结果的保证。" +
+                    "样本不足 5 次尝试时不显示数字；同一开机内重复运行会单独统计，因为内核状态已被上一次改变。",
                 style = COUITheme.textStyles.body2,
                 fontSize = 11.sp,
                 color = oneKeyColors().muted

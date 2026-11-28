@@ -185,9 +185,11 @@ internal fun RateBlock(controller: JailbreakController) {
     val c = oneKeyColors()
     val r = controller.successRate
     val stats = controller.historyStats
-    val tone = when (r.level) {
-        0, 1 -> c.devicePositive
-        2 -> c.warning
+    val tone = when {
+        !r.valid -> c.warning
+        !r.displayable -> c.deviceMuted
+        r.level <= 1 -> c.devicePositive
+        r.level == 2 -> c.warning
         else -> c.error
     }
     Column(
@@ -197,24 +199,51 @@ internal fun RateBlock(controller: JailbreakController) {
             .background(c.deviceStatusBg.copy(alpha = 0.5f))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
+        // 硬闸未过：不显示任何百分比，只显示原因。给数字等于给假信息。
+        if (!r.valid) {
+            Text(
+                "当前不建议运行",
+                style = COUITheme.textStyles.body2,
+                fontSize = 13.sp,
+                color = c.warning
+            )
+            Spacer(Modifier.height(4.dp))
+            r.blockers.forEach { b ->
+                Text(
+                    "· " + b,
+                    style = COUITheme.textStyles.body2,
+                    fontSize = 11.sp,
+                    color = c.deviceMuted
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth()) {
+                RateCell("CPU 温度", r.tempText, r.tempState, Modifier.weight(1f))
+                RateCell("线程运行", r.busyText, r.busyState, Modifier.weight(1f))
+                RateCell("电量", r.batteryText, r.batteryState, Modifier.weight(1f))
+            }
+            return@Column
+        }
         Row(verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        if (r.valid) String.format(java.util.Locale.US, "%.0f", r.score) else "--",
+                        if (r.displayable) String.format(java.util.Locale.US, "%.0f", r.probability) else "--",
                         style = COUITheme.textStyles.headline1,
                         fontFamily = FontFamily.Monospace,
                         color = tone
                     )
-                    Text(
-                        "%",
-                        style = COUITheme.textStyles.body2,
-                        color = tone,
-                        modifier = Modifier.padding(start = 1.dp, bottom = 4.dp)
-                    )
+                    if (r.displayable) {
+                        Text(
+                            "%",
+                            style = COUITheme.textStyles.body2,
+                            color = tone,
+                            modifier = Modifier.padding(start = 1.dp, bottom = 4.dp)
+                        )
+                    }
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "本次成功率",
+                        if (r.displayable) r.rangeText else "本次成功率",
                         style = COUITheme.textStyles.body2,
                         fontSize = 11.sp,
                         color = c.deviceMuted,
@@ -245,11 +274,22 @@ internal fun RateBlock(controller: JailbreakController) {
                 }
             }
         }
+        Spacer(Modifier.height(6.dp))
+        // 依据行：用户看到的不是玄学数字，而是"凭什么这么算"。
+        Text(
+            r.bootText + " · 预计 " + r.attemptsPlanned + " 次尝试 · 单次约 " +
+                String.format(java.util.Locale.US, "%.1f", r.msPerAttempt / 1000.0) + " 秒",
+            style = COUITheme.textStyles.body2,
+            fontSize = 10.sp,
+            color = c.deviceMuted
+        )
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth()) {
-            RateCell("内存占用", r.slabText, r.slabState, Modifier.weight(1f))
+            // 内存占用（slab）只对 6.12 链有意义：6.18 引擎根本不读 slabinfo。
+            if (r.slabRelevant) RateCell("内存占用", r.slabText, r.slabState, Modifier.weight(1f))
             RateCell("CPU 温度", r.tempText, r.tempState, Modifier.weight(1f))
-            RateCell("系统负载", r.loadText, r.loadState, Modifier.weight(1f))
+            RateCell("线程运行", r.busyText, r.busyState, Modifier.weight(1f))
+            RateCell("电量", r.batteryText, r.batteryState, Modifier.weight(1f))
         }
     }
 }

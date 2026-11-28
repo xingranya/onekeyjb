@@ -5,7 +5,7 @@ BASE = "https://api.cnb.cool/xingranya/onekeyjb/-/releases/2115388998399250432"
 TOK = os.environ["CNB_TOKEN"]
 R = "/Users/xingranya/Downloads/onekeyjb-private"
 
-VC, VN = 222, "2.23.1"
+VC, VN = 223, "2.24.0"
 size = os.path.getsize(APK)
 sha = hashlib.sha256(open(APK, "rb").read()).hexdigest()
 print("size", size, "sha", sha)
@@ -31,7 +31,7 @@ doc["changelog"] = "v" + VN + "\n\n" + "\n".join("- " + n for n in notes)
 vs = [v for v in doc.get("versions", []) if v.get("versionCode") != VC]
 vs.insert(0, {"versionName": VN, "versionCode": VC, "publishedAt": doc["publishedAt"], "size": size, "notes": notes})
 doc["versions"] = vs
-open("/tmp/upd-2310.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
+open("/tmp/upd-2240.json", "w", encoding="utf-8").write(json.dumps(doc, ensure_ascii=False, indent=2))
 print("prepared", doc["versionCode"], doc["versionName"], "versions", len(vs))
 
 def api(url, data=None, method="POST"):
@@ -54,7 +54,7 @@ def upload(name, path):
     print("upload", name, "put", put, "verify", st2, flush=True)
 
 upload("OneKeyJB-latest.apk", APK)
-upload("update.json", "/tmp/upd-2310.json")
+upload("update.json", "/tmp/upd-2240.json")
 upload("OneKey-Knowledge.md", R + "/dist/OneKey-Knowledge.md")
 upload("onekey-kb.json", R + "/knowledge/ai-kb/onekey-kb.json")
 upload("onekey-kb.docs.json", R + "/knowledge/ai-kb/onekey-kb.docs.json")

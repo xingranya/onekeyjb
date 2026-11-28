@@ -65,6 +65,16 @@ object OneKeyEngine {
         context.assets.open(asset).close(); true
     } catch (e: Throwable) { false }
 
+    /**
+     * 跑一次完整链路。
+     *
+     * [budgetMs] 是给引擎的总预算：引擎自身按 240 秒设计，实测命中间隔 3~5 分钟，
+     * 过去写死 90 秒等于只给它 37% 的时间就判死。默认值仍保留 90 秒，
+     * 让老调用点行为不变；正式调用必须显式传入。
+     *
+     * [onTelemetry] 每解析到一行引擎输出就回调一次累计遥测，
+     * 用于把真实 attempt / hit 数落进成功率统计。
+     */
     fun run(
         context: Context,
         profile: DeviceProfile,
@@ -77,6 +87,8 @@ object OneKeyEngine {
         unloadGuard: Boolean,
         disableAntiRoot: Boolean,
         useUniversalModule: Boolean,
+        budgetMs: Long = 90_000L,
+        onTelemetry: (EngineTelemetry) -> Unit = {},
     ): Boolean {
         val ws = ROOT + "-" + System.currentTimeMillis()
         if (!ShizukuShell.run("mkdir -p " + ws + " && chmod 700 " + ws + " && echo OK", 20).output.contains("OK")) {
@@ -120,6 +132,7 @@ object OneKeyEngine {
         var abortReason: String? = null
         var sawPermissive = false
         var failedStageSignals = 0
+        var telemetry = EngineTelemetry()
         try {
             val proc = ShizukuShell.start(cmd) { raw ->
                 var line = raw.trim()
@@ -129,14 +142,24 @@ object OneKeyEngine {
                     .replace("k61821", "98260-engine")
                     .replace("t61269", "98260-engine").replace("k61269", "98260-engine")
                 if (line.contains("SELINUX=permissive")) sawPermissive = true
+                // 结构化遥测必须先于中止判定：中止时要用真实 attempt / 命中数写日志，
+                // 而不是"连续 N 次未成功"这种没有出处的说法。
+                telemetry = EngineTelemetryParser.parse(line, telemetry)
+                onTelemetry(telemetry)
                 // 竞态没落地时引擎会继续盲写并反复重试，这是内核被拖挂的直接原因：立即中止。
                 // 一次尝试会同时打出 HIT=0 与 rc=-1，只按 rc 行计一次失败，避免把单次失败当成两次。
+                // 阈值从 4 抬到 6：4 次把理论上限压到 11.5%，且样本太少无法标定成功率。
                 if (abortReason == null && line.contains("rc=-1")) {
                     failedStageSignals += 1
-                    if (failedStageSignals >= 4) {
-                        abortReason = "连续 " + failedStageSignals + " 次尝试未成功"
+                    if (failedStageSignals >= SuccessRate.ABORT_AFTER) {
+                        abortReason = "连续 " + failedStageSignals + " 次尝试未命中"
                         RunReport.stop("布置提权原语", abortReason!!)
-                        log("已连续失败 " + failedStageSignals + " 次，中止以避免内核进入不稳定状态")
+                        log(
+                            "已连续尝试 " + failedStageSignals + " 次未命中（引擎累计 " +
+                                telemetry.attempts + " 次、命中 " + telemetry.hits +
+                                " 次，单次约 " + (if (telemetry.avgMs > 0) telemetry.avgMs else 0L) +
+                                "ms），中止以避免内核进入不稳定状态"
+                        )
                     } else {
                         log("第 " + failedStageSignals + " 次尝试未命中，继续重试")
                     }
@@ -169,8 +192,8 @@ object OneKeyEngine {
                     else -> if (line.length in 3..300) log(line)
                 }
             }
-            // 首次失败就停：引擎自身的 attempt 重试会把内核越打越乱。
-            val deadline = System.currentTimeMillis() + 90_000
+            // 预算按内核给：引擎自身按 --auto240 设计，90 秒会把正常链路提前砍断。
+            val deadline = System.currentTimeMillis() + budgetMs
             while (proc.isRunning() && abortReason == null && System.currentTimeMillis() < deadline) Thread.sleep(200)
             if (proc.isRunning()) {
                 runCatching { proc.destroy() }.onFailure {
@@ -178,7 +201,13 @@ object OneKeyEngine {
                     log("执行器进程销毁失败，已标记引擎不可用：" + (it.message ?: it.javaClass.simpleName))
                 }
                 killRunner(log, useRoot = false)
-                if (abortReason == null) { abortReason = "执行超时（90 秒）"; log("引擎超时，已终止") }
+                if (abortReason == null) {
+                    abortReason = "执行超时（" + (budgetMs / 1000L) + " 秒）"
+                    log(
+                        "引擎超时，已终止（累计 " + telemetry.attempts + " 次尝试、" +
+                            telemetry.hits + " 次命中）"
+                    )
+                }
             }
             // root 校验必须早于清理：holder 持有 root cred，先确认 root 可用，finally 才能以 root 身份杀掉它。
             if (ok) {
